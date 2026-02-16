@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/loveable.svg" />
+    <title>Loveable - Find Your Perfect Match</title>
+    <meta name="description" content="Join Loveable to find your soulmate, play games, and earn rewards!" />
+    <meta name="author" content="Loveable" />
+
+    <meta property="og:title" content="Loveable - Find Your Match" />
+    <meta property="og:description" content="Join Loveable to find your soulmate, play games, and earn rewards!" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <script>
+      (function () {
+        try {
+          var mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+          var storedTheme = null;
+          try {
+            storedTheme = localStorage.getItem("theme");
+          } catch (e) {}
+          function applyTheme(theme) {
+            if (theme === "dark") {
+              document.documentElement.classList.add("dark");
+            } else if (theme === "light") {
+              document.documentElement.classList.remove("dark");
+            } else if (mq && mq.matches) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+            }
+          }
+          applyTheme(storedTheme || "system");
+          if (!mq) return;
+          mq.addEventListener("change", function () {
+            var current = null;
+            try {
+              current = localStorage.getItem("theme");
+            } catch (e) {}
+            if (current && current !== "system") {
+              return;
+            }
+            applyTheme("system");
+          });
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

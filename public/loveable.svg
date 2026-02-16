@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="love_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#ec4899" />
+<stop offset="100%" stop-color="#a855f7" />
+</linearGradient>
+</defs>
+<path d="M256 448l-30-27C118 323 48 259 48 181 48 117 98 67 162 67c36 0 70 17 94 44 24-27 58-44 94-44 64 0 114 50 114 114 0 78-70 142-178 240l-30 27z" fill="url(#love_gradient)" stroke="white" stroke-width="20"/>
+</svg>

@@ -1,0 +1,11 @@
+node_modules
+.expo
+.expo-shared
+.expo-cache
+.user-profile
+backend/.venv
+backend/__pycache__
+.git
+dist
+build
+android
