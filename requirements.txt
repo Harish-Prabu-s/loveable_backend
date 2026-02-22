@@ -10,6 +10,8 @@ cffi==2.0.0
 chardet==5.2.0
 charset-normalizer==3.4.4
 cryptography==46.0.4
+daphne==3.0.2
+dj-config-url==0.1.1
 Django==5.0.2
 django-cors-headers==4.4.0
 djangorestframework==3.14.0
@@ -56,3 +58,7 @@ uritemplate==4.2.0
 urllib3==2.6.3
 yarl==1.22.0
 whitenoise==6.11.0
+dj-database-url==2.3.0
+psycopg2-binary==2.9.9
+yarl==1.22.0
+zope.interface==8.2
