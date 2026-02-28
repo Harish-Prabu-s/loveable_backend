@@ -64,9 +64,16 @@ def get_auth_response_data(user, request=None):
     """
     Generates a consistent authentication response structure.
     """
-    data = create_tokens(user)
-    data.update(get_user_profile_data(user, request))
-    return data
+    tokens = create_tokens(user)
+    profile_data = get_user_profile_data(user, request)
+    is_new = profile_data.pop('is_new_user', False)
+    
+    return {
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens['refresh_token'],
+        'user': profile_data,
+        'is_new_user': is_new
+    }
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

@@ -122,11 +122,18 @@ def verify_otp(request):
         otp = OTP.objects.filter(phone_number=phone, code=otp_code, is_used=False, expires_at__gt=timezone.now()).first()
         if not otp:
             return Response({'error': 'Invalid OTP'}, status=400)
+        existing_profile = Profile.objects.filter(phone_number=phone).first()
+        is_new_user = existing_profile is None
         user = get_or_create_profile(phone)
         otp.is_used = True
         otp.save()
         tokens = create_tokens(user)
-        profile = user.profile
+        profile, _ = Profile.objects.get_or_create(
+            user=user,
+            defaults={
+                'phone_number': phone,
+            },
+        )
         profile.is_verified = True
         profile.last_login = timezone.now()
         profile.save()
@@ -152,7 +159,7 @@ def verify_otp(request):
                 'last_login': profile.last_login.isoformat() if profile.last_login else None,
                 'photo': photo_url
             },
-            'is_new_user': True,
+            'is_new_user': is_new_user,
         })
     except Exception as e:
         import traceback
