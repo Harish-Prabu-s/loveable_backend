@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Room, Message } from '@/types';
+import type { Room, Message } from '../types';
 
 export const chatApi = {
   createRoom: async (receiver_id: number, call_type: 'audio' | 'video' = 'audio'): Promise<Room> => {

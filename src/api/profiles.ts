@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Profile } from '@/types';
+import type { Profile } from '../types';
 
 export const profilesApi = {
   getProfile: async (): Promise<Profile> => {

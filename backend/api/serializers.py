@@ -4,8 +4,9 @@ from django.conf import settings
 from .models import (
     Profile, Wallet, CoinTransaction, Payment, Withdrawal,
     Game, LevelProgress, Offer, LeagueTier, CallSession,
-    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow
+    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel
 )
+from .utils import get_absolute_media_url
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,22 +37,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_photo(self, obj):
         request = self.context.get('request')
-        # Handle legacy cases where ImageField name mistakenly stores a full URL
-        if obj.photo and hasattr(obj.photo, 'name') and obj.photo.name:
-            name = obj.photo.name  # type: ignore[attr-defined]
-            if isinstance(name, str) and name.startswith('http'):
-                try:
-                    idx = name.find('/media/')
-                    media_path = name[idx + len('/media/'):] if idx != -1 else name
-                    url_path = settings.MEDIA_URL + media_path
-                    return request.build_absolute_uri(url_path) if request else url_path
-                except Exception:
-                    return None
-            try:
-                return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
-            except Exception:
-                return None
-        return None
+        return get_absolute_media_url(obj.photo, request)
 
     def get_is_following(self, obj):
         request = self.context.get('request')
@@ -164,28 +150,30 @@ class StorySerializer(serializers.ModelSerializer):
     user_display_name = serializers.CharField(source='user.profile.display_name', read_only=True)
     user_avatar = serializers.SerializerMethodField()
     view_count = serializers.IntegerField(source='views.count', read_only=True)
+    media_url = serializers.SerializerMethodField()
+    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
+    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Story
-        fields = ['id', 'user', 'image_url', 'timestamp', 'user_display_name', 'user_avatar', 'view_count']
+        fields = ['id', 'user', 'media_url', 'media_type', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked']
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_media_url(self, obj):
+        request = self.context.get('request')
+        return get_absolute_media_url(obj.media_url, request)
 
     def get_user_avatar(self, obj):
-        profile = obj.user.profile
         request = self.context.get('request')
-        if profile.photo and hasattr(profile.photo, 'name') and profile.photo.name:
-            name = profile.photo.name  # type: ignore[attr-defined]
-            if isinstance(name, str) and name.startswith('http'):
-                try:
-                    idx = name.find('/media/')
-                    media_path = name[idx + len('/media/'):] if idx != -1 else name
-                    url_path = settings.MEDIA_URL + media_path
-                    return request.build_absolute_uri(url_path) if request else url_path
-                except Exception:
-                    return None
-            try:
-                return request.build_absolute_uri(profile.photo.url) if request else profile.photo.url
-            except Exception:
-                return None
+        profile = getattr(obj.user, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
         return None
 
 class StoryViewSerializer(serializers.ModelSerializer):
@@ -197,22 +185,39 @@ class StoryViewSerializer(serializers.ModelSerializer):
         fields = ['id', 'viewer', 'viewer_name', 'viewer_avatar', 'viewed_at']
 
     def get_viewer_avatar(self, obj):
-        profile = obj.viewer.profile
         request = self.context.get('request')
-        if profile.photo and hasattr(profile.photo, 'name') and profile.photo.name:
-            name = profile.photo.name  # type: ignore[attr-defined]
-            if isinstance(name, str) and name.startswith('http'):
-                try:
-                    idx = name.find('/media/')
-                    media_path = name[idx + len('/media/'):] if idx != -1 else name
-                    url_path = settings.MEDIA_URL + media_path
-                    return request.build_absolute_uri(url_path) if request else url_path
-                except Exception:
-                    return None
-            try:
-                return request.build_absolute_uri(profile.photo.url) if request else profile.photo.url
-            except Exception:
-                return None
+        profile = getattr(obj.viewer, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
+        return None
+
+class ReelSerializer(serializers.ModelSerializer):
+    user_display_name = serializers.CharField(source='user.profile.display_name', read_only=True)
+    user_avatar = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
+    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    is_liked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reel
+        fields = ['id', 'user', 'video_url', 'caption', 'created_at', 'user_display_name', 'user_avatar', 'likes_count', 'comments_count', 'is_liked']
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_video_url(self, obj):
+        request = self.context.get('request')
+        return get_absolute_media_url(obj.video_url, request)
+
+    def get_user_avatar(self, obj):
+        request = self.context.get('request')
+        profile = getattr(obj.user, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
         return None
 
 class GiftSerializer(serializers.ModelSerializer):

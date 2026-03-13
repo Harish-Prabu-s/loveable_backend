@@ -24,6 +24,22 @@ type SignalingMessage =
       roomId: number;
     };
 
+function getSignalingUrl(): string {
+  if (typeof process !== "undefined" && process.env?.VITE_SIGNALING_WS_URL) {
+    return String(process.env.VITE_SIGNALING_WS_URL).replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    let host = window.location.hostname || "localhost";
+    if (host === "localhost" || host === "127.0.0.1") {
+      const apiUrl = (typeof process !== "undefined" && process.env?.VITE_API_URL) ? process.env.VITE_API_URL : "";
+      const m = apiUrl.match(/^https?:\/\/([^/:]+)/);
+      if (m) host = m[1];
+    }
+    return `ws://${host}:9000`;
+  }
+  return "ws://localhost:9000";
+}
+
 interface UseWebRTCOptions {
   roomId?: number;
   enabled: boolean;
@@ -34,6 +50,8 @@ interface UseWebRTCOptions {
 interface UseWebRTCResult {
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  isConnected: boolean;
+  sendCallEnd: () => void;
 }
 
 export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
@@ -41,8 +59,24 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const isCaller = options.isCaller ?? true;
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const roomIdRef = useRef<number | undefined>(roomId);
+
+  roomIdRef.current = roomId;
+
+  const sendCallEnd = () => {
+    const ws = wsRef.current;
+    const rid = roomIdRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN && rid) {
+      try {
+        ws.send(JSON.stringify({ type: "call-end", roomId: rid }));
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   useEffect(() => {
     if (!enabled || !roomId) {
@@ -51,19 +85,16 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     if (typeof window === "undefined") {
       return;
     }
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      toast.error("Your browser does not support camera/microphone access.");
+    const mediaDevices =
+      (navigator as any).mediaDevices ??
+      ((window as any).ReactNativeWebView && (window as any).webkit?.mediaDevices);
+    if (!mediaDevices?.getUserMedia) {
+      toast.error("Camera/microphone access is not supported.");
       return;
     }
 
     let isCancelled = false;
-
-    const signalingBase =
-      typeof process !== "undefined" &&
-      (process as any).env &&
-      (process as any).env.VITE_SIGNALING_URL
-        ? String((process as any).env.VITE_SIGNALING_URL)
-        : `ws://${window.location.hostname}:9000`;
+    const signalingBase = getSignalingUrl();
 
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -73,11 +104,15 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     pcRef.current = pc;
 
     pc.ontrack = (event) => {
-      if (!event.streams || event.streams.length === 0) {
-        return;
-      }
-      if (!isCancelled) {
-        setRemoteStream(event.streams[0]);
+      if (!event.streams || event.streams.length === 0) return;
+      if (!isCancelled) setRemoteStream(event.streams[0]);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (!isCancelled && pc.iceConnectionState === "connected") {
+        setIsConnected(true);
+      } else if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+        if (!isCancelled) setIsConnected(false);
       }
     };
 
@@ -119,6 +154,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
                 await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
               }
             } else if (data.type === "call-end") {
+              if (!isCancelled) setRemoteStream(null);
               if (pcRef.current) {
                 pcRef.current.close();
                 pcRef.current = null;
@@ -151,7 +187,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
               }
             : false;
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await mediaDevices.getUserMedia({
           audio: audioConstraints,
           video: videoConstraints,
         });
@@ -219,28 +255,40 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     return () => {
       isCancelled = true;
-      if (pcRef.current) {
-        pcRef.current.getSenders().forEach((s) => {
-          try {
-            s.track?.stop();
-          } catch {
-          }
-        });
-        pcRef.current.close();
-        pcRef.current = null;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomId) {
+        try {
+          wsRef.current.send(JSON.stringify({ type: "call-end", roomId }));
+        } catch {
+          /* ignore */
+        }
       }
       if (wsRef.current) {
         try {
           wsRef.current.close();
         } catch {
+          /* ignore */
         }
         wsRef.current = null;
       }
-      if (localStream) {
-        localStream.getTracks().forEach((t) => t.stop());
+      if (pcRef.current) {
+        pcRef.current.getSenders().forEach((s) => {
+          try {
+            s.track?.stop();
+          } catch {
+            /* ignore */
+          }
+        });
+        pcRef.current.close();
+        pcRef.current = null;
       }
+      setLocalStream((prev) => {
+        prev?.getTracks().forEach((t) => t.stop());
+        return null;
+      });
+      setRemoteStream(null);
+      setIsConnected(false);
     };
   }, [enabled, roomId, kind, isCaller]);
 
-  return { localStream, remoteStream };
+  return { localStream, remoteStream, isConnected, sendCallEnd };
 }

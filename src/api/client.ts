@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
-import { storage } from '@/lib/storage';
+import { storage } from '../lib/storage';
 
 const LAN_HOST = '10.153.68.184';
 

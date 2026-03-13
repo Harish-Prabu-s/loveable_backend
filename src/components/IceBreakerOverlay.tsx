@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { X, Shuffle, SkipForward } from 'lucide-react';
-import { gamesApi } from '@/api/games';
-import type { IcebreakerResponse } from '@/api/games';
-import { useAuthStore } from '@/store/authStore';
+import { gamesApi } from '../api/games';
+import type { IcebreakerResponse } from '../api/games';
+import { useAuthStore } from '../store/authStore';
 
 type Props = {
   onClose: () => void;

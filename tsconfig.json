@@ -1,18 +1,14 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
   "compilerOptions": {
     "baseUrl": ".",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "paths": {
       "@/*": [
-        "./src/*"
+        "./*"
       ]
     },
     "noImplicitAny": false,
@@ -22,5 +18,20 @@
     "noUnusedLocals": false,
     "strictNullChecks": false
   },
-  "extends": "expo/tsconfig.base"
+  "include": [
+    "api",
+    "app",
+    "lib",
+    "components",
+    "hooks",
+    "constants",
+    "context",
+    "store",
+    "types",
+    "utils",
+    "pages",
+    "App.js",
+    "App.tsx"
+  ],
+  "extends": "expo/tsconfig.base.json"
 }

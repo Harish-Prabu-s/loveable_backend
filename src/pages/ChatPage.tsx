@@ -6,21 +6,21 @@ import {
   Smile, Reply, Play, Pause, Trash2, Fingerprint
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCall } from '@/context/CallContext';
-import { useAuthStore } from '@/store/authStore';
-import { useWalletStore } from '@/store/walletStore';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { chatApi } from '@/api/chat';
-import type { Message as ApiMessage, Room } from '@/types';
-import { profilesApi } from '@/api/profiles';
-import IceBreakerOverlay from '@/components/IceBreakerOverlay';
-import { GAMES, Game } from '@/constants/games';
-import TicTacToe from '@/components/games/TicTacToe';
-import CandyMatch from '@/components/games/CandyMatch';
-import FruitSlash from '@/components/games/FruitSlash';
-import CarromBoard from '@/components/games/CarromBoard';
-import LudoBoard from '@/components/games/LudoBoard';
-import { EMOJI_CATEGORIES, GIF_CATEGORIES } from '@/constants/chatData';
+import { useCall } from '../context/CallContext';
+import { useAuthStore } from '../store/authStore';
+import { useWalletStore } from '../store/walletStore';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { chatApi } from '../api/chat';
+import type { Message as ApiMessage, Room } from '../types';
+import { profilesApi } from '../api/profiles';
+import IceBreakerOverlay from '../components/IceBreakerOverlay';
+import { GAMES, Game } from '../constants/games';
+import TicTacToe from '../components/games/TicTacToe';
+import CandyMatch from '../components/games/CandyMatch';
+import FruitSlash from '../components/games/FruitSlash';
+import CarromBoard from '../components/games/CarromBoard';
+import LudoBoard from '../components/games/LudoBoard';
+import { EMOJI_CATEGORIES, GIF_CATEGORIES } from '../constants/chatData';
 
 type UiMessage = {
   id: string;

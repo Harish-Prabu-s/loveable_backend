@@ -22,15 +22,15 @@ def create_tokens(user: User):
     refresh = RefreshToken.for_user(user)
     return {'access_token': str(refresh.access_token), 'refresh_token': str(refresh)}
 
-def get_or_create_profile(phone: str) -> User:
+def get_or_create_profile(phone: str) -> tuple[User, bool]:
     profile = Profile.objects.filter(phone_number=phone).first()
     if profile:
-        return profile.user
+        return profile.user, False
     username = f"user_{phone}"
     user = User.objects.create_user(username=username, password=None)
     Profile.objects.create(user=user, phone_number=phone, is_verified=False)
     Wallet.objects.create(user=user)
-    return user
+    return user, True
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -122,9 +122,11 @@ def verify_otp(request):
         otp = OTP.objects.filter(phone_number=phone, code=otp_code, is_used=False, expires_at__gt=timezone.now()).first()
         if not otp:
             return Response({'error': 'Invalid OTP'}, status=400)
-        user = get_or_create_profile(phone)
+        
+        user, created = get_or_create_profile(phone)
         otp.is_used = True
         otp.save()
+        
         tokens = create_tokens(user)
         profile = user.profile
         profile.is_verified = True
@@ -139,12 +141,19 @@ def verify_otp(request):
             except Exception:
                 pass
 
+        # If it's an existing user but they haven't set their name, consider them "new" for onboarding
+        is_new = created or not profile.display_name or profile.display_name == 'User'
+
         return Response({
+            'success': True,
             'access_token': tokens['access_token'],
             'refresh_token': tokens['refresh_token'],
+            'token': tokens['access_token'], # Essential for frontend fallback
+            'temp_token': tokens['access_token'] if is_new else None, # For onboarding flow
             'user': {
                 'id': user.id,
                 'phone_number': profile.phone_number,
+                'display_name': profile.display_name,
                 'gender': profile.gender,
                 'is_verified': profile.is_verified,
                 'is_online': profile.is_online,
@@ -152,7 +161,7 @@ def verify_otp(request):
                 'last_login': profile.last_login.isoformat() if profile.last_login else None,
                 'photo': photo_url
             },
-            'is_new_user': True,
+            'is_new_user': is_new,
         })
     except Exception as e:
         import traceback

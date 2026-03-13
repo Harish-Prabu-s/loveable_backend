@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import Layout from '@/components/Layout';
-import apiClient from '@/api/client';
-import { useAuthStore } from '@/store/authStore';
+import Layout from '../components/Layout';
+import apiClient from '../api/client';
+import { useAuthStore } from '../store/authStore';
 import { Navigate } from 'react-router-dom';
 
 type AdminUserRow = {

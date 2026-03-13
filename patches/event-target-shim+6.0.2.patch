@@ -1,0 +1,15 @@
+diff --git a/node_modules/event-target-shim/package.json b/node_modules/event-target-shim/package.json
+index 045cf8b..420303e 100644
+--- a/node_modules/event-target-shim/package.json
++++ b/node_modules/event-target-shim/package.json
+@@ -8,6 +8,10 @@
+       "import": "./index.mjs",
+       "require": "./index.js"
+     },
++    "./index": {
++      "import": "./index.mjs",
++      "require": "./index.js"
++    },
+     "./es5": {
+       "import": "./es5.mjs",
+       "require": "./es5.js"

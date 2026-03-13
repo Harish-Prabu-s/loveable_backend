@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { OTPRequest, AuthResponse, GenderSelection, User } from '@/types';
+import type { OTPRequest, AuthResponse, GenderSelection, User } from '../types';
 
 interface OTPResponse {
   message: string;

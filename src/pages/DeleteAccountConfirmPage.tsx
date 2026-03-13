@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Layout from '@/components/Layout';
-import { useAuthStore } from '@/store/authStore';
+import Layout from '../components/Layout';
+import { useAuthStore } from '../store/authStore';
 import { ShieldCheck, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { accountApi } from '@/api/account';
+import { accountApi } from '../api/account';
 
 export default function DeleteAccountConfirmPage() {
   const navigate = useNavigate();

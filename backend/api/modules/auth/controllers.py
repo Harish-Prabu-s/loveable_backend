@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -32,41 +33,51 @@ def get_user_profile_data(user, request=None):
             else:
                 photo_url = p.photo.url
         except Exception:
-            pass
-    elif p.photo and isinstance(p.photo, str):
-        s = p.photo
-        if request and '/media/' in s:
-            idx = s.find('/media/')
-            media_path = s[idx + len('/media/'):] if idx != -1 else s
-            photo_url = request.build_absolute_uri(settings.MEDIA_URL + media_path)
+            photo_url = None
+
+    if not photo_url:
+        # Assign modern friendly defaults based on gender
+        gender = str(p.gender).lower()
+        default_path = "defaults/male_avatar.png" if "female" not in gender else "defaults/female_avatar.png"
+        full_default_path = f"{settings.MEDIA_URL}{default_path}"
+        if request:
+            photo_url = request.build_absolute_uri(full_default_path)
         else:
-            photo_url = s
+            photo_url = full_default_path
 
     return {
         'id': user.id,
-        'phone_number': p.phone_number,
+        'profile_id': p.id,
+        'username': user.username,
+        'display_name': p.display_name or user.username,
         'email': p.email,
-        'gender': p.gender,
-        'display_name': p.display_name,
-        'bio': p.bio,
-        'interests': p.interests,
+        'phone': p.phone_number,
         'photo': photo_url,
-        'language': p.language,
+        'gender': p.gender,
+        'bio': p.bio,
         'is_verified': p.is_verified,
-        'is_online': p.is_online,
-        'is_superuser': user.is_superuser,
-        'date_joined': p.date_joined.isoformat() if p.date_joined else None,
-        'last_login': p.last_login.isoformat() if p.last_login else None,
-        'is_new_user': is_new
+        'wallet_balance': getattr(user, 'wallet').coin_balance if hasattr(user, 'wallet') else 0
     }
 
 def get_auth_response_data(user, request=None):
     """
     Generates a consistent authentication response structure.
     """
-    data = create_tokens(user)
-    data.update(get_user_profile_data(user, request))
-    return data
+    tokens = create_tokens(user)
+    profile_data = get_user_profile_data(user, request)
+    is_new = not (profile_data.get('display_name') and profile_data.get('display_name') != 'User' and profile_data.get('gender'))
+    
+    return {
+        'success': True,
+        'access': tokens['access'],
+        'refresh': tokens['refresh'],
+        'access_token': tokens['access'],
+        'refresh_token': tokens['refresh'],
+        'token': tokens['access'],
+        'temp_token': tokens['access'] if is_new else None,
+        'user': profile_data,
+        'is_new_user': is_new
+    }
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -388,25 +399,58 @@ def update_profile_view(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def complete_profile_view(request):
+    """
+    Final step of onboarding. Updates all info and returns full auth data.
+    """
+    user = request.user
+    p = user.profile
+    data = request.data
+    
+    # Update fields
+    if 'name' in data:
+        p.display_name = data['name']
+    if 'email' in data:
+        p.email = data['email']
+        user.email = data['email']
+        user.save()
+    if 'gender' in data:
+        p.gender = data['gender']
+    if 'language' in data:
+        p.language = data['language']
+    if 'languages' in data and isinstance(data['languages'], list) and data['languages']:
+        # For now we use the first one as primary language if field is singular
+        p.language = data['languages'][0]
+    if 'bio' in data:
+        p.bio = data['bio']
+        
+    p.save()
+    
+    # Return full auth response (tokens + updated user)
+    return Response(get_auth_response_data(user, request))
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def upload_avatar_view(request):
-    try:
-        if 'photo' not in request.FILES:
-            return Response({'error': 'No photo provided'}, status=400)
-        
-        photo = request.FILES['photo']
-        p = request.user.profile
-        
-        # Save file
-        filename = f"avatars/{request.user.id}_{photo.name}"
-        # If using default storage (local filesystem usually), it saves to MEDIA_ROOT
-        path = default_storage.save(filename, ContentFile(photo.read()))
-        
-        p.photo = path
+    """
+    Standardized avatar upload endpoint.
+    Expects 'photo' or 'avatar' file in request.FILES.
+    """
+    p = request.user.profile
+    # Accept both field names for flexibility
+    photo_file = request.FILES.get('photo') or request.FILES.get('avatar')
+    
+    if photo_file:
+        p.photo = photo_file
         p.save()
-        photo_url = request.build_absolute_uri(settings.MEDIA_URL + path)
-        return Response({'success': True, 'photo_url': photo_url})
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        profile_data = get_user_profile_data(request.user, request)
+        return Response({
+            'success': True,
+            'photo_url': profile_data.get('photo'),
+            'user': profile_data
+        })
+    return Response({'error': 'No photo provided'}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -429,7 +473,10 @@ def set_language_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    return Response(get_user_profile_data(request.user))
+    """
+    Returns the current user's full profile.
+    """
+    return Response(get_user_profile_data(request.user, request))
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

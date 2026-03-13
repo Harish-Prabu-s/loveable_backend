@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { notify } from '@/lib/utils';
-import { walletApi } from '@/api/wallet';
-import { profilesApi } from '@/api/profiles';
-import { chatApi } from '@/api/chat';
-import { useAuthStore } from '@/store/authStore';
-import { useWalletStore } from '@/store/walletStore';
+import { notify } from '../lib/utils';
+import { walletApi } from '../api/wallet';
+import { profilesApi } from '../api/profiles';
+import { chatApi } from '../api/chat';
+import { useAuthStore } from '../store/authStore';
+import { useWalletStore } from '../store/walletStore';
 
 type CallType = 'voice' | 'video' | 'live';
 

@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Wallet, CoinTransaction, PaginatedResponse } from '@/types';
+import type { Wallet, CoinTransaction, PaginatedResponse } from '../types';
 
 export const walletApi = {
   getWallet: async (): Promise<Wallet> => {

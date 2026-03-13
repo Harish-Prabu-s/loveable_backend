@@ -1,0 +1,4 @@
+src/pages/DiscoverPage.tsx(12,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/HomePage.tsx(15,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/LeaderboardPage.tsx(7,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/ProfilePage.tsx(9,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.

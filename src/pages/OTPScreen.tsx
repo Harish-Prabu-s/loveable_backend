@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { ArrowLeft, KeyRound } from 'lucide-react';
-import { authApi } from '@/api/auth';
+import { authApi } from '../api/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { PhoneAuthProvider } from 'firebase/auth';
-import type { AuthResponse } from '@/types';
+import type { AuthResponse } from '../types';
 
 export default function OTPScreen() {
   const location = useLocation();

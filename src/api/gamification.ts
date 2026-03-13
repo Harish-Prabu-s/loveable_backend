@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { UserLevel, DailyReward, LeaderboardEntry, PaginatedResponse } from '@/types';
+import type { UserLevel, DailyReward, LeaderboardEntry, PaginatedResponse } from '../types';
 
 export const gamificationApi = {
   getLevel: async (): Promise<UserLevel> => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Flag, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { reportsApi } from '@/api/reports';
+import { reportsApi } from '../api/reports';
 
 interface ReportDialogProps {
   isOpen: boolean;

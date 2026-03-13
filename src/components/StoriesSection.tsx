@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, X, Eye } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { storiesApi } from '@/api/stories';
-import { profilesApi } from '@/api/profiles';
-import type { Story, StoryView } from '@/types';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { storiesApi } from '../api/stories';
+import { profilesApi } from '../api/profiles';
+import type { Story, StoryView } from '../types';
 import StoryComposer from './StoryComposer';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 
 // Backend-powered list

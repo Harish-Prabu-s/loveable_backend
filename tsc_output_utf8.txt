@@ -1,0 +1,7 @@
+﻿hooks/use-toast.ts(3,15): error TS2614: Module '"@/components/ui/toast"' has no exported member 'ToastActionElement'. Did you mean to use 'import ToastActionElement from "@/components/ui/toast"' instead?
+hooks/use-toast.ts(3,35): error TS2614: Module '"@/components/ui/toast"' has no exported member 'ToastProps'. Did you mean to use 'import ToastProps from "@/components/ui/toast"' instead?
+hooks/use-toast.ts(3,53): error TS1149: File name 'D:/loveable_app/react-to-android/components/ui/toast.tsx' differs from already included file name 'D:/loveable_app/react-to-android/components/ui/Toast.tsx' only in casing.
+  The file is in the program because:
+    Imported via './Toast' from file 'D:/loveable_app/react-to-android/components/ui/GlobalToast.tsx'
+    Matched by include pattern 'components' in 'D:/loveable_app/react-to-android/tsconfig.json'
+    Imported via "@/components/ui/toast" from file 'D:/loveable_app/react-to-android/hooks/use-toast.ts'

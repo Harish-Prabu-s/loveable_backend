@@ -5,17 +5,32 @@ from ...models import Profile, Follow, FriendRequest
 def get_my_profile(user: User) -> Profile:
     return user.profile
 
-def update_my_profile(user: User, data: dict, files=None) -> Profile:
-    p = user.profile
-    for field in ['display_name', 'bio', 'interests', 'age', 'location', 'language', 'app_lock_enabled']:
-        if field in data:
-            setattr(p, field, data[field])
-    # Handle photo upload
+def update_my_profile(user, data, files=None):
+    p = get_my_profile(user)
+    
+    # Handle username update (on the User model)
+    if 'username' in data:
+        new_username = data['username'].strip()
+        if new_username and new_username != user.username:
+            # Check for uniqueness
+            if not User.objects.filter(username=new_username).exists():
+                user.username = new_username
+                user.save()
+    
+    if 'display_name' in data:
+        p.display_name = data['display_name']
+    if 'bio' in data:
+        p.bio = data['bio']
+    if 'gender' in data:
+        p.gender = data['gender']
+        
     if files and 'photo' in files:
         p.photo = files['photo']
-    elif 'photo' in data and not data['photo']:
-        # Allow clearing the photo
+    elif 'photo' in data and not isinstance(data['photo'], str): # sometimes arrives in data
+        p.photo = data['photo']
+    elif 'photo' in data and not data['photo']: # Allow clearing the photo
         p.photo = None
+
     p.save()
     return p
 

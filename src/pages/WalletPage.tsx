@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Wallet as WalletIcon, Coins, History, ArrowRight, Plus } from 'lucide-react';
-import { walletApi } from '@/api/wallet';
-import type { Wallet, CoinTransaction } from '@/types';
+import { walletApi } from '../api/wallet';
+import type { Wallet, CoinTransaction } from '../types';
 
-import { useAuthStore } from '@/store/authStore';
-import { useWalletStore } from '@/store/walletStore';
+import { useAuthStore } from '../store/authStore';
+import { useWalletStore } from '../store/walletStore';
 
 export default function WalletPage() {
   const navigate = useNavigate();

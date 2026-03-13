@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Play, Star, Users, Gamepad2, ArrowLeft, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '@/store/authStore';
-import { useWalletStore } from '@/store/walletStore';
-import TicTacToe from '@/components/games/TicTacToe';
-import FruitSlash from '@/components/games/FruitSlash';
-import CandyMatch from '@/components/games/CandyMatch';
-import CarromBoard from '@/components/games/CarromBoard';
-import LudoBoard from '@/components/games/LudoBoard';
+import { useAuthStore } from '../store/authStore';
+import { useWalletStore } from '../store/walletStore';
+import TicTacToe from '../components/games/TicTacToe';
+import FruitSlash from '../components/games/FruitSlash';
+import CandyMatch from '../components/games/CandyMatch';
+import CarromBoard from '../components/games/CarromBoard';
+import LudoBoard from '../components/games/LudoBoard';
 
 interface Game {
   id: string;

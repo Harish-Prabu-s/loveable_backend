@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Trophy, Crown, Medal, ArrowLeft, Star, Clock, Phone } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuthStore } from '@/store/authStore';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { useAuthStore } from '../store/authStore';
+import { getProfileAvatar } from '@/utils/avatar';
 
 type LeagueTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Master';
 
@@ -43,7 +44,7 @@ const generateMockLeaderboard = (): LeaderboardUser[] => {
     { id: '7', name: 'Meera Reddy', points: 45000, appUsageMinutes: 110, callMinutes: 250 },
     { id: '8', name: 'Pooja Kumar', points: 8000, appUsageMinutes: 50, callMinutes: 60 },
   ];
-  
+
   // Sort by points desc
   return users.sort((a, b) => b.points - a.points).map((u, index) => ({
     ...u,
@@ -56,7 +57,7 @@ export default function LeaderboardPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
-  
+
   useEffect(() => {
     setUsers(generateMockLeaderboard());
   }, []);
@@ -81,7 +82,7 @@ export default function LeaderboardPage() {
         {/* Header */}
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6 rounded-b-3xl relative overflow-hidden shadow-xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
-          
+
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-6">
               <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
@@ -95,7 +96,7 @@ export default function LeaderboardPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-12 h-12 border-2 border-primary">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.phone_number}`} />
+                    <AvatarImage src={getProfileAvatar(undefined, user?.id || user?.phone_number || 'guest', user?.gender)} />
                     <AvatarFallback>{user?.phone_number?.slice(-2) || 'G'}</AvatarFallback>
                   </Avatar>
                   <div>
@@ -111,7 +112,7 @@ export default function LeaderboardPage() {
                   <p className="text-xs text-gray-400">Total Points</p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-black/20 p-2 rounded-lg flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-400" />
@@ -128,31 +129,31 @@ export default function LeaderboardPage() {
 
         {/* List */}
         <div className="p-4 space-y-4">
-           {users.map((u) => {
-             const leagueInfo = getLeague(u.points);
-             return (
-               <div key={u.id} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100">
-                 <div className={`font-bold text-lg w-6 text-center ${u.rank <= 3 ? 'text-yellow-500' : 'text-gray-400'}`}>
-                   #{u.rank}
-                 </div>
-                 <Avatar className="w-10 h-10">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`} />
-                    <AvatarFallback>{u.name[0]}</AvatarFallback>
-                 </Avatar>
-                 <div className="flex-1">
-                   <p className="font-bold text-gray-900">{u.name}</p>
-                   <div className="flex items-center gap-1 text-xs text-gray-500">
-                     <span className={leagueInfo.color}>{leagueInfo.tier}</span>
-                     <span>• {u.callMinutes} min calls</span>
-                   </div>
-                 </div>
-                 <div className="text-right">
-                   <p className="font-bold text-primary">{u.points.toLocaleString()}</p>
-                   <p className="text-[10px] text-gray-400">Pts</p>
-                 </div>
-               </div>
-             );
-           })}
+          {users.map((u) => {
+            const leagueInfo = getLeague(u.points);
+            return (
+              <div key={u.id} className="bg-white p-4 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100">
+                <div className={`font-bold text-lg w-6 text-center ${u.rank <= 3 ? 'text-yellow-500' : 'text-gray-400'}`}>
+                  #{u.rank}
+                </div>
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={getProfileAvatar(u.avatar, u.id)} />
+                  <AvatarFallback>{u.name[0]}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">{u.name}</p>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <span className={leagueInfo.color}>{leagueInfo.tier}</span>
+                    <span>• {u.callMinutes} min calls</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-primary">{u.points.toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400">Pts</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </Layout>

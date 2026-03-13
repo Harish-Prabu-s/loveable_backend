@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Mail, CheckCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/api/auth';
+import { useAuthStore } from '../store/authStore';
+import { authApi } from '../api/auth';
 
 export default function EmailCapturePage() {
   const navigate = useNavigate();

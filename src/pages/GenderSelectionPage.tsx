@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import { User, Users, UserCircle } from 'lucide-react';
-import type { Gender } from '@/types';
+import type { Gender } from '../types';
 
 export default function GenderSelectionPage() {
   const [selectedGender, setSelectedGender] = useState<Gender | null>(null);

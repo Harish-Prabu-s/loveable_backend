@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { walletApi } from '@/api/wallet';
-import type { Wallet } from '@/types';
+import { walletApi } from '../api/wallet';
+import type { Wallet } from '../types';
 import { toast } from 'sonner';
 
 interface WalletState {

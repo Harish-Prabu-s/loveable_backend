@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Upload as UploadIcon, Wand2, Type, Image as ImageIcon, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { storiesApi } from '@/api/stories';
+import { storiesApi } from '../api/stories';
 
 type Props = {
   onClose: () => void;
@@ -46,17 +46,17 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
     }
 
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user', width: { ideal: 1280 } }, 
-        audio: mode === 'video' 
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 } },
+        audio: mode === 'video'
       });
       setStream(s);
     } catch (e: any) {
       console.error("Error accessing camera:", e);
       if (e.name === 'NotAllowedError') {
-         toast.error("Camera permission denied");
+        toast.error("Camera permission denied");
       } else {
-         toast.error(`Camera Error: ${e.message}`);
+        toast.error(`Camera Error: ${e.message}`);
       }
       setStream(null);
     }
@@ -176,14 +176,14 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-white z-10">
           <div className="flex gap-2">
-            <button 
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mode==='photo'?'bg-primary text-white shadow-lg shadow-primary/30':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} 
+            <button
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mode === 'photo' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               onClick={() => { setMode('photo'); setCapturedImage(null); setStream(null); }}
             >
               Photo
             </button>
-            <button 
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mode==='video'?'bg-primary text-white shadow-lg shadow-primary/30':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} 
+            <button
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mode === 'video' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               onClick={() => { setMode('video'); setCapturedImage(null); setStream(null); }}
             >
               Video
@@ -198,9 +198,9 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
           {/* Source Selection (only if no capture/file) */}
           {!capturedImage && !recordingBlob && !selectedFile && !stream && (
-             <div className="grid grid-cols-2 gap-4 mb-4">
-              <button 
-                onClick={startCamera} 
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button
+                onClick={startCamera}
                 className="flex flex-col items-center justify-center gap-3 p-8 bg-white border-2 border-dashed border-gray-200 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all group"
               >
                 <div className="p-4 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
@@ -208,13 +208,13 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
                 </div>
                 <span className="font-semibold text-gray-700">Open Camera</span>
               </button>
-              
+
               <label className="flex flex-col items-center justify-center gap-3 p-8 bg-white border-2 border-dashed border-gray-200 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all group cursor-pointer">
                 <div className="p-4 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
                   <UploadIcon className="w-8 h-8 text-primary" />
                 </div>
                 <span className="font-semibold text-gray-700">Upload File</span>
-                <input type="file" accept={mode==='photo' ? 'image/*' : 'video/*' } className="hidden" onChange={handleFileSelect} />
+                <input type="file" accept={mode === 'photo' ? 'image/*' : 'video/*'} className="hidden" onChange={handleFileSelect} />
               </label>
             </div>
           )}
@@ -225,9 +225,9 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
               {mode === 'photo' ? (
                 <>
                   {capturedImage || selectedFile ? (
-                    <img 
-                      src={selectedFile ? URL.createObjectURL(selectedFile) : capturedImage!} 
-                      className="w-full h-full object-contain bg-black" 
+                    <img
+                      src={selectedFile ? URL.createObjectURL(selectedFile) : capturedImage!}
+                      className="w-full h-full object-contain bg-black"
                       alt="Preview"
                     />
                   ) : (
@@ -236,7 +236,7 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
                       <canvas ref={canvasRef} className="hidden" />
                       {/* Capture Button Overlay */}
                       <div className="absolute bottom-8 left-0 right-0 flex justify-center z-20">
-                        <button 
+                        <button
                           onClick={capturePhoto}
                           className="w-20 h-20 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/40 transition-all transform hover:scale-105 active:scale-95 shadow-lg"
                         >
@@ -251,18 +251,18 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
                   <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
                   {recording ? (
                     <div className="absolute bottom-8 left-0 right-0 flex justify-center z-20">
-                       <button 
-                        onClick={stopRecording} 
+                      <button
+                        onClick={stopRecording}
                         className="w-20 h-20 rounded-full border-4 border-red-500 flex items-center justify-center animate-pulse"
-                       >
-                         <div className="w-10 h-10 bg-red-500 rounded-md" />
-                       </button>
+                      >
+                        <div className="w-10 h-10 bg-red-500 rounded-md" />
+                      </button>
                     </div>
                   ) : (
                     stream && !recordingBlob && (
                       <div className="absolute bottom-8 left-0 right-0 flex justify-center z-20">
-                        <button 
-                          onClick={startRecording} 
+                        <button
+                          onClick={startRecording}
                           className="w-20 h-20 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/40 transition-all transform hover:scale-105 active:scale-95 shadow-lg"
                         >
                           <div className="w-16 h-16 bg-red-500 rounded-full shadow-inner" />
@@ -275,7 +275,7 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
 
               {/* Retake Button (Overlay) */}
               {(capturedImage || recordingBlob || selectedFile) && (
-                <button 
+                <button
                   onClick={() => {
                     setCapturedImage(null);
                     setRecordingBlob(null);
@@ -299,24 +299,24 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
                   <Wand2 className="w-4 h-4" />
                   <span>Filters & Effects</span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-500 flex justify-between">Brightness <span>{filter.brightness}%</span></label>
-                        <input type="range" min={0} max={200} value={filter.brightness} onChange={(e)=>setFilter({...filter, brightness: Number(e.target.value)})} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-500 flex justify-between">Contrast <span>{filter.contrast}%</span></label>
-                        <input type="range" min={0} max={200} value={filter.contrast} onChange={(e)=>setFilter({...filter, contrast: Number(e.target.value)})} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-500 flex justify-between">Saturation <span>{filter.saturate}%</span></label>
-                        <input type="range" min={0} max={200} value={filter.saturate} onChange={(e)=>setFilter({...filter, saturate: Number(e.target.value)})} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-gray-500 flex justify-between">Blur <span>{filter.blur}px</span></label>
-                        <input type="range" min={0} max={10} value={filter.blur} onChange={(e)=>setFilter({...filter, blur: Number(e.target.value)})} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500 flex justify-between">Brightness <span>{filter.brightness}%</span></label>
+                    <input type="range" min={0} max={200} value={filter.brightness} onChange={(e) => setFilter({ ...filter, brightness: Number(e.target.value) })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500 flex justify-between">Contrast <span>{filter.contrast}%</span></label>
+                    <input type="range" min={0} max={200} value={filter.contrast} onChange={(e) => setFilter({ ...filter, contrast: Number(e.target.value) })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500 flex justify-between">Saturation <span>{filter.saturate}%</span></label>
+                    <input type="range" min={0} max={200} value={filter.saturate} onChange={(e) => setFilter({ ...filter, saturate: Number(e.target.value) })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500 flex justify-between">Blur <span>{filter.blur}px</span></label>
+                    <input type="range" min={0} max={10} value={filter.blur} onChange={(e) => setFilter({ ...filter, blur: Number(e.target.value) })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
                 </div>
               </div>
 
@@ -326,23 +326,23 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
                   <span>Text & Overlay</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
-                    <input 
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                        placeholder="Add caption text..." 
-                        value={textOverlay} 
-                        onChange={(e)=>setTextOverlay(e.target.value)} 
-                    />
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input 
-                                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                                placeholder="Paste GIF URL..." 
-                                value={gifUrl} 
-                                onChange={(e)=>setGifUrl(e.target.value)} 
-                            />
-                        </div>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    placeholder="Add caption text..."
+                    value={textOverlay}
+                    onChange={(e) => setTextOverlay(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        placeholder="Paste GIF URL..."
+                        value={gifUrl}
+                        onChange={(e) => setGifUrl(e.target.value)}
+                      />
                     </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -351,17 +351,17 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
 
         {/* Footer */}
         <div className="p-4 border-t bg-white flex justify-end gap-3">
-            <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-100 transition-colors">
-                Cancel
-            </button>
-            <button 
-                onClick={save} 
-                disabled={(!capturedImage && !selectedFile && !recordingBlob) || recording}
-                className="px-6 py-2.5 bg-gradient-to-r from-primary to-pink-600 text-white rounded-xl font-medium shadow-lg shadow-primary/30 inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <Save className="w-4 h-4" /> 
-                {recording ? 'Recording...' : 'Share Story'}
-            </button>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={(!capturedImage && !selectedFile && !recordingBlob) || recording}
+            className="px-6 py-2.5 bg-gradient-to-r from-primary to-pink-600 text-white rounded-xl font-medium shadow-lg shadow-primary/30 inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {recording ? 'Recording...' : 'Share Story'}
+          </button>
         </div>
       </div>
     </div>

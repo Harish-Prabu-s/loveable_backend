@@ -3,11 +3,31 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# --- DIAGNOSTIC MIDDLEWARE ---
+class AuthDebugMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+    def __call__(self, request):
+        auth = request.META.get('HTTP_AUTHORIZATION', 'NONE')
+        # Only log first 20 chars of token for security
+        bearer = auth[:20] if len(auth) > 20 else auth
+        print(f"AG_DEBUG: [{request.method}] {request.path} | Auth: {bearer}")
+        response = self.get_response(request)
+        print(f"AG_DEBUG: Response: {response.status_code}")
+        # If 401, check if user was authenticated
+        if response.status_code == 401:
+            print(f"AG_DEBUG: 401 Detail - User: {request.user}")
+        return response
+# -----------------------------
+
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')
 DEBUG = True
-ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4']
+ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4', '10.130.45.184', 'preflagellate-agnus-timidly.ngrok-free.dev']
+CSRF_TRUSTED_ORIGINS = ['https://preflagellate-agnus-timidly.ngrok-free.dev']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -17,10 +37,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
+    'channels',
     'api',
 ]
 
 MIDDLEWARE = [
+    'vibely_backend.settings.AuthDebugMiddleware', # Diagnostic first
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -50,6 +72,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'vibely_backend.wsgi.application'
+ASGI_APPLICATION = 'vibely_backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 DATABASES = {
     'default': {
@@ -69,6 +98,8 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+from datetime import timedelta
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -76,6 +107,23 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     )
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
 # Email Settings (Gmail)
@@ -106,8 +154,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'YourSecretHere')
 
 # Razorpay Settings
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+# RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+# RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_KEY_ID = 'rzp_test_SNqKIEWV9NSYuU'
+RAZORPAY_KEY_SECRET = '0OMicPadM4h7denXPCIF9Jd6'
 
 # SMS Settings (Twilio)
 # NOTE: TWILIO_ACCOUNT_SID must start with 'AC'.

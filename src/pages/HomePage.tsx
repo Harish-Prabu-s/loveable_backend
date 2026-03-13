@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
-import { useAuthStore } from '@/store/authStore';
-import { profilesApi } from '@/api/profiles';
-import { walletApi } from '@/api/wallet';
-import { gamificationApi } from '@/api/gamification';
-import type { Profile, Wallet, UserLevel } from '@/types';
+import Layout from '../components/Layout';
+import { useAuthStore } from '../store/authStore';
+import { profilesApi } from '../api/profiles';
+import { walletApi } from '../api/wallet';
+import { gamificationApi } from '../api/gamification';
+import type { Profile, Wallet, UserLevel } from '../types';
 import { Coins, Video, Mic, Radio, Phone, Sparkles, MessageCircle, Trophy, ChevronRight, Frown, Meh, Smile, HeartHandshake, Coffee, Zap, Users, UserCheck } from 'lucide-react';
-import { notify, notifyTimeSlotOncePerDay } from '@/lib/utils';
+import { notify, notifyTimeSlotOncePerDay } from '../lib/utils';
 import { toast } from 'sonner';
-import StoriesSection from '@/components/StoriesSection';
-import { useCall } from '@/context/CallContext';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getAvatarUrl } from '@/lib/avatars';
+import StoriesSection from '../components/StoriesSection';
+import { useCall } from '../context/CallContext';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { getProfileAvatar } from '@/utils/avatar';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export default function HomePage() {
   const [showFollowing, setShowFollowing] = useState(false);
   const [followersList, setFollowersList] = useState<Profile[]>([]);
   const [followingList, setFollowingList] = useState<Profile[]>([]);
-  
+
   const femalePref = localStorage.getItem('female_call_pref') || 'both';
 
   // Redirect to gender page if gender not selected
@@ -89,7 +89,7 @@ export default function HomePage() {
     return { tier: 'Bronze', color: 'text-orange-600', bg: 'bg-orange-600', min: 0, next: 1000 };
   };
 
-  const currentXP = level?.xp || 1500; 
+  const currentXP = level?.xp || 1500;
   const league = getLeagueInfo(currentXP);
   const leagueProgress = Math.min(((currentXP - league.min) / (league.next - league.min)) * 100, 100);
 
@@ -139,7 +139,7 @@ export default function HomePage() {
   return (
     <Layout>
       <div className="pb-24 min-h-screen font-sans selection:bg-pink-100 bg-background text-foreground">
-        
+
         {/* Hero / Header Section - Unified Gradient Theme */}
         <div className="relative bg-gradient-primary p-6 pb-16 rounded-b-[3rem] shadow-2xl shadow-pink-500/20 text-white overflow-hidden">
           {/* Decorative Elements */}
@@ -152,22 +152,22 @@ export default function HomePage() {
               <h1 className="text-4xl font-extrabold mb-2 tracking-tight">Hi, {profile?.display_name || 'Friend'}! ✨</h1>
               <p className="text-white/90 text-lg font-medium">Ready to connect?</p>
               <div className="flex gap-4 mt-3 text-white/80 text-sm font-bold">
-                  <button
-                    type="button"
-                    onClick={handleFollowersClick}
-                    className="backdrop-blur-md bg-white/10 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 hover:bg-white/20 active:scale-95 transition"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    {profile?.followers_count || 0} Followers
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFollowingClick}
-                    className="backdrop-blur-md bg-white/10 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 hover:bg-white/20 active:scale-95 transition"
-                  >
-                    <UserCheck className="w-3.5 h-3.5" />
-                    {profile?.following_count || 0} Following
-                  </button>
+                <button
+                  type="button"
+                  onClick={handleFollowersClick}
+                  className="backdrop-blur-md bg-white/10 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 hover:bg-white/20 active:scale-95 transition"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  {profile?.followers_count || 0} Followers
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFollowingClick}
+                  className="backdrop-blur-md bg-white/10 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 hover:bg-white/20 active:scale-95 transition"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  {profile?.following_count || 0} Following
+                </button>
               </div>
             </div>
             <button
@@ -187,7 +187,7 @@ export default function HomePage() {
             <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 text-center">How are you feeling?</h2>
             <div className="grid grid-cols-2 gap-3">
               {moods.map((mood) => (
-                <button 
+                <button
                   key={mood.label}
                   onClick={() => {
                     toast.success(`Finding someone to talk about feeling ${mood.label}...`);
@@ -208,17 +208,17 @@ export default function HomePage() {
         {/* Main CTA: Find a Voice Friend */}
         <div className="px-5 mt-8">
           <div className="bg-card rounded-[2rem] p-6 shadow-lg shadow-pink-500/20 border border-border relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full blur-3xl -z-10"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full blur-3xl -z-10"></div>
             <h3 className="font-bold text-foreground mb-1 text-xl">Find a Voice Friend</h3>
             <p className="text-sm text-muted-foreground mb-5">Connecting you with someone who understands...</p>
-            
-            <button 
+
+            <button
               onClick={() => startCall('voice')}
               className="w-full btn-primary text-xl flex items-center justify-between px-8 py-5 shadow-xl shadow-pink-500/50 active:scale-95 group"
             >
               <div className="flex items-center gap-4">
                 <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm">
-                   <Mic className="w-6 h-6 animate-pulse text-white" />
+                  <Mic className="w-6 h-6 animate-pulse text-white" />
                 </div>
                 <span>Start Voice Chat</span>
               </div>
@@ -233,67 +233,66 @@ export default function HomePage() {
             <h3 className="font-extrabold text-foreground text-xl tracking-tight">New People</h3>
             <button className="text-pink-500 text-sm font-bold hover:text-pink-400 transition-colors" onClick={() => navigate('/discover')}>See All</button>
           </div>
-          
+
           <div className="flex overflow-x-auto gap-5 pb-6 no-scrollbar snap-x">
             {recommendedUsers.length === 0 ? (
-                <div className="w-full text-center py-4 text-muted-foreground text-sm">No new people found</div>
+              <div className="w-full text-center py-4 text-muted-foreground text-sm">No new people found</div>
             ) : recommendedUsers.map((p) => (
-                <div key={p.id} onClick={() => navigate(`/profile/${p.user}`)} className="min-w-[110px] snap-start flex flex-col items-center group cursor-pointer">
-                  <div className="relative mb-3 transition-transform duration-300 group-hover:scale-105">
-                    <div className="p-[3px] rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 shadow-md">
-                      <Avatar className="w-20 h-20 border-[3px] border-white">
-                        <AvatarImage src={p.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.user}`} className="object-cover" />
-                        <AvatarFallback>{(p.display_name || 'U')[0]}</AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <div className={`absolute bottom-1 right-1 w-5 h-5 border-[3px] border-white rounded-full ${p.is_busy ? 'bg-red-500' : p.is_online ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <div key={p.id} onClick={() => navigate(`/profile/${p.user}`)} className="min-w-[110px] snap-start flex flex-col items-center group cursor-pointer">
+                <div className="relative mb-3 transition-transform duration-300 group-hover:scale-105">
+                  <div className="p-[3px] rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 shadow-md">
+                    <Avatar className="w-20 h-20 border-[3px] border-white">
+                      <AvatarImage src={getProfileAvatar(p.photo, p.user, p.gender)} className="object-cover" />
+                      <AvatarFallback>{(p.display_name || 'U')[0]}</AvatarFallback>
+                    </Avatar>
                   </div>
-                  <p className="text-sm font-bold text-foreground mb-1 truncate w-full text-center px-1">{p.display_name || `User #${p.user}`}</p>
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (p.is_busy) {
-                        toast.error('User is currently in a call');
-                        return;
-                      }
-                      startCall('voice', { userId: p.user }); 
-                    }}
-                    className={`text-[11px] font-bold px-4 py-1.5 rounded-full transition-colors shadow-sm ${
-                      p.is_busy
-                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                        : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
-                    }`}
-                  >
-                    Connect
-                  </button>
+                  <div className={`absolute bottom-1 right-1 w-5 h-5 border-[3px] border-white rounded-full ${p.is_busy ? 'bg-red-500' : p.is_online ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                 </div>
-              ))}
+                <p className="text-sm font-bold text-foreground mb-1 truncate w-full text-center px-1">{p.display_name || `User #${p.user}`}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (p.is_busy) {
+                      toast.error('User is currently in a call');
+                      return;
+                    }
+                    startCall('voice', { userId: p.user });
+                  }}
+                  className={`text-[11px] font-bold px-4 py-1.5 rounded-full transition-colors shadow-sm ${p.is_busy
+                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                    : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                    }`}
+                >
+                  Connect
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Stories Section (Integrated) */}
         <div className="mt-2 bg-card py-6 shadow-sm border-y border-border">
-           <div className="px-5 mb-3">
-              <h3 className="font-extrabold text-foreground text-xl tracking-tight">Vibe Check</h3>
-           </div>
-           <StoriesSection />
+          <div className="px-5 mb-3">
+            <h3 className="font-extrabold text-foreground text-xl tracking-tight">Vibe Check</h3>
+          </div>
+          <StoriesSection />
         </div>
 
         {/* League / Gamification */}
-        <div 
+        <div
           onClick={() => navigate('/leaderboard')}
           className="mx-5 mt-8 mb-8 bg-gradient-to-r from-[#2C3E50] to-[#000000] rounded-3xl p-6 text-white shadow-2xl shadow-gray-400/50 relative overflow-hidden cursor-pointer active:scale-95 transition-transform"
         >
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex-1">
-               <div className="flex items-center gap-2 mb-3">
-                 <Trophy className={`w-6 h-6 text-yellow-400 drop-shadow-md`} />
-                 <span className="font-bold text-xl">{league.tier} League</span>
-               </div>
-               <div className="w-full bg-white/10 h-2.5 rounded-full mb-3 overflow-hidden backdrop-blur-sm">
-                 <div className={`h-full ${league.bg} shadow-[0_0_10px_rgba(255,255,255,0.5)]`} style={{ width: `${leagueProgress}%` }}></div>
-               </div>
-               <p className="text-xs text-gray-400 font-bold tracking-widest uppercase">{currentXP} / {league.next} XP to Rank Up</p>
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy className={`w-6 h-6 text-yellow-400 drop-shadow-md`} />
+                <span className="font-bold text-xl">{league.tier} League</span>
+              </div>
+              <div className="w-full bg-white/10 h-2.5 rounded-full mb-3 overflow-hidden backdrop-blur-sm">
+                <div className={`h-full ${league.bg} shadow-[0_0_10px_rgba(255,255,255,0.5)]`} style={{ width: `${leagueProgress}%` }}></div>
+              </div>
+              <p className="text-xs text-gray-400 font-bold tracking-widest uppercase">{currentXP} / {league.next} XP to Rank Up</p>
             </div>
             <div className="bg-white/10 p-3 rounded-full ml-4 backdrop-blur-md border border-white/10">
               <ChevronRight className="w-6 h-6 text-white" />
@@ -320,7 +319,7 @@ export default function HomePage() {
                     >
                       <Avatar className="w-8 h-8">
                         <AvatarImage
-                          src={p.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.user}`}
+                          src={getProfileAvatar(p.photo, p.user, p.gender)}
                           className="object-cover"
                         />
                         <AvatarFallback>{(p.display_name || 'U')[0]}</AvatarFallback>
@@ -361,7 +360,7 @@ export default function HomePage() {
                     >
                       <Avatar className="w-8 h-8">
                         <AvatarImage
-                          src={p.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.user}`}
+                          src={getProfileAvatar(p.photo, p.user, p.gender)}
                           className="object-cover"
                         />
                         <AvatarFallback>{(p.display_name || 'U')[0]}</AvatarFallback>

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Gift, giftsApi } from '@/api/gifts';
+import { Gift, giftsApi } from '../api/gifts';
 import { X, Gift as GiftIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useWalletStore } from '@/store/walletStore';
+import { useWalletStore } from '../store/walletStore';
 
 interface GiftOverlayProps {
   onClose: () => void;

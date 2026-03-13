@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
+import { reelsApi } from '@/api/reels';
+
+// Requires to add upload endpoint in the backend. Assuming standard multipart flow.
+import client, { fetchWithAuth } from '@/api/client';
+
+export default function CreateReel({ visible, onClose, onCreated }) {
+    const [media, setMedia] = useState<string | null>(null);
+    const [caption, setCaption] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const pickVideo = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            allowsEditing: true,
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setMedia(result.assets[0].uri);
+        }
+    };
+
+    const uploadReel = async () => {
+        if (!media) return;
+        setLoading(true);
+
+        try {
+            // 1. Upload video
+            const formData = new FormData();
+            formData.append('media', {
+                uri: media,
+                name: 'reel.mp4',
+                type: 'video/mp4',
+            } as any);
+
+            if (__DEV__) {
+                console.log('[API] Uploading reel video:', media);
+            }
+
+            const uploadRes = await fetchWithAuth(`reels/upload/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+
+            if (!uploadRes.ok) {
+                throw new Error('Upload failed');
+            }
+
+            const data = await uploadRes.json();
+            const video_url = data.url;
+
+            // 2. Create Reel record
+            await reelsApi.createReel(video_url, caption);
+
+            setMedia(null);
+            setCaption('');
+            if (onCreated) onCreated();
+            onClose();
+        } catch (e) {
+            console.error(e);
+            alert('Failed to upload reel');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide">
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={onClose}>
+                        <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>New Reel</Text>
+                    <TouchableOpacity onPress={uploadReel} disabled={loading || !media}>
+                        {loading ? <ActivityIndicator color="#3B82F6" /> : <Text style={[styles.postBtn, !media && { color: '#64748B' }]}>Share</Text>}
+                    </TouchableOpacity>
+                </View>
+
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                    <View style={styles.content}>
+
+                        <View style={styles.inputArea}>
+                            <TouchableOpacity style={styles.mediaSelector} onPress={pickVideo}>
+                                {media ? (
+                                    <View style={styles.previewContainer}>
+                                        <Video
+                                            source={{ uri: media }}
+                                            style={styles.preview}
+                                            resizeMode={ResizeMode.COVER}
+                                            shouldPlay
+                                            isMuted
+                                            isLooping
+                                        />
+                                        <View style={styles.videoIcon}>
+                                            <MaterialCommunityIcons name="video" size={16} color="#FFF" />
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View style={styles.placeholderBox}>
+                                        <MaterialCommunityIcons name="video-plus" size={32} color="#94A3B8" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <TextInput
+                                style={styles.captionInput}
+                                placeholder="Write a caption..."
+                                placeholderTextColor="#64748B"
+                                multiline
+                                value={caption}
+                                onChangeText={setCaption}
+                            />
+                        </View>
+
+                    </View>
+                </KeyboardAvoidingView>
+            </View>
+        </Modal>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#020617',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 60,
+        paddingBottom: 16,
+        backgroundColor: '#0F172A',
+        borderBottomWidth: 1,
+        borderBottomColor: '#1E293B',
+    },
+    title: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    postBtn: {
+        color: '#3B82F6',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    content: {
+        padding: 16,
+        flex: 1,
+    },
+    inputArea: {
+        flexDirection: 'row',
+    },
+    mediaSelector: {
+        marginRight: 16,
+    },
+    previewContainer: {
+        width: 80,
+        height: 140, // Vertical orientation for reels
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    preview: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#1E293B',
+    },
+    videoIcon: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        padding: 2,
+        borderRadius: 4,
+    },
+    placeholderBox: {
+        width: 80,
+        height: 140,
+        borderRadius: 8,
+        backgroundColor: '#1E293B',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    captionInput: {
+        flex: 1,
+        color: '#FFF',
+        fontSize: 16,
+        textAlignVertical: 'top',
+    }
+});

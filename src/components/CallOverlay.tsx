@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useCall } from '@/context/CallContext';
-import { useWalletStore } from '@/store/walletStore';
+import { useCall } from '../context/CallContext';
+import { useWalletStore } from '../store/walletStore';
 import { toast } from 'sonner';
 import ReportDialog from './ReportDialog';
 import IceBreakerOverlay from './IceBreakerOverlay';
 import { GiftOverlay } from './GiftOverlay';
 import { Sparkles, Gift, Flag, Maximize2, Minimize2, User, Mic, MicOff, Video, X, UserPlus, UserCheck, Users, Heart, AlertTriangle, PhoneCall, VideoOff } from 'lucide-react';
-import { profilesApi } from '@/api/profiles';
-import type { Profile } from '@/types';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useWebRTC } from "@/hooks/useWebRTC";
+import { profilesApi } from '../api/profiles';
+import type { Profile } from '../types';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { useWebRTC } from '../hooks/useWebRTC';
 
 export default function CallOverlay() {
   const { callState, endCall, toggleMinimize, switchCallType, incomingCall, acceptIncomingCall, rejectIncomingCall } = useCall();
@@ -204,12 +204,17 @@ export default function CallOverlay() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const localPreviewRef = React.useRef<HTMLVideoElement>(null);
   const remoteAudioRef = React.useRef<HTMLAudioElement>(null);
-  const { localStream, remoteStream } = useWebRTC({
+  const { localStream, remoteStream, isConnected, sendCallEnd } = useWebRTC({
     roomId: callState.roomId,
     enabled: callState.isActive,
     kind: callState.type === "video" ? "video" : "voice",
     isCaller: callState.isCaller,
   });
+
+  const handleEndCall = () => {
+    sendCallEnd();
+    endCall();
+  };
 
   useEffect(() => {
     if (videoRef.current && callState.type === "video") {
@@ -421,8 +426,8 @@ export default function CallOverlay() {
            <div className="bg-black/30 backdrop-blur-md rounded-xl p-3 border border-white/10 w-48">
               <div className="flex items-center justify-between mb-1">
                  <p className="text-primary-300 text-xs font-bold capitalize flex items-center gap-1">
-                    <span className={`w-1.5 h-1.5 rounded-full ${callState.type === 'video' ? 'bg-green-500' : 'bg-blue-500'} animate-pulse inline-block`} />
-                    {callState.type}
+                    <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'} animate-pulse inline-block`} title={isConnected ? 'Connected' : 'Connecting...'} />
+                    {callState.type} {isConnected ? '' : '(connecting…)'}
                  </p>
                  <span className="text-yellow-400 font-bold text-[10px]">Bal: {wallet?.coin_balance || 0}</span>
               </div>
@@ -457,7 +462,7 @@ export default function CallOverlay() {
           )}
           
           <button 
-            onClick={() => endCall()}
+            onClick={handleEndCall}
             className="p-6 rounded-full bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] transform active:scale-95 transition-all hover:scale-110"
           >
             <X className="w-8 h-8 text-white" />

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { History, ArrowLeft, Plus, ArrowRight } from 'lucide-react';
-import { walletApi } from '@/api/wallet';
-import type { CoinTransaction } from '@/types';
-import { useAuthStore } from '@/store/authStore';
+import { walletApi } from '../api/wallet';
+import type { CoinTransaction } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 export default function TransactionsPage() {
   const navigate = useNavigate();

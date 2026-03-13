@@ -3,8 +3,8 @@ import { Lock, Fingerprint, Grid, Grid3x3, RefreshCw, Send, CheckCircle2 } from 
 import { toast } from 'sonner';
 import PinPad from './lock/PinPad';
 import PatternLock from './lock/PatternLock';
-import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/api/auth';
+import { useAuthStore } from '../store/authStore';
+import { authApi } from '../api/auth';
 
 interface BiometricLockProps {
   children: React.ReactNode;

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { accountApi } from '@/api/account';
+import { accountApi } from '../api/account';
 
 const makeToken = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 

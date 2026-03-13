@@ -1,14 +1,15 @@
 import { create } from 'zustand';
-import { authApi } from '@/api/auth';
-import type { User, Gender } from '@/types';
-import { storage } from '@/lib/storage';
+import { authApi } from '../api/auth';
+import type { User, Gender } from '../types';
+import { storage } from '../lib/storage';
+import { DeviceEventEmitter } from 'react-native';
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
   initialize: () => Promise<void>;
   login: (phoneNumber: string, otpCode: string) => Promise<boolean>;
   loginWithFirebase: (idToken: string, phoneNumber: string) => Promise<boolean>;
@@ -37,6 +38,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         isAuthenticated: true,
       });
     }
+
+    // Listen for logout events
+    DeviceEventEmitter.addListener('auth:logout', () => {
+      set({ user: null, token: null, isAuthenticated: false });
+    });
   },
 
   login: async (phoneNumber: string, otpCode: string) => {
@@ -56,7 +62,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         token: response.access_token,
         isAuthenticated: true,
       });
-      
+
       return response.is_new_user;
     } finally {
       set({ isLoading: false });
@@ -80,7 +86,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         token: response.access_token,
         isAuthenticated: true,
       });
-      
+
       return response.is_new_user;
     } finally {
       set({ isLoading: false });
@@ -99,6 +105,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     await storage.removeItem('refresh_token');
     await storage.removeItem('user');
     set({ user: null, token: null, isAuthenticated: false });
+    DeviceEventEmitter.emit('auth:logout');
   },
 
   selectGender: async (gender: Gender) => {
@@ -134,9 +141,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const { photo_url } = await authApi.uploadAvatar(file);
       const currentUser = get().user;
       if (currentUser) {
-          const updatedUser = { ...currentUser, photo: photo_url };
-          await storage.setItem('user', JSON.stringify(updatedUser));
-          set({ user: updatedUser });
+        const updatedUser = { ...currentUser, photo: photo_url };
+        await storage.setItem('user', JSON.stringify(updatedUser));
+        set({ user: updatedUser });
       }
     } finally {
       set({ isLoading: false });

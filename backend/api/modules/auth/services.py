@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from ...models import Profile, OTP, Wallet, DeletionRequest, EmailOTP
 from django.conf import settings
+from .avatar_utils import assign_default_avatar
 from twilio.rest import Client
 import logging
 from .utils_fast2sms import send_fast2sms_otp, send_fast2sms_otp_get
@@ -42,7 +43,7 @@ def get_or_create_user_by_email(email: str) -> User:
         user.set_unusable_password()
         user.save()
         
-    Profile.objects.get_or_create(
+    profile, _ = Profile.objects.get_or_create(
         user=user, 
         defaults={
             'email': email, 
@@ -50,6 +51,9 @@ def get_or_create_user_by_email(email: str) -> User:
             'phone_number': f"temp_{username}"
         }
     )
+    if not profile.photo:
+        assign_default_avatar(profile)
+        
     Wallet.objects.get_or_create(user=user)
     return user
 
@@ -128,10 +132,9 @@ except Exception as e:
 
 def create_tokens(user: User):
     refresh = RefreshToken.for_user(user)
-    access = AccessToken.for_user(user)
     return {
-        'access_token': str(access),
-        'refresh_token': str(refresh)
+        'access': str(refresh.access_token),
+        'refresh': str(refresh)
     }
 
 def complete_user_verification(user: User) -> User:
@@ -173,6 +176,9 @@ def get_or_create_user_by_phone(phone: str) -> User:
     if not created and profile.phone_number != phone:
         profile.phone_number = phone
         profile.save()
+        
+    if not profile.photo:
+        assign_default_avatar(profile)
         
     Wallet.objects.get_or_create(user=user)
     return user

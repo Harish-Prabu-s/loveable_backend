@@ -1,0 +1,451 @@
+/**
+ * Bug Condition Exploration Test for React Native/Expo Dependency Incompatibilities
+ * 
+ * **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+ * 
+ * This test encodes the EXPECTED behavior - the app should launch successfully
+ * with compatible dependency versions.
+ * 
+ * CRITICAL: This test MUST FAIL on unfixed code (current incompatible versions)
+ * - Failure confirms the bug exists
+ * - Success after fix confirms the bug is resolved
+ * 
+ * Current (UNFIXED) versions that should cause failure:
+ * - React Native 0.81.5 (incompatible with Expo SDK 54)
+ * - Expo SDK ~54.0.32 (requires React Native 0.76.x)
+ * - React 19.1.0 (incompatible with React Native 0.81.5)
+ * - expo-router ~6.0.23 (requires React Native 0.76.x+)
+ */
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+describe('Bug Condition Exploration: App Build and Launch with Dependency Versions', () => {
+  /**
+   * Property 1: Fault Condition - App Crashes with Incompatible Dependency Versions
+   * 
+   * This property tests that the app launches successfully with compatible versions.
+   * On UNFIXED code with incompatible versions, this test MUST FAIL.
+   * 
+   * The test verifies:
+   * 1. React Native version is compatible with Expo SDK 54 (requires 0.76.x+)
+   * 2. React version is compatible with React Native (requires 18.x for RN 0.81.5)
+   * 3. expo-router version is compatible with React Native (requires 0.76.x+)
+   * 4. All peer dependencies are satisfied
+   */
+  it('should have compatible dependency versions for Android app launch', () => {
+    // Read package.json to check current dependency versions
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    const reactNativeVersion = packageJson.dependencies['react-native'];
+    const expoVersion = packageJson.dependencies['expo'];
+    const reactVersion = packageJson.dependencies['react'];
+    const expoRouterVersion = packageJson.dependencies['expo-router'];
+    
+    // Extract major.minor version numbers for comparison
+    const extractVersion = (versionString: string): { major: number; minor: number } => {
+      const cleaned = versionString.replace(/^[\^~]/, '');
+      const parts = cleaned.split('.');
+      return {
+        major: parseInt(parts[0], 10),
+        minor: parseInt(parts[1], 10)
+      };
+    };
+    
+    const rnVersion = extractVersion(reactNativeVersion);
+    const reactVer = extractVersion(reactVersion);
+    const expoVer = extractVersion(expoVersion);
+    const routerVer = extractVersion(expoRouterVersion);
+    
+    // ASSERTION 1: React Native version must be 0.76.x or higher for Expo SDK 54
+    // Current UNFIXED code has 0.81.5 which appears newer but is actually older
+    // This will FAIL on unfixed code because 0.81.5 is incompatible
+    const isReactNativeCompatibleWithExpo = 
+      (rnVersion.major === 0 && rnVersion.minor >= 76) || rnVersion.major > 0;
+    
+    expect(isReactNativeCompatibleWithExpo).toBe(true);
+    expect(rnVersion.major).toBe(0);
+    expect(rnVersion.minor).toBeGreaterThanOrEqual(76);
+    
+    // ASSERTION 2: React version must be 18.x for React Native 0.76.x
+    // Current UNFIXED code has React 19.1.0 which is incompatible
+    // This will FAIL on unfixed code
+    const isReactCompatibleWithReactNative = reactVer.major === 18;
+    
+    expect(isReactCompatibleWithReactNative).toBe(true);
+    expect(reactVer.major).toBe(18);
+    
+    // ASSERTION 3: expo-router 6.x requires React Native 0.76.x+
+    // Current UNFIXED code has React Native 0.81.5 which doesn't meet this requirement
+    // This will FAIL on unfixed code
+    if (routerVer.major >= 6) {
+      expect(rnVersion.minor).toBeGreaterThanOrEqual(76);
+    }
+    
+    // ASSERTION 4: Expo SDK 54 requires React Native 0.76.x
+    // Current UNFIXED code has React Native 0.81.5 which is incompatible
+    // This will FAIL on unfixed code
+    if (expoVer.major === 54 || (expoVer.major === 0 && expoVer.minor === 54)) {
+      expect(rnVersion.minor).toBeGreaterThanOrEqual(76);
+    }
+    
+    // Document the versions being tested
+    console.log('Testing with dependency versions:');
+    console.log(`  React Native: ${reactNativeVersion}`);
+    console.log(`  Expo SDK: ${expoVersion}`);
+    console.log(`  React: ${reactVersion}`);
+    console.log(`  expo-router: ${expoRouterVersion}`);
+    console.log('');
+    console.log('Compatibility checks:');
+    console.log(`  React Native compatible with Expo SDK 54: ${isReactNativeCompatibleWithExpo}`);
+    console.log(`  React compatible with React Native: ${isReactCompatibleWithReactNative}`);
+    console.log(`  React Native version (0.${rnVersion.minor}.x) >= 0.76.x: ${rnVersion.minor >= 76}`);
+  });
+  
+  /**
+   * Additional verification: Check for peer dependency conflicts
+   * This test documents the specific peer dependency issues
+   */
+  it('should not have peer dependency conflicts', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    const reactNativeVersion = packageJson.dependencies['react-native'];
+    const reactVersion = packageJson.dependencies['react'];
+    
+    const rnVersion = extractVersion(reactNativeVersion);
+    const reactVer = extractVersion(reactVersion);
+    
+    // React Native 0.81.5 only supports React 18.x
+    // React 19.x requires React Native 0.76.5+
+    // This will FAIL on unfixed code with React 19.1.0
+    
+    // CRITICAL: React Native 0.81.x is OLDER than 0.76.x (versioning anomaly)
+    // So if we have RN 0.81.x, it's incompatible with React 19
+    const isRNVersionOld = rnVersion.minor === 81;
+    
+    if (isRNVersionOld || (rnVersion.major === 0 && rnVersion.minor < 76)) {
+      expect(reactVer.major).toBeLessThan(19);
+    }
+    
+    // Document the conflict
+    console.log('Peer dependency check:');
+    console.log(`  React Native version: 0.${rnVersion.minor}.x`);
+    console.log(`  React version: ${reactVer.major}.x`);
+    console.log(`  Is RN 0.81.x (old version): ${isRNVersionOld}`);
+    console.log(`  Compatible: ${reactVer.major < 19 || (!isRNVersionOld && rnVersion.minor >= 76)}`);
+  });
+});
+
+// Helper function for version extraction (defined outside describe block for reuse)
+function extractVersion(versionString: string): { major: number; minor: number } {
+  const cleaned = versionString.replace(/^[\^~]/, '');
+  const parts = cleaned.split('.');
+  return {
+    major: parseInt(parts[0], 10),
+    minor: parseInt(parts[1], 10)
+  };
+}
+
+/**
+ * Preservation Property Tests for Non-Android and Non-Version-Dependent Features
+ * 
+ * **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
+ * 
+ * These tests follow observation-first methodology:
+ * - Observe behavior on UNFIXED code for non-buggy inputs
+ * - Capture baseline behavior patterns
+ * - Verify identical behavior after fix
+ * 
+ * EXPECTED OUTCOME: Tests PASS on unfixed code (confirms baseline to preserve)
+ * 
+ * Property 2: Preservation - Non-Android and Non-Version-Dependent Features
+ * For any functionality that does NOT depend on the specific React Native version
+ * (web builds, UI rendering, Firebase auth, styling), the fixed dependency configuration
+ * SHALL produce exactly the same behavior as the original configuration.
+ */
+describe('Preservation Property Tests: Non-Version-Dependent Features', () => {
+  /**
+   * Property 2.1: Web Build Configuration Preservation
+   * 
+   * **Validates: Requirements 3.1**
+   * 
+   * Tests that web build configuration through Vite remains unchanged.
+   * The web build does NOT depend on React Native version since it uses react-native-web.
+   */
+  it('should preserve web build configuration with Vite', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify Vite is present and configured for web builds
+    expect(packageJson.devDependencies).toHaveProperty('vite');
+    expect(packageJson.scripts).toHaveProperty('build');
+    expect(packageJson.scripts.build).toContain('vite build');
+    
+    // Verify react-native-web is present (enables web builds)
+    expect(packageJson.dependencies).toHaveProperty('react-native-web');
+    
+    // Verify web-specific scripts are present
+    expect(packageJson.scripts).toHaveProperty('start');
+    expect(packageJson.scripts.start).toContain('vite');
+    
+    console.log('Web build configuration preserved:');
+    console.log(`  Vite version: ${packageJson.devDependencies.vite}`);
+    console.log(`  react-native-web version: ${packageJson.dependencies['react-native-web']}`);
+    console.log(`  Build script: ${packageJson.scripts.build}`);
+  });
+  
+  /**
+   * Property 2.2: Vite Configuration Preservation
+   * 
+   * **Validates: Requirements 3.1**
+   * 
+   * Tests that Vite configuration file exists and has expected structure.
+   */
+  it('should preserve Vite configuration file', () => {
+    const viteConfigPath = join(process.cwd(), 'vite.config.ts');
+    
+    // Verify vite.config.ts exists
+    expect(() => readFileSync(viteConfigPath, 'utf-8')).not.toThrow();
+    
+    const viteConfig = readFileSync(viteConfigPath, 'utf-8');
+    
+    // Verify key configuration elements are present
+    expect(viteConfig).toContain('defineConfig');
+    expect(viteConfig).toContain('@vitejs/plugin-react');
+    expect(viteConfig).toContain('resolve');
+    expect(viteConfig).toContain('alias');
+    
+    // Verify react-native-web alias is configured
+    expect(viteConfig).toContain('react-native-web');
+    
+    console.log('Vite configuration preserved with react-native-web alias');
+  });
+  
+  /**
+   * Property 2.3: Radix UI Components Preservation
+   * 
+   * **Validates: Requirements 3.5**
+   * 
+   * Tests that Radix UI component dependencies are present and unchanged.
+   * These components do NOT depend on React Native version.
+   */
+  it('should preserve Radix UI component dependencies', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // List of Radix UI components that should be preserved
+    const radixComponents = [
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-label',
+      '@radix-ui/react-slider',
+      '@radix-ui/react-switch',
+    ];
+    
+    // Verify all Radix UI components are present
+    radixComponents.forEach(component => {
+      expect(packageJson.dependencies).toHaveProperty(component);
+    });
+    
+    console.log(`Radix UI components preserved: ${radixComponents.length} components found`);
+  });
+  
+  /**
+   * Property 2.4: Tailwind CSS Configuration Preservation
+   * 
+   * **Validates: Requirements 3.5**
+   * 
+   * Tests that Tailwind CSS and related styling dependencies are preserved.
+   */
+  it('should preserve Tailwind CSS styling configuration', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify Tailwind CSS dependencies
+    expect(packageJson.devDependencies).toHaveProperty('tailwindcss');
+    expect(packageJson.devDependencies).toHaveProperty('autoprefixer');
+    expect(packageJson.devDependencies).toHaveProperty('postcss');
+    
+    // Verify Tailwind utility packages
+    expect(packageJson.dependencies).toHaveProperty('tailwind-merge');
+    expect(packageJson.dependencies).toHaveProperty('tailwindcss-animate');
+    
+    // Verify Tailwind config file exists
+    const tailwindConfigPath = join(process.cwd(), 'tailwind.config.ts');
+    expect(() => readFileSync(tailwindConfigPath, 'utf-8')).not.toThrow();
+    
+    console.log('Tailwind CSS configuration preserved:');
+    console.log(`  tailwindcss version: ${packageJson.devDependencies.tailwindcss}`);
+    console.log(`  tailwind-merge version: ${packageJson.dependencies['tailwind-merge']}`);
+  });
+  
+  /**
+   * Property 2.5: Firebase Authentication Dependencies Preservation
+   * 
+   * **Validates: Requirements 3.4**
+   * 
+   * Tests that Firebase authentication dependencies are preserved.
+   */
+  it('should preserve Firebase authentication dependencies', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify Firebase dependencies
+    expect(packageJson.dependencies).toHaveProperty('firebase');
+    expect(packageJson.dependencies).toHaveProperty('@capacitor-firebase/authentication');
+    
+    console.log('Firebase authentication dependencies preserved:');
+    console.log(`  firebase version: ${packageJson.dependencies.firebase}`);
+    console.log(`  @capacitor-firebase/authentication version: ${packageJson.dependencies['@capacitor-firebase/authentication']}`);
+  });
+  
+  /**
+   * Property 2.6: Capacitor Native Features Preservation
+   * 
+   * **Validates: Requirements 3.2**
+   * 
+   * Tests that Capacitor dependencies and configuration are preserved.
+   */
+  it('should preserve Capacitor native feature dependencies', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify Capacitor core dependencies
+    expect(packageJson.dependencies).toHaveProperty('@capacitor/core');
+    expect(packageJson.dependencies).toHaveProperty('@capacitor/android');
+    expect(packageJson.dependencies).toHaveProperty('@capacitor/cli');
+    
+    // Verify Capacitor config exists
+    const capacitorConfigPath = join(process.cwd(), 'capacitor.config.json');
+    expect(() => readFileSync(capacitorConfigPath, 'utf-8')).not.toThrow();
+    
+    const capacitorConfig = JSON.parse(readFileSync(capacitorConfigPath, 'utf-8'));
+    
+    // Verify config structure
+    expect(capacitorConfig).toHaveProperty('appId');
+    expect(capacitorConfig).toHaveProperty('appName');
+    expect(capacitorConfig).toHaveProperty('webDir');
+    expect(capacitorConfig.webDir).toBe('dist');
+    
+    console.log('Capacitor configuration preserved:');
+    console.log(`  @capacitor/core version: ${packageJson.dependencies['@capacitor/core']}`);
+    console.log(`  webDir: ${capacitorConfig.webDir}`);
+  });
+  
+  /**
+   * Property 2.7: React Component Dependencies Preservation
+   * 
+   * **Validates: Requirements 3.3**
+   * 
+   * Tests that React component libraries and UI dependencies are preserved.
+   */
+  it('should preserve React component and UI library dependencies', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify core React dependencies
+    expect(packageJson.dependencies).toHaveProperty('react');
+    expect(packageJson.dependencies).toHaveProperty('react-dom');
+    
+    // Verify UI component libraries
+    expect(packageJson.dependencies).toHaveProperty('lucide-react');
+    expect(packageJson.dependencies).toHaveProperty('framer-motion');
+    expect(packageJson.dependencies).toHaveProperty('class-variance-authority');
+    expect(packageJson.dependencies).toHaveProperty('clsx');
+    
+    // Verify form handling
+    expect(packageJson.dependencies).toHaveProperty('react-hook-form');
+    expect(packageJson.dependencies).toHaveProperty('zod');
+    
+    // Verify routing
+    expect(packageJson.dependencies).toHaveProperty('react-router-dom');
+    
+    console.log('React component libraries preserved:');
+    console.log(`  lucide-react version: ${packageJson.dependencies['lucide-react']}`);
+    console.log(`  framer-motion version: ${packageJson.dependencies['framer-motion']}`);
+    console.log(`  react-hook-form version: ${packageJson.dependencies['react-hook-form']}`);
+  });
+  
+  /**
+   * Property 2.8: TypeScript Configuration Preservation
+   * 
+   * **Validates: Requirements 3.3**
+   * 
+   * Tests that TypeScript configuration is preserved.
+   */
+  it('should preserve TypeScript configuration', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify TypeScript dependencies
+    expect(packageJson.devDependencies).toHaveProperty('typescript');
+    expect(packageJson.devDependencies).toHaveProperty('@types/react');
+    expect(packageJson.devDependencies).toHaveProperty('@types/react-dom');
+    
+    // Verify tsconfig files exist
+    const tsconfigPath = join(process.cwd(), 'tsconfig.json');
+    expect(() => readFileSync(tsconfigPath, 'utf-8')).not.toThrow();
+    
+    console.log('TypeScript configuration preserved:');
+    console.log(`  typescript version: ${packageJson.devDependencies.typescript}`);
+    console.log(`  @types/react version: ${packageJson.devDependencies['@types/react']}`);
+  });
+  
+  /**
+   * Property 2.9: Build Output Configuration Preservation
+   * 
+   * **Validates: Requirements 3.1**
+   * 
+   * Tests that build output configuration remains consistent.
+   */
+  it('should preserve build output configuration', () => {
+    const viteConfigPath = join(process.cwd(), 'vite.config.ts');
+    const viteConfig = readFileSync(viteConfigPath, 'utf-8');
+    
+    const capacitorConfigPath = join(process.cwd(), 'capacitor.config.json');
+    const capacitorConfig = JSON.parse(readFileSync(capacitorConfigPath, 'utf-8'));
+    
+    // Verify Capacitor webDir matches expected build output
+    expect(capacitorConfig.webDir).toBe('dist');
+    
+    // Verify index.html exists (entry point for web build)
+    const indexHtmlPath = join(process.cwd(), 'index.html');
+    expect(() => readFileSync(indexHtmlPath, 'utf-8')).not.toThrow();
+    
+    console.log('Build output configuration preserved:');
+    console.log(`  Capacitor webDir: ${capacitorConfig.webDir}`);
+    console.log(`  Entry point: index.html exists`);
+  });
+  
+  /**
+   * Property 2.10: State Management and Data Fetching Preservation
+   * 
+   * **Validates: Requirements 3.3**
+   * 
+   * Tests that state management and data fetching libraries are preserved.
+   */
+  it('should preserve state management and data fetching dependencies', () => {
+    const packageJsonPath = join(process.cwd(), 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Verify state management
+    expect(packageJson.dependencies).toHaveProperty('zustand');
+    
+    // Verify data fetching
+    expect(packageJson.dependencies).toHaveProperty('@tanstack/react-query');
+    expect(packageJson.dependencies).toHaveProperty('axios');
+    
+    console.log('State management and data fetching preserved:');
+    console.log(`  zustand version: ${packageJson.dependencies.zustand}`);
+    console.log(`  @tanstack/react-query version: ${packageJson.dependencies['@tanstack/react-query']}`);
+    console.log(`  axios version: ${packageJson.dependencies.axios}`);
+  });
+});

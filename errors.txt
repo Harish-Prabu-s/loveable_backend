@@ -1,0 +1,40 @@
+app/chat/[id].tsx(8,23): error TS2307: Cannot find module 'expo-image' or its corresponding type declarations.
+app/leaderboard.tsx(8,23): error TS2307: Cannot find module 'expo-image' or its corresponding type declarations.
+components/CallOverlay.tsx(9,23): error TS2307: Cannot find module 'expo-image' or its corresponding type declarations.
+components/CallOverlay.tsx(75,5): error TS2322: Type '"video" | "voice"' is not assignable to type 'WebRTCCallKind'.
+  Type '"voice"' is not assignable to type 'WebRTCCallKind'.
+components/haptic-tab.tsx(3,26): error TS2307: Cannot find module 'expo-haptics' or its corresponding type declarations.
+components/lock/PatternLock.tsx(3,27): error TS2307: Cannot find module 'react-native-svg' or its corresponding type declarations.
+components/StoriesSection.tsx(7,23): error TS2307: Cannot find module 'expo-image' or its corresponding type declarations.
+components/StoriesSection.tsx(8,53): error TS2307: Cannot find module 'expo-av' or its corresponding type declarations.
+components/StoryComposer.tsx(8,23): error TS2307: Cannot find module 'expo-image' or its corresponding type declarations.
+components/StoryComposer.tsx(9,35): error TS2307: Cannot find module 'expo-av' or its corresponding type declarations.
+components/StoryComposer.tsx(84,52): error TS2345: Argument of type 'File' is not assignable to parameter of type 'string'.
+components/ui/icon-symbol.ios.tsx(1,59): error TS2307: Cannot find module 'expo-symbols' or its corresponding type declarations.
+components/ui/icon-symbol.tsx(4,47): error TS2307: Cannot find module 'expo-symbols' or its corresponding type declarations.
+src/components/CallOverlay.tsx(210,5): error TS2322: Type '"video" | "voice"' is not assignable to type 'WebRTCCallKind'.
+  Type '"voice"' is not assignable to type 'WebRTCCallKind'.
+src/components/MSG91Widget.tsx(4,23): error TS2307: Cannot find module 'react-hot-toast' or its corresponding type declarations.
+src/components/PaymentModal.tsx(34,21): error TS2322: Type '{ children: (string | number)[]; onClick: () => void; className: string; }' is not assignable to type 'IntrinsicAttributes & ButtonProps'.
+  Property 'onClick' does not exist on type 'IntrinsicAttributes & ButtonProps'.
+src/components/StoryComposer.tsx(145,52): error TS2345: Argument of type 'File' is not assignable to parameter of type 'string'.
+src/components/ui/alert-dialog.tsx(5,10): error TS2305: Module '"@/components/ui/button"' has no exported member 'buttonVariants'.
+src/components/ui/carousel.tsx(169,6): error TS2339: Property 'className' does not exist on type 'ButtonProps'.
+src/components/ui/carousel.tsx(176,9): error TS2322: Type 'string' is not assignable to type '"sm" | "md" | "lg"'.
+src/components/ui/carousel.tsx(197,6): error TS2339: Property 'className' does not exist on type 'ButtonProps'.
+src/components/ui/carousel.tsx(204,9): error TS2322: Type 'string' is not assignable to type '"sm" | "md" | "lg"'.
+src/components/ui/drawer.tsx(2,43): error TS2307: Cannot find module 'vaul' or its corresponding type declarations.
+src/components/ui/pagination.tsx(5,10): error TS2459: Module '"@/components/ui/button"' declares 'ButtonProps' locally, but it is not exported.
+src/components/ui/pagination.tsx(5,23): error TS2305: Module '"@/components/ui/button"' has no exported member 'buttonVariants'.
+src/components/ui/sidebar.tsx(219,58): error TS2344: Type 'FC<ButtonProps>' does not satisfy the constraint 'keyof IntrinsicElements | ForwardRefExoticComponent<any> | (new (props: any, context: any) => Component<any, {}, any>) | ((props: any) => ReactNode)'.
+  Property '$$typeof' is missing in type 'FunctionComponent<ButtonProps>' but required in type 'ForwardRefExoticComponent<any>'.
+src/components/ui/sidebar.tsx(220,6): error TS2339: Property 'className' does not exist on type 'ButtonProps'.
+src/components/ui/sidebar.tsx(220,17): error TS2339: Property 'onClick' does not exist on type 'ButtonProps'.
+src/components/ui/sidebar.tsx(228,9): error TS2322: Type '"icon"' is not assignable to type '"sm" | "md" | "lg"'.
+src/components/ui/sidebar.tsx(287,56): error TS2344: Type 'FC<InputProps>' does not satisfy the constraint 'keyof IntrinsicElements | ForwardRefExoticComponent<any> | (new (props: any, context: any) => Component<any, {}, any>) | ((props: any) => ReactNode)'.
+  Property '$$typeof' is missing in type 'FunctionComponent<InputProps>' but required in type 'ForwardRefExoticComponent<any>'.
+src/components/ui/sidebar.tsx(288,6): error TS2339: Property 'className' does not exist on type 'InputProps'.
+src/components/ui/sidebar.tsx(291,9): error TS2322: Type '{ label?: string; error?: string; containerStyle?: ViewStyle; inputStyle?: TextStyle; labelStyle?: TextStyle; errorStyle?: TextStyle; allowFontScaling?: boolean; ... 159 more ...; className: string; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'ref' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/main.tsx(3,17): error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+src/store/authStore.ts(141,56): error TS2345: Argument of type 'File' is not assignable to parameter of type 'string'.

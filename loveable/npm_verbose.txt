@@ -1,0 +1,125 @@
+﻿npm : npm verbose cli C
+:\nvm4w\nodejs\node.exe
+ C:\nvm4w\nodejs\node_m
+odules\npm\bin\npm-cli.
+js
+At line:1 char:1
++ npm install 
+--dry-run --cache 
+D:\npm_cache 
+--loglevel verbose 
+2>&1 |  ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (npm verbose c   
+ li...\bin\npm-cli.    
+js:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+npm info using 
+npm@10.8.2
+npm info using 
+node@v20.20.0
+npm verbose title npm 
+install
+npm verbose argv 
+"install" "--dry-run" 
+"--cache" 
+"D:\\npm_cache" 
+"--loglevel" "verbose"
+npm verbose logfile 
+logs-max:10 dir:D:\npm_
+cache\_logs\2026-03-08T
+16_35_12_971Z-
+npm verbose logfile D:\
+npm_cache\_logs\2026-03
+-08T16_35_12_971Z-debug
+-0.log
+npm http fetch GET 200 
+https://registry.npmjs.
+org/@types%2fhammerjs 
+36ms (cache hit)
+npm verbose stack 
+TypeError: Invalid 
+Version: 
+npm verbose stack     
+at new SemVer (C:\nvm\v
+20.20.0\node_modules\np
+m\node_modules\semver\c
+lasses\semver.js:38:13)
+npm verbose stack     
+at compare (C:\nvm\v20.
+20.0\node_modules\npm\n
+ode_modules\semver\func
+tions\compare.js:3:32)
+npm verbose stack     
+at Object.gte (C:\nvm\v
+20.20.0\node_modules\np
+m\node_modules\semver\f
+unctions\gte.js:2:30)
+npm verbose stack     
+at Node.canDedupe (C:\n
+vm\v20.20.0\node_module
+s\npm\node_modules\@npm
+cli\arborist\lib\node.j
+s:1081:32)
+npm verbose stack     
+at PlaceDep.pruneDedupa
+ble (C:\nvm\v20.20.0\no
+de_modules\npm\node_mod
+ules\@npmcli\arborist\l
+ib\place-dep.js:426:14)
+npm verbose stack     
+at new PlaceDep (C:\nvm
+\v20.20.0\node_modules\
+npm\node_modules\@npmcl
+i\arborist\lib\place-de
+p.js:278:14)
+npm verbose stack     
+at #buildDepStep (C:\nv
+m\v20.20.0\node_modules
+\npm\node_modules\@npmc
+li\arborist\lib\arboris
+t\build-ideal-tree.js:9
+17:18)
+npm verbose stack     
+at async Arborist.build
+IdealTree (C:\nvm\v20.2
+0.0\node_modules\npm\no
+de_modules\@npmcli\arbo
+rist\lib\arborist\build
+-ideal-tree.js:181:7)
+npm verbose stack     
+at async Promise.all 
+(index 1)
+npm verbose stack     
+at async 
+Arborist.reify (C:\nvm\
+v20.20.0\node_modules\n
+pm\node_modules\@npmcli
+\arborist\lib\arborist\
+reify.js:131:5)
+npm error Invalid 
+Version: 
+npm verbose cwd D:\love
+able_app\react-to-andro
+id\loveable
+npm verbose os 
+Windows_NT 10.0.26200
+npm verbose node 
+v20.20.0
+npm verbose npm  
+v10.8.2
+npm verbose exit 1
+npm verbose code 1
+npm error A complete 
+log of this run can be 
+found in: D:\npm_cache\
+_logs\2026-03-08T16_35_
+12_971Z-debug-0.log

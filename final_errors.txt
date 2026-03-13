@@ -1,0 +1,7 @@
+components/ui/icon-symbol.tsx(8,27): error TS2344: Type 'SFSymbols7_0 | { ios?: SFSymbols7_0; android?: "function" | "error" | "info" | "message" | "code" | "title" | "delete" | "description" | "cancel" | "style" | ... 4044 more ... | "zoom_out_map"; web?: "function" | ... 4053 more ... | "zoom_out_map"; }' does not satisfy the constraint 'string | number | symbol'.
+  Type '{ ios?: SFSymbols7_0; android?: "function" | "error" | "info" | "message" | "code" | "title" | "delete" | "description" | "cancel" | "style" | "join" | "shift" | "sort" | ... 4041 more ... | "zoom_out_map"; web?: "function" | ... 4053 more ... | "zoom_out_map"; }' is not assignable to type 'string | number | symbol'.
+components/ui/icon-symbol.tsx(40,65): error TS2538: Type '{ ios?: SFSymbols7_0; android?: "function" | "error" | "info" | "message" | "code" | "title" | "delete" | "description" | "cancel" | "style" | "join" | "shift" | "sort" | ... 4041 more ... | "zoom_out_map"; web?: "function" | ... 4053 more ... | "zoom_out_map"; }' cannot be used as an index type.
+src/pages/DiscoverPage.tsx(12,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/HomePage.tsx(15,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/LeaderboardPage.tsx(7,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.
+src/pages/ProfilePage.tsx(9,34): error TS2307: Cannot find module '../utils/avatar' or its corresponding type declarations.

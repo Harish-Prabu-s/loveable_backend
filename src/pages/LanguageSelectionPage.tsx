@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Globe2, Check } from 'lucide-react';
-import { notify } from '@/lib/utils';
-import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/api/auth';
+import { notify } from '../lib/utils';
+import { useAuthStore } from '../store/authStore';
+import { authApi } from '../api/auth';
 import { toast } from 'sonner';
 
 const LANGUAGES = [

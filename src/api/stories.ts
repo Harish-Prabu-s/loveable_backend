@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Story, StoryView } from '@/types';
+import type { Story, StoryView } from '../types';
 
 export const storiesApi = {
   list: async (): Promise<Story[]> => {

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
+import Layout from '../components/Layout';
 import { Coins, Check, CreditCard, ArrowLeft, ShieldCheck, Loader2 } from 'lucide-react';
-import { notify } from '@/lib/utils';
-import { walletApi } from '@/api/wallet';
-import apiClient from '@/api/client';
-import { offersApi, Offer } from '@/api/offers';
+import { notify } from '../lib/utils';
+import { walletApi } from '../api/wallet';
+import apiClient from '../api/client';
+import { offersApi, Offer } from '../api/offers';
 import { toast } from 'sonner';
-import { PaymentModal } from '@/components/PaymentModal';
-import { useWalletStore } from '@/store/walletStore';
-import { useAuthStore } from '@/store/authStore';
+import { PaymentModal } from '../components/PaymentModal';
+import { useWalletStore } from '../store/walletStore';
+import { useAuthStore } from '../store/authStore';
 
 const loadScript = (src: string) => {
   return new Promise((resolve) => {
