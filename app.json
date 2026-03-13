@@ -48,6 +48,7 @@
       }
     },
     "plugins": [
+      "./plugins/withMainApplication.cjs",
       "@config-plugins/react-native-webrtc",
       "expo-secure-store",
       "./plugins/withGradleWrapper.cjs",
