@@ -6,8 +6,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "patch-package",
-    "start": "expo start -c",
-    "go": "expo start --go -c",
+    "start": "expo start --go -c",
     "build": "vite build",
     "preview": "vite preview",
     "signal": "node signaling-server.cjs",
@@ -69,7 +68,6 @@
     "expo-build-properties": "~1.0.10",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
-    "expo-dev-client": "~6.0.20",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-image-picker": "~17.0.10",
