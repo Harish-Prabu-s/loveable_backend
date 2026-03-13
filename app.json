@@ -15,23 +15,56 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./android_app/assets/images/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.loveable.loveableapp"
+      "package": "com.loveable.loveableapp",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
+    "scheme": "loveable-app",
     "web": {
       "favicon": "./public/favicon.ico",
       "bundler": "metro"
     },
     "extra": {
       "eas": {
-        "projectId": "c998b35b-b1ab-48db-b790-a12fa553da03"
+        "projectId": "88e8dc0b-8da0-4e8e-8d0a-6771e435dc93"
       }
-    }
+    },
+    "plugins": [
+      "@config-plugins/react-native-webrtc",
+      "expo-secure-store",
+      "./plugins/withGradleWrapper.cjs",
+      "./plugins/withJitsiMaven.cjs",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "newArchEnabled": true,
+            "kotlinVersion": "2.1.0"
+          }
+        }
+      ]
+    ],
+    "owner": "harish23"
   }
 }
