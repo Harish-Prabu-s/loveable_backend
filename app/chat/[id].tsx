@@ -23,9 +23,11 @@ type UiMessage = {
     audio?: boolean;
     gameId?: string;
     gameTitle?: string;
+    shareType?: 'post' | 'reel';
+    shareId?: number;
     sender: 'me' | 'other';
     timestamp: number;
-    type: 'text' | 'image' | 'audio' | 'video' | 'game_invite';
+    type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
 };
 
 export default function ChatScreen() {
@@ -56,7 +58,29 @@ export default function ChatScreen() {
             gameId = parts[1];
             gameTitle = parts[2]?.replace(']', '');
         } else if (m.type === 'voice') {
-            type = 'audio';
+            type = 'audio' as any;
+        } else if (m.type === 'post_share' && m.content.startsWith('[POST_SHARE:')) {
+            type = 'post_share';
+            const postId = m.content.match(/\[POST_SHARE:(\d+)\]/)?.[1];
+            return {
+                id: String(m.id),
+                shareType: 'post',
+                shareId: postId ? Number(postId) : undefined,
+                sender: Number(m.sender) === Number(user?.id) ? 'me' : 'other',
+                timestamp: new Date(m.created_at).getTime(),
+                type,
+            };
+        } else if (m.type === 'reel_share' && m.content.startsWith('[REEL_SHARE:')) {
+            type = 'reel_share';
+            const reelId = m.content.match(/\[REEL_SHARE:(\d+)\]/)?.[1];
+            return {
+                id: String(m.id),
+                shareType: 'reel',
+                shareId: reelId ? Number(reelId) : undefined,
+                sender: Number(m.sender) === Number(user?.id) ? 'me' : 'other',
+                timestamp: new Date(m.created_at).getTime(),
+                type,
+            };
         } else {
             type = m.type as any;
         }
@@ -235,6 +259,32 @@ export default function ChatScreen() {
                                         )}
                                         {msg.type === 'image' && msg.image && (
                                             <Image source={{ uri: msg.image }} style={styles.messageImage} />
+                                        )}
+                                        {(msg.type === 'post_share' || msg.type === 'reel_share') && (
+                                            <TouchableOpacity 
+                                                style={styles.shareCard}
+                                                onPress={() => {
+                                                    if (msg.shareType === 'post') {
+                                                        router.push({ pathname: '/post/[id]' as any, params: { id: msg.shareId } });
+                                                    } else {
+                                                        router.push({ pathname: '/reels' as any, params: { reelId: msg.shareId } });
+                                                    }
+                                                }}
+                                            >
+                                                <View style={styles.shareCardHeader}>
+                                                    <MaterialCommunityIcons 
+                                                        name={msg.shareType === 'post' ? "image-outline" : "movie-play-outline"} 
+                                                        size={20} 
+                                                        color={isMe ? "#FFFFFF" : "#8B5CF6"} 
+                                                    />
+                                                    <Text style={[styles.shareCardTitle, isMe ? styles.messageTextMe : styles.messageTextOther]}>
+                                                        Shared {msg.shareType}
+                                                    </Text>
+                                                </View>
+                                                <Text style={[styles.shareCardAction, isMe ? styles.messageTextMe : { color: '#8B5CF6' }]}>
+                                                    Tap to view
+                                                </Text>
+                                            </TouchableOpacity>
                                         )}
                                         <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextOther]}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -469,5 +519,27 @@ const styles = StyleSheet.create({
     micButton: {
         padding: 10,
         marginBottom: 2,
+    },
+    shareCard: {
+        padding: 8,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        minWidth: 150,
+    },
+    shareCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    shareCardTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    shareCardAction: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 4,
+        textAlign: 'center',
     },
 });

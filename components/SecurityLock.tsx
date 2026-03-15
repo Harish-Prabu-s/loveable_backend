@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Vibration, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MotiView, AnimatePresence } from 'moti';
@@ -17,27 +17,42 @@ export const SecurityLock = () => {
 
     useEffect(() => {
         if (isLocked && biometricsEnabled) {
-            handleBiometricAuth();
+            // Slight delay to ensure UI is ready and feels smooth
+            const timer = setTimeout(() => {
+                handleBiometricAuth();
+            }, 300);
+            return () => clearTimeout(timer);
         }
-    }, [isLocked]);
+    }, [isLocked, biometricsEnabled]);
 
     const handleBiometricAuth = async () => {
+        if (!biometricsEnabled) return;
+        
         try {
-            const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Unlock Vibely',
-                fallbackLabel: 'Use PIN',
-            });
-            if (result.success) {
-                setLocked(false);
-                setEnteredPin('');
+            const hasHardware = await LocalAuthentication.hasHardwareAsync();
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+            
+            if (hasHardware && isEnrolled) {
+                const result = await LocalAuthentication.authenticateAsync({
+                    promptMessage: 'Unlock Vibely',
+                    fallbackLabel: 'Use PIN',
+                    disableDeviceFallback: false,
+                    cancelLabel: 'Cancel',
+                });
+                
+                if (result.success) {
+                    setLocked(false);
+                    setEnteredPin('');
+                }
             }
         } catch (e) {
-            console.error(e);
+            console.error('Biometric error:', e);
         }
     };
 
     const handlePress = (num: string) => {
-        if (enteredPin.length >= 4) return;
+        if (enteredPin.length >= 4 || error) return;
+        
         const newPin = enteredPin + num;
         setEnteredPin(newPin);
 
@@ -52,46 +67,54 @@ export const SecurityLock = () => {
                 setTimeout(() => {
                     setEnteredPin('');
                     setError(false);
-                }, 500);
+                }, 800);
             }
         }
     };
 
     const handleDelete = () => {
-        setEnteredPin(prev => prev.slice(0, -1));
+        if (enteredPin.length > 0) {
+            setEnteredPin(prev => prev.slice(0, -1));
+        }
     };
 
     if (!isLocked) return null;
 
     return (
         <View style={StyleSheet.absoluteFill}>
-            <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={Platform.OS === 'ios' ? 90 : 100} tint="dark" style={StyleSheet.absoluteFill} />
 
             <LinearGradient
-                colors={['rgba(139, 92, 246, 0.2)', 'transparent', 'rgba(139, 92, 246, 0.1)']}
+                colors={['rgba(139, 92, 246, 0.3)', 'transparent', 'rgba(139, 92, 246, 0.15)']}
                 style={StyleSheet.absoluteFill}
             />
 
             <View style={styles.container}>
                 <MotiView
-                    from={{ opacity: 0, scale: 0.9, translateY: 20 }}
+                    from={{ opacity: 0, scale: 0.9, translateY: 30 }}
                     animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                    transition={{ type: 'spring', damping: 15 }}
                     style={styles.content}
                 >
-                    <MaterialCommunityIcons name="lock-outline" size={64} color="#8B5CF6" />
-                    <Text style={styles.title}>Vibely Locked</Text>
-                    <Text style={styles.subtitle}>Enter PIN to unlock your account</Text>
+                    <View style={styles.iconContainer}>
+                        <MaterialCommunityIcons name="shield-lock-outline" size={56} color="#8B5CF6" />
+                    </View>
+                    
+                    <Text style={styles.title}>Vibely Security</Text>
+                    <Text style={styles.subtitle}>Authentication required to continue</Text>
 
                     <View style={styles.dotsContainer}>
-                        {[1, 2, 3, 4].map((_, i) => (
+                        {[0, 1, 2, 3].map((i) => (
                             <MotiView
                                 key={i}
                                 animate={{
                                     scale: enteredPin.length > i ? 1.2 : 1,
-                                    backgroundColor: enteredPin.length > i ? '#8B5CF6' : '#1E293B',
-                                    borderColor: error ? '#EF4444' : '#8B5CF6',
+                                    backgroundColor: error ? '#EF4444' : (enteredPin.length > i ? '#8B5CF6' : 'rgba(255,255,255,0.1)'),
+                                    borderColor: error ? '#EF4444' : (enteredPin.length > i ? '#8B5CF6' : 'rgba(139, 92, 246, 0.3)'),
+                                    translateX: error ? (i % 2 === 0 ? 5 : -5) : 0
                                 }}
-                                style={[styles.dot, error && styles.dotError]}
+                                transition={error ? { type: 'timing', duration: 100 } : { type: 'spring' }}
+                                style={styles.dot}
                             />
                         ))}
                     </View>
@@ -102,20 +125,38 @@ export const SecurityLock = () => {
                                 key={num}
                                 style={styles.key}
                                 onPress={() => handlePress(String(num))}
+                                activeOpacity={0.7}
                             >
                                 <Text style={styles.keyText}>{num}</Text>
                             </TouchableOpacity>
                         ))}
-                        <TouchableOpacity style={styles.key} onPress={handleBiometricAuth}>
-                            {biometricsEnabled && <MaterialCommunityIcons name="fingerprint" size={28} color="#8B5CF6" />}
+                        <TouchableOpacity 
+                            style={[styles.key, { borderColor: 'transparent', backgroundColor: 'transparent' }]} 
+                            onPress={handleBiometricAuth}
+                            activeOpacity={0.6}
+                        >
+                            {biometricsEnabled && <MaterialCommunityIcons name="fingerprint" size={32} color="#8B5CF6" />}
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.key} onPress={() => handlePress('0')}>
+                        <TouchableOpacity
+                            style={styles.key}
+                            onPress={() => handlePress('0')}
+                            activeOpacity={0.7}
+                        >
                             <Text style={styles.keyText}>0</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.key} onPress={handleDelete}>
-                            <MaterialCommunityIcons name="backspace-outline" size={24} color="#64748B" />
+                        <TouchableOpacity 
+                            style={[styles.key, { borderColor: 'transparent', backgroundColor: 'transparent' }]} 
+                            onPress={handleDelete}
+                            onLongPress={() => setEnteredPin('')}
+                            activeOpacity={0.6}
+                        >
+                            <MaterialCommunityIcons name="backspace-outline" size={28} color="#94A3B8" />
                         </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity style={styles.forgotBtn} onPress={() => toast.info("Please use your fingerprint or contact support")}>
+                        <Text style={styles.forgotText}>Forgot PIN?</Text>
+                    </TouchableOpacity>
                 </MotiView>
             </View>
         </View>
@@ -132,54 +173,68 @@ const styles = StyleSheet.create({
     content: {
         alignItems: 'center',
         width: '100%',
+        maxWidth: 400,
+    },
+    iconContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
     },
     title: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: 'bold',
         color: '#F8FAFC',
-        marginTop: 20,
     },
     subtitle: {
         fontSize: 16,
         color: '#94A3B8',
         marginTop: 8,
-        marginBottom: 40,
+        marginBottom: 48,
     },
     dotsContainer: {
         flexDirection: 'row',
-        gap: 15,
-        marginBottom: 50,
+        gap: 20,
+        marginBottom: 60,
     },
     dot: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    dotError: {
-        backgroundColor: '#EF4444',
-        borderColor: '#EF4444',
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1.5,
     },
     keypad: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         width: width * 0.8,
         justifyContent: 'center',
-        gap: 20,
+        gap: 24,
     },
     key: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: '#0F172A',
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(30, 41, 59, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#1E293B',
+        borderColor: 'rgba(148, 163, 184, 0.1)',
     },
     keyText: {
-        fontSize: 24,
+        fontSize: 28,
         color: '#F8FAFC',
-        fontWeight: '600',
+        fontWeight: '500',
     },
+    forgotBtn: {
+        marginTop: 40,
+        padding: 10,
+    },
+    forgotText: {
+        color: '#8B5CF6',
+        fontSize: 15,
+        fontWeight: '600',
+    }
 });

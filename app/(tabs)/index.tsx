@@ -249,11 +249,20 @@ const createStyles = StyleSheet.create({
   charCount: { fontSize: 12, textAlign: 'right', marginTop: 8 },
 });
 
+import { CommentSheet } from '@/components/CommentSheet';
+import { ShareSheet } from '@/components/ShareSheet';
+
 // ─── Post Card ───────────────────────────────────────────────────────────────
 
 function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }) {
   const { colors } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
+  
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  
+  const [showShare, setShowShare] = useState(false);
 
   const handleLike = () => {
     Animated.sequence([
@@ -261,6 +270,34 @@ function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }
       Animated.timing(scale, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
     onLike(post.id);
+  };
+
+  const handleOpenComments = async () => {
+    setShowComments(true);
+    setCommentsLoading(true);
+    try {
+      const data = await postsApi.getComments(post.id);
+      setComments(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleAddComment = async (text: string) => {
+    try {
+      await postsApi.addComment(post.id, text);
+      const data = await postsApi.getComments(post.id);
+      setComments(data);
+    } catch (e) {
+      toast.error("Failed to post comment");
+    }
+  };
+
+  const handleShare = async (targetUserId: number) => {
+    await postsApi.sharePost(post.id, targetUserId);
+    setShowShare(false);
   };
 
   return (
@@ -305,14 +342,28 @@ function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }
           </Animated.View>
           <Text style={[postStyles.actionCount, { color: colors.textSecondary }]}>{post.likes_count}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={postStyles.actionBtn}>
+        <TouchableOpacity style={postStyles.actionBtn} onPress={handleOpenComments}>
           <MaterialCommunityIcons name="comment-outline" size={22} color={colors.textMuted} />
           <Text style={[postStyles.actionCount, { color: colors.textSecondary }]}>{post.comments_count}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={postStyles.actionBtn}>
+        <TouchableOpacity style={postStyles.actionBtn} onPress={() => setShowShare(true)}>
           <MaterialCommunityIcons name="share-outline" size={22} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
+
+      <CommentSheet 
+        visible={showComments}
+        onClose={() => setShowComments(false)}
+        comments={comments}
+        loading={commentsLoading}
+        onAddComment={handleAddComment}
+      />
+
+      <ShareSheet 
+        visible={showShare}
+        onClose={() => setShowShare(false)}
+        onShare={handleShare}
+      />
     </View>
   );
 }
@@ -340,6 +391,8 @@ const postStyles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 13, fontWeight: '600' },
 });
+
+import { toast } from '@/utils/toast';
 
 // ─── Main Home Screen ─────────────────────────────────────────────────────────
 

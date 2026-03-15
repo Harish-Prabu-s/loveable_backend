@@ -31,6 +31,7 @@ def _serialize_post(post, request_user, request=None):
         'likes_count': PostLike.objects.filter(post=post).count(),
         'comments_count': post.comments.count(),
         'is_liked': is_liked,
+        'is_owner': post.user == request_user,
         'created_at': post.created_at.isoformat(),
     }
 
@@ -80,17 +81,19 @@ def like_view(request, post_id: int):
     
     # Send notification to content owner if liked
     if result.get('is_liked'):
-        from ...models import Post, PushToken
+        from ...models import Post
         try:
             post = Post.objects.get(pk=post_id)
             if post.user != request.user:
-                from ..notifications.push_service import send_push_notification
-                tokens = list(PushToken.objects.filter(user=post.user).values_list('expo_token', flat=True))
+                from ..notifications.push_service import send_push_notification, _get_user_tokens
+                tokens = _get_user_tokens(post.user.id)
+                profile = getattr(request.user, 'profile', None)
+                sender_name = profile.display_name if profile else request.user.username
                 if tokens:
                     send_push_notification(
                         tokens, 
                         title="New Like!", 
-                        body=f"{request.user.display_name or request.user.username} liked your post!",
+                        body=f"{sender_name} liked your post!",
                         data={'type': 'post_like', 'post_id': post.id}
                     )
         except Post.DoesNotExist:
@@ -113,13 +116,15 @@ def comment_view(request, post_id: int):
         
         # Send notification to content owner
         if post.user != request.user:
-            from ..notifications.push_service import send_push_notification
-            tokens = list(PushToken.objects.filter(user=post.user).values_list('expo_token', flat=True))
+            from ..notifications.push_service import send_push_notification, _get_user_tokens
+            tokens = _get_user_tokens(post.user.id)
+            profile = getattr(request.user, 'profile', None)
+            sender_name = profile.display_name if profile else request.user.username
             if tokens:
                 send_push_notification(
                     tokens, 
                     title="New Comment!", 
-                    body=f"{request.user.display_name or request.user.username} commented on your post: {text[:30]}...",
+                    body=f"{sender_name} commented: {text[:30]}...",
                     data={'type': 'post_comment', 'post_id': post.id}
                 )
 
@@ -127,6 +132,75 @@ def comment_view(request, post_id: int):
     except Post.DoesNotExist:
         return Response({'error': 'post not found'}, status=404)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def share_post_view(request, post_id: int):
+    from ...models import Post, User, Message, Room
+    target_user_id = request.data.get('target_user_id')
+    if not target_user_id:
+        return Response({'error': 'target_user_id required'}, status=400)
+    
+    try:
+        post = Post.objects.get(pk=post_id)
+        target_user = User.objects.get(pk=target_user_id)
+        
+        # Create/Find Chat Room
+        from ..chat.services import get_or_create_room
+        room = get_or_create_room(request.user, target_user.id, 'audio') # Default to audio if new
+        
+        # Create Message for sharing
+        from ...utils import get_absolute_media_url
+        msg_media_url = get_absolute_media_url(post.image, request)
+        Message.objects.create(
+            room=room,
+            sender=request.user,
+            content=f"[POST_SHARE:{post.id}]",
+            type='post_share',
+            media_url=msg_media_url
+        )
+
+        # Send notification to target user
+        from ..notifications.push_service import send_push_notification, _get_user_tokens
+        tokens = _get_user_tokens(target_user.id)
+        profile = getattr(request.user, 'profile', None)
+        sender_name = profile.display_name if profile else request.user.username
+        if tokens:
+            send_push_notification(
+                tokens, 
+                title="Shared Post", 
+                body=f"{sender_name} shared a post with you.",
+                data={'type': 'post_share', 'post_id': post.id, 'from_user_id': request.user.id}
+            )
+        
+        return Response({'success': True})
+    except (Post.DoesNotExist, User.DoesNotExist):
+        return Response({'error': 'post or user not found'}, status=404)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def list_comments_view(request, post_id: int):
+    if request.method == 'POST':
+        return comment_view(request._request, post_id)
+    from ...models import Post, PostComment
+    from ...utils import get_absolute_media_url
+    try:
+        post = Post.objects.get(pk=post_id)
+        comments = post.comments.all().select_related('user__profile').order_by('-created_at')
+        data = []
+        for c in comments:
+            p = getattr(c.user, 'profile', None)
+            data.append({
+                'id': c.id,
+                'user': c.user.id,
+                'display_name': p.display_name if p else '',
+                'photo': get_absolute_media_url(p.photo, request) if p and p.photo else None,
+                'text': c.text,
+                'created_at': c.created_at.isoformat(),
+            })
+        return Response(data)
+    except Post.DoesNotExist:
+        return Response({'error': 'post not found'}, status=404)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])

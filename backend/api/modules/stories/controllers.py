@@ -114,17 +114,60 @@ def comment_story_view(request, story_id):
 
         # Send notification to content owner
         if story.user != request.user:
-            from ..notifications.push_service import send_push_notification
-            from ...models import PushToken
-            tokens = list(PushToken.objects.filter(user=story.user).values_list('expo_token', flat=True))
+            from ..notifications.push_service import send_push_notification, _get_user_tokens
+            tokens = _get_user_tokens(story.user.id)
+            profile = getattr(request.user, 'profile', None)
+            sender_name = profile.display_name if profile else request.user.username
             if tokens:
                 send_push_notification(
                     tokens, 
                     title="New Story Comment!", 
-                    body=f"{request.user.display_name or request.user.username} commented on your story: {text[:30]}...",
+                    body=f"{sender_name} commented on your story: {text[:30]}...",
                     data={'type': 'story_comment', 'story_id': story.id}
                 )
 
         return Response({'success': True, 'id': comment.id})
     except Story.DoesNotExist:
         return Response({'error': 'Story not found'}, status=404)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def list_story_comments_view(request, story_id: int):
+    if request.method == 'POST':
+        return comment_story_view(request._request, story_id)
+    
+    from ...models import Story, StoryComment
+    from ...utils import get_absolute_media_url
+    try:
+        story = Story.objects.get(pk=story_id)
+        comments = story.comments.all().select_related('user__profile').order_by('-created_at')
+        data = []
+        for c in comments:
+            p = getattr(c.user, 'profile', None)
+            data.append({
+                'id': c.id,
+                'user': c.user.id,
+                'display_name': p.display_name if p else '',
+                'photo': get_absolute_media_url(p.photo, request) if p and p.photo else None,
+                'text': c.text,
+                'created_at': c.created_at.isoformat(),
+            })
+        return Response(data)
+    except Story.DoesNotExist:
+        return Response({'error': 'Story not found'}, status=404)
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_story_view(request, story_id: int):
+    try:
+        story = Story.objects.get(id=story_id)
+        if story.user != request.user:
+            return Response({'error': 'permission denied'}, status=403)
+        
+        # Delete file from storage
+        if story.media_url:
+            story.media_url.delete(save=False)
+            
+        story.delete()
+        return Response(status=204)
+    except Story.DoesNotExist:
+        return Response({'error': 'story not found'}, status=404)

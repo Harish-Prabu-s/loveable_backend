@@ -44,6 +44,7 @@ class Profile(models.Model):
     display_name = models.CharField(max_length=120, default='User')
     bio = models.TextField(blank=True)
     photo = models.ImageField(upload_to='profiles/', null=True, blank=True)
+    device_token = models.CharField(max_length=255, null=True, blank=True)
     interests = models.JSONField(default=list, blank=True)
     age = models.IntegerField(null=True, blank=True)
     location = models.CharField(max_length=120, null=True, blank=True)

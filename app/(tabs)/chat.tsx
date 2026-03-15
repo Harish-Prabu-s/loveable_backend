@@ -18,17 +18,17 @@ import { generateAvatarUrl } from '@/utils/avatar';
 import { getMediaUrl } from '@/utils/media';
 
 export default function ChatScreen() {
-  const [rooms, setRooms] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const loadRooms = async () => {
+  const loadContacts = async () => {
     try {
-      const data = await chatApi.getRooms();
-      setRooms(data || []);
+      const data = await chatApi.getContactList();
+      setContacts(data || []);
     } catch (error) {
-      console.error('Failed to load chat rooms:', error);
+      console.error('Failed to load contacts:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -36,17 +36,17 @@ export default function ChatScreen() {
   };
 
   useEffect(() => {
-    loadRooms();
+    loadContacts();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadRooms();
+    loadContacts();
   };
 
-  const filteredRooms = (Array.isArray(rooms) ? rooms : []).filter(room =>
-    room.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    room.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredContacts = (Array.isArray(contacts) ? contacts : []).filter(contact =>
+    contact.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    contact.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading && !refreshing) {
@@ -88,43 +88,40 @@ export default function ChatScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F9FAFB" />
         }
       >
-        {filteredRooms.length === 0 ? (
+        {filteredContacts.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="message-outline" size={64} color="#334155" />
             <Text style={styles.emptyText}>No messages yet</Text>
             <Text style={styles.emptySubText}>Start a conversation with someone!</Text>
           </View>
         ) : (
-          filteredRooms.map((room) => (
+          filteredContacts.map((contact) => (
             <TouchableOpacity
-              key={room.id}
+              key={contact.id}
               style={styles.chatItem}
               onPress={() => {
-                router.push({ pathname: '/chat/[id]' as any, params: { id: room.id } });
+                // We navigate to /[id] where [id] is the other user's ID
+                // The receiver logic in [id].tsx should handle this
+                router.push({ pathname: '/chat/[id]' as any, params: { id: contact.id, isUser: 'true' } });
               }}
             >
               <Image
                 source={{
-                  uri: room.image
-                    ? (getMediaUrl(room.image) || generateAvatarUrl(room.id ?? room.participant_id ?? 'room', undefined))
-                    : generateAvatarUrl(room.id ?? room.participant_id ?? 'room', room.participant_gender)
+                  uri: contact.photo || generateAvatarUrl(contact.id, 'O')
                 }}
                 style={styles.avatar}
               />
               <View style={styles.chatInfo}>
                 <View style={styles.chatHeader}>
-                  <Text style={styles.roomName} numberOfLines={1}>{room.name || 'Chat Room'}</Text>
-                  <Text style={styles.time}>{room.last_message_time || 'Now'}</Text>
+                  <Text style={styles.roomName} numberOfLines={1}>{contact.display_name || contact.username}</Text>
+                  <Text style={styles.time}>{contact.last_timestamp ? new Date(contact.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</Text>
                 </View>
                 <View style={styles.chatFooter}>
                   <Text style={styles.lastMessage} numberOfLines={1}>
-                    {room.last_message || 'Start chatting...'}
+                    {contact.last_message_type === 'post_share' ? 'Shared a post' : 
+                     contact.last_message_type === 'reel_share' ? 'Shared a reel' : 
+                     contact.last_message || 'Start chatting...'}
                   </Text>
-                  {room.unread_count > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{room.unread_count}</Text>
-                    </View>
-                  )}
                 </View>
               </View>
             </TouchableOpacity>

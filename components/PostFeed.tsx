@@ -60,6 +60,17 @@ export default function PostFeed() {
         }
     };
 
+    const handleDeletePost = async (postId: number) => {
+        try {
+            await postsApi.deletePost(postId);
+            setPosts(prev => prev.filter(p => p.id !== postId));
+            toast.success("Post deleted");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to delete post");
+        }
+    };
+
     const renderPost = ({ item, index }: { item: Post, index: number }) => (
         <View style={styles.postContainer}>
             {/* Header */}
@@ -70,9 +81,16 @@ export default function PostFeed() {
                         <Text style={styles.username}>{item.display_name || item.username}</Text>
                     </View>
                 </View>
-                <TouchableOpacity>
-                    <MaterialCommunityIcons name="dots-vertical" size={24} color="#94A3B8" />
-                </TouchableOpacity>
+                <View style={styles.headerRight}>
+                    {item.is_owner && (
+                        <TouchableOpacity onPress={() => handleDeletePost(item.id)} style={styles.headerBtn}>
+                            <MaterialCommunityIcons name="delete-outline" size={24} color="#EF4444" />
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity>
+                        <MaterialCommunityIcons name="dots-vertical" size={24} color="#94A3B8" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Image */}
@@ -146,6 +164,14 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 12,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerBtn: {
+        padding: 4,
+        marginRight: 8,
     },
     userInfo: {
         flexDirection: 'row',

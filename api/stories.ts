@@ -7,7 +7,8 @@ export interface Story {
   media_url: string;
   media_type: string;
   created_at: string;
-  expires_at: string;
+  expires_at: string | null;
+  is_owner: boolean;
   user_display_name: string;
   user_avatar: string;
   view_count: number;
@@ -85,9 +86,13 @@ export const storiesApi = {
     return res.data;
   },
 
-  addComment: async (story_id: number, text: string): Promise<any> => {
-    const res = await client.post(`/stories/${story_id}/comment/`, { text });
+  commentStory: async (id: number, text: string): Promise<{ success: boolean; id: number }> => {
+    const res = await client.post(`/stories/${id}/comment/`, { text });
     return res.data;
+  },
+
+  deleteStory: async (id: number): Promise<void> => {
+    await client.delete(`/stories/${id}/delete/`);
   },
 
   like: async (story_id: number): Promise<{ liked: boolean; likes_count: number }> => {

@@ -60,7 +60,7 @@
             "usesCleartextTraffic": true,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "newArchEnabled": true,
+            "newArchEnabled": false,
             "kotlinVersion": "2.1.0"
           }
         }

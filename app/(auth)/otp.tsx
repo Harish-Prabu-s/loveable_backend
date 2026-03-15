@@ -15,11 +15,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { authApi } from '../../api/auth';
-import { storage } from '../../lib/storage';
-import { useAuth } from '../../context/AuthContext';
-import { useAuthStore } from '../../store/authStore';
-import type { User } from '../../types';
+import { authApi } from '@/api/auth';
+import { storage } from '@/lib/storage';
+import { useAuth } from '@/context/AuthContext';
+import { useAuthStore } from '@/store/authStore';
+import type { User } from '@/types';
 import { MotiView } from 'moti';
 
 export default function OtpVerificationScreen() {

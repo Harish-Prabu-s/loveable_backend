@@ -21,7 +21,7 @@ import { useAuthStore } from '@/store/authStore';
 export default function FollowingScreen() {
     const { userId } = useLocalSearchParams<{ userId?: string }>();
     const parsedUserId = userId ? parseInt(userId, 10) : undefined;
-    const { user } = useAuthStore();
+    const { user, isInitialized } = useAuthStore();
 
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,10 +32,16 @@ export default function FollowingScreen() {
 
     const load = useCallback(async () => {
         try {
-            if (!targetId) return;
+            if (!isInitialized) return; // Wait for store to hydrate
+            if (!targetId) {
+                console.warn('[Following] No targetId found. isInitialized:', isInitialized, 'user?.id:', user?.id, 'userId_param:', userId);
+                return;
+            }
+            console.log(`[Following] Fetching following list for targetId: ${targetId}`);
             const data = await profilesApi.getFollowing(targetId);
             // Handle both paginated ({ results: [] }) and plain array responses
             const list = Array.isArray(data) ? data : (data as any)?.results ?? [];
+            console.log(`[Following] Received ${list.length} users`);
             setUsers(list);
         } catch (error) {
             console.error('Failed to load following list:', error);

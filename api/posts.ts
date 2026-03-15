@@ -14,6 +14,7 @@ export interface Post {
     likes_count: number;
     comments_count: number;
     is_liked: boolean;
+    is_owner: boolean;
     created_at: string;
 }
 
@@ -78,5 +79,23 @@ export const postsApi = {
     /** Delete a post */
     deletePost: async (postId: number): Promise<void> => {
         await apiClient.delete(`posts/${postId}/`);
+    },
+
+    /** Get comments for a post */
+    getComments: async (postId: number): Promise<any[]> => {
+        const response = await apiClient.get(`posts/${postId}/comments/`);
+        return Array.isArray(response.data) ? response.data : (response.data?.results ?? []);
+    },
+
+    /** Add a comment to a post */
+    addComment: async (postId: number, text: string): Promise<any> => {
+        const response = await apiClient.post(`posts/${postId}/comment/`, { text });
+        return response.data;
+    },
+
+    /** Share a post with a friend */
+    sharePost: async (postId: number, targetUserId: number): Promise<{ success: boolean }> => {
+        const response = await apiClient.post(`posts/${postId}/share/`, { target_user_id: targetUserId });
+        return response.data;
     },
 };

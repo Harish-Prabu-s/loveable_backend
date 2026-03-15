@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "jsx": "react-jsx",
+    "jsx": "react-native",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "module": "esnext",
@@ -11,6 +11,15 @@
         "./*"
       ]
     },
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "types": [
+      "node",
+      "react",
+      "react-native"
+    ],
     "noImplicitAny": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,

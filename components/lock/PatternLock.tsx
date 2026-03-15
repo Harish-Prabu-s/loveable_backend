@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { View, Text, StyleSheet, PanResponder, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -112,16 +112,17 @@ export default function PatternLock({
             const start = getDotCoords(dotIndex);
             const end = getDotCoords(pattern[i + 1]);
             return (
-              <Line
-                key={`line-${i}`}
-                x1={start.x}
-                y1={start.y}
-                x2={end.x}
-                y2={end.y}
-                stroke={error ? '#EF4444' : '#8B5CF6'}
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
+              <Fragment key={`line-${i}`}>
+                <Line
+                  x1={start.x}
+                  y1={start.y}
+                  x2={end.x}
+                  y2={end.y}
+                  stroke={error ? '#EF4444' : '#8B5CF6'}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+              </Fragment>
             );
           })}
 

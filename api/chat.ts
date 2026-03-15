@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Room, Message } from '@/types';
+import type { Room, Message, Contact } from '@/types';
 
 export const chatApi = {
   createRoom: async (receiver_id: number, call_type: 'audio' | 'video' = 'audio'): Promise<Room> => {
@@ -24,7 +24,7 @@ export const chatApi = {
     const data = res.data;
     return Array.isArray(data) ? data : (data?.results ?? []);
   },
-  sendMessage: async (room_id: number, content: string, type: 'text' | 'image' | 'audio' | 'game_invite' = 'text', media_url?: string, duration_seconds?: number): Promise<Message> => {
+  sendMessage: async (room_id: number, content: string, type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share' = 'text', media_url?: string, duration_seconds?: number): Promise<Message> => {
     const res = await apiClient.post(`chat/messages/${room_id}/send/`, { content, type, media_url, duration_seconds });
     return res.data;
   },
@@ -38,5 +38,9 @@ export const chatApi = {
     formData.append('type', type);
     const res = await apiClient.post('uploads/', formData);
     return res.data;
+  },
+  getContactList: async (): Promise<Contact[]> => {
+    const res = await apiClient.get('chat/contact-list/');
+    return Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
   },
 };

@@ -6,8 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-export default function StoryViewer({ visible, story, onClose, onNext, onPrev }) {
+export default function StoryViewer({ visible, story, onClose, onNext, onPrev, onDelete }) {
     const [progress, setProgress] = useState(0);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         let timer;
@@ -52,9 +53,24 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev })
                             <Text style={styles.username}>{story.user_display_name}</Text>
                             <Text style={styles.timeText}>2h</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                            <MaterialCommunityIcons name="close" size={28} color="#FFF" />
-                        </TouchableOpacity>
+                        <View style={styles.headerRight}>
+                            {story.is_owner && (
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        setIsDeleting(true);
+                                        await onDelete(story.id);
+                                        setIsDeleting(false);
+                                    }} 
+                                    style={styles.headerBtn}
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? <ActivityIndicator size="small" color="#EF4444" /> : <MaterialCommunityIcons name="delete-outline" size={24} color="#EF4444" />}
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
+                                <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Controls Overlay */}
@@ -142,8 +158,13 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.6)',
         fontSize: 12,
     },
-    closeBtn: {
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerBtn: {
         padding: 8,
+        marginLeft: 8,
     },
     controlsOverlay: {
         ...StyleSheet.absoluteFillObject,

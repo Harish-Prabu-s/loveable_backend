@@ -22,7 +22,7 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     pin: null,
     biometricsEnabled: false,
     lastBackgroundTime: null,
-    lockGracePeriod: 30000, // 30 seconds
+    lockGracePeriod: 0, // Instant lock
 
     initialize: async () => {
         const pin = await storage.getItem('app_lock_pin');
@@ -53,11 +53,9 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     recordBackgroundTime: () => set({ lastBackgroundTime: Date.now() }),
 
     checkLockNeeded: () => {
-        const { lastBackgroundTime, lockGracePeriod, pin } = get();
+        const { pin } = get();
         if (!pin) return false;
-        if (!lastBackgroundTime) return false;
-
-        const timeInBackground = Date.now() - lastBackgroundTime;
-        return timeInBackground > lockGracePeriod;
+        // Requirement: "Even if the app is reopened within 1 second -> require authentication"
+        return true; 
     },
 }));

@@ -49,6 +49,20 @@ def profile_by_id(request, user_id: int):
 @permission_classes([IsAuthenticated])
 def follow_view(request, user_id: int):
     follow_user(request.user, user_id)
+    
+    # Send notification to the user being followed
+    from ..notifications.push_service import send_push_notification, _get_user_tokens
+    tokens = _get_user_tokens(user_id)
+    profile = getattr(request.user, 'profile', None)
+    sender_name = profile.display_name if profile else request.user.username
+    if tokens:
+        send_push_notification(
+            tokens, 
+            title="New Follower!", 
+            body=f"{sender_name} started following you!",
+            data={'type': 'follow', 'user_id': request.user.id}
+        )
+    
     return Response({'status': 'followed'})
 
 @api_view(['POST'])

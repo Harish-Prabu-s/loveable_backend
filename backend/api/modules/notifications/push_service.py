@@ -231,6 +231,18 @@ def _get_messages(lang: str, hour: int) -> list[str]:
     return slot.get(lang, slot.get('en', ['Hey! Come chat with someone today 😊']))
 
 
+def _get_user_tokens(user_id: int) -> list[str]:
+    """Helper to get all valid tokens for a user from both PushToken and Profile models."""
+    from api.models import PushToken, Profile
+    tokens = set(PushToken.objects.filter(user_id=user_id).values_list('expo_token', flat=True))
+    try:
+        profile = Profile.objects.get(user_id=user_id)
+        if profile.device_token and profile.device_token.startswith('ExponentPushToken'):
+            tokens.add(profile.device_token)
+    except Profile.DoesNotExist:
+        pass
+    return list(tokens)
+
 def send_push_notification(tokens: list[str], title: str, body: str, data: dict = None) -> dict:
     """Send push notifications to a list of Expo tokens via Expo's API."""
     if not tokens:
@@ -294,26 +306,29 @@ def send_scheduled_push(hour: int) -> dict:
         notifications_enabled=True
     ).values_list('user_id', flat=True)
 
-    # Group tokens by language
-    lang_tokens: dict[str, list[str]] = {}
-    push_tokens = PushToken.objects.filter(
-        user_id__in=enabled_user_ids
-    ).select_related('user__profile')
+    # Group user IDs by language
+    lang_user_ids: dict[str, list[int]] = {}
+    profiles = Profile.objects.filter(user_id__in=enabled_user_ids).values('user_id', 'language')
 
-    for pt in push_tokens:
-        try:
-            lang = pt.user.profile.language or 'en'
-        except Exception:
-            lang = 'en'
-        lang_tokens.setdefault(lang, []).append(pt.expo_token)
+    for p in profiles:
+        lang = p.get('language') or 'en'
+        lang_user_ids.setdefault(lang, []).append(p['user_id'])
 
     total_sent = 0
     total_errors = 0
 
-    for lang, tokens in lang_tokens.items():
+    for lang, user_ids in lang_user_ids.items():
+        # Get all tokens for these users
+        all_tokens = []
+        for uid in user_ids:
+            all_tokens.extend(_get_user_tokens(uid))
+        
+        if not all_tokens:
+            continue
+
         msgs = _get_messages(lang, hour)
         body = random.choice(msgs)
-        result = send_push_notification(tokens, title='', body=body)
+        result = send_push_notification(all_tokens, title='', body=body)
         total_sent += result['sent']
         total_errors += result['errors']
         logger.info('Sent %d notifications for lang=%s hour=%s', result['sent'], lang, hour)
@@ -345,7 +360,7 @@ def send_refund_notification(user_id: int) -> dict:
         lang = 'en'
 
     message = REFUND_MESSAGES.get(lang, REFUND_MESSAGES['en'])
-    tokens = list(PushToken.objects.filter(user_id=user_id).values_list('expo_token', flat=True))
+    tokens = _get_user_tokens(user_id)
 
     if not tokens:
         return {'sent': 0, 'errors': 0}

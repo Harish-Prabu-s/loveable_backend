@@ -24,7 +24,64 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const { user, token } = useAuth();
     const router = useRouter();
     const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
+    const [expoToken, setExpoToken] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const notificationListener = useRef<any>(null);
+    const responseListener = useRef<any>(null);
+
+    useEffect(() => {
+        setupNotifications();
+
+        return () => {
+            if (notificationListener.current) {
+                notificationListener.current.remove();
+            }
+            if (responseListener.current) {
+                responseListener.current.remove();
+            }
+        };
+    }, []);
+
+    const setupNotifications = async () => {
+        try {
+            const Notifications = await import('expo-notifications').catch(() => null);
+            if (!Notifications) return;
+
+            // Handle foreground notifications
+            Notifications.setNotificationHandler({
+                handleNotification: async () => ({
+                    shouldShowAlert: true,
+                    shouldPlaySound: true,
+                    shouldSetBadge: false,
+                }),
+            });
+
+            notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+                console.log('[Notification] Received in foreground:', notification);
+                // Can show custom toast here if needed
+            });
+
+            responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+                console.log('[Notification] Response:', response);
+                const data = response.notification.request.content.data;
+                handleNotificationClick(data);
+            });
+        } catch (err) {
+            console.warn('[Notification] Setup error:', err);
+        }
+    };
+
+    const handleNotificationClick = (data: any) => {
+        if (!data) return;
+        if (data.type === 'post_like' || data.type === 'post_comment') {
+            // Navigate to post (logic depends on your app routing)
+            router.push('/(tabs)'); 
+        } else if (data.type === 'chat_message') {
+            router.push(`/chat/${data.sender_id}`);
+        } else if (data.type === 'follow') {
+            router.push(`/user/${data.user_id}`);
+        }
+    };
 
     useEffect(() => {
         console.log(`[WS] Effect trigger - Token: ${!!token}, UserID: ${user?.id}`);
@@ -80,7 +137,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             };
 
             ws.onerror = (err: any) => {
-                console.warn('[WS] Error:', err.message || err);
+                console.warn('[WS] Connection Error for user', user.id, ':', err.message || JSON.stringify(err));
             };
         };
 

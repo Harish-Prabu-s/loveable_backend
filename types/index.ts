@@ -128,7 +128,7 @@ export interface Message {
   room: number;
   sender: number;
   content: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite';
+  type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
   media_url?: string;
   duration_seconds?: number;
   created_at: string;

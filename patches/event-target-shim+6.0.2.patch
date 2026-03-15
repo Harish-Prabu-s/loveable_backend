@@ -1,15 +1,49 @@
-diff --git a/node_modules/event-target-shim/package.json b/node_modules/event-target-shim/package.json
-index 045cf8b..420303e 100644
---- a/node_modules/event-target-shim/package.json
-+++ b/node_modules/event-target-shim/package.json
-@@ -8,6 +8,10 @@
-       "import": "./index.mjs",
-       "require": "./index.js"
-     },
-+    "./index": {
-+      "import": "./index.mjs",
-+      "require": "./index.js"
-+    },
-     "./es5": {
-       "import": "./es5.mjs",
-       "require": "./es5.js"
+diff --git a/node_modules/event-target-shim/es5.js b/node_modules/event-target-shim/es5.js
+index 8af71d6..4ca1b73 100644
+--- a/node_modules/event-target-shim/es5.js
++++ b/node_modules/event-target-shim/es5.js
+@@ -147,7 +147,7 @@ function setWarningHandler(value) {
+ 
+ var Warning = /*#__PURE__*/function () {
+   function Warning(code, message) {
+-    _classCallCheck__default['default'](this, Warning);
++    // _classCallCheck__default['default'](this, Warning);
+ 
+     this.code = code;
+     this.message = message;
+@@ -254,7 +254,7 @@ var Event = /*#__PURE__*/function () {
+   }]);
+ 
+   function Event(type, eventInitDict) {
+-    _classCallCheck__default['default'](this, Event);
++    // _classCallCheck__default['default'](this, Event);
+ 
+     Object.defineProperty(this, "isTrusted", {
+       value: false,
+@@ -645,7 +645,7 @@ function createInvalidStateError(message) {
+       function DOMException(msg) {
+         var _this;
+ 
+-        _classCallCheck__default['default'](this, DOMException);
++        // _classCallCheck__default['default'](this, DOMException);
+ 
+         _this = _super.call(this, msg);
+ 
+@@ -766,7 +766,7 @@ var EventWrapper = /*#__PURE__*/function (_Event) {
+   function EventWrapper(event) {
+     var _thisSuper, _thisSuper2, _this2;
+ 
+-    _classCallCheck__default['default'](this, EventWrapper);
++    // _classCallCheck__default['default'](this, EventWrapper);
+ 
+     _this2 = _super2.call(this, event.type, {
+       bubbles: event.bubbles,
+@@ -1237,7 +1237,7 @@ var EventTarget = /*#__PURE__*/function () {
+    * Initialize this instance.
+    */
+   function EventTarget() {
+-    _classCallCheck__default['default'](this, EventTarget);
++    // _classCallCheck__default['default'](this, EventTarget);
+ 
+     internalDataMap$2.set(this, createListenerListMap());
+   } // Implementation

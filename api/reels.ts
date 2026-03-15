@@ -11,6 +11,7 @@ export interface Reel {
     likes_count: number;
     comments_count: number;
     is_liked: boolean;
+    is_owner: boolean;
 }
 
 export const reelsApi = {
@@ -33,5 +34,18 @@ export const reelsApi = {
     commentReel: async (id: number, text: string): Promise<{ success: boolean; id: number }> => {
         const res = await client.post(`/reels/${id}/comment/`, { text });
         return res.data;
+    },
+
+    getComments: async (id: number): Promise<any[]> => {
+        const res = await client.get(`/reels/${id}/comments/`);
+        return Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
+    },
+
+    shareReel: async (id: number, targetUserId: number): Promise<{ success: boolean }> => {
+        const res = await client.post(`/reels/${id}/share/`, { target_user_id: targetUserId });
+        return res.data;
+    },
+    deleteReel: async (id: number): Promise<void> => {
+        await client.delete(`/reels/${id}/delete/`);
     },
 };

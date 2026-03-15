@@ -84,12 +84,26 @@ export default function StoryViewScreen() {
         }
     };
 
-    const loadViewers = async () => {
-        if (story?.user === user?.id) {
-            const views = await storiesApi.getViews(storyId);
-            setViewers(views || []);
-            setShowViewers(true);
-        }
+    const handleDeleteStory = () => {
+        Alert.alert(
+            'Delete Story',
+            'Are you sure you want to delete this story?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await storiesApi.deleteStory(storyId);
+                            router.back();
+                        } catch (e) {
+                            Alert.alert('Error', 'Failed to delete story');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (!story) {
@@ -146,10 +160,16 @@ export default function StoryViewScreen() {
                 </TouchableOpacity>
 
                 {story.user === user?.id && (
-                    <TouchableOpacity onPress={loadViewers} style={styles.actionBtn}>
-                        <MaterialCommunityIcons name="eye-outline" size={30} color="#FFF" />
-                        <Text style={styles.actionCount}>{story.view_count || 0}</Text>
-                    </TouchableOpacity>
+                    <>
+                        <TouchableOpacity onPress={loadViewers} style={styles.actionBtn}>
+                            <MaterialCommunityIcons name="eye-outline" size={30} color="#FFF" />
+                            <Text style={styles.actionCount}>{story.view_count || 0}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleDeleteStory} style={styles.actionBtn}>
+                            <MaterialCommunityIcons name="delete-outline" size={30} color="#EF4444" />
+                            <Text style={[styles.actionCount, { color: '#EF4444' }]}>Delete</Text>
+                        </TouchableOpacity>
+                    </>
                 )}
             </View>
 

@@ -102,7 +102,7 @@ export interface Message {
   room: number;
   sender: number;
   content: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite';
+  type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
   media_url?: string;
   duration_seconds?: number;
   created_at: string;
@@ -116,6 +116,20 @@ export interface Story {
   user_display_name?: string;
   user_avatar?: string;
   view_count?: number;
+  likes_count?: number;
+  comments_count?: number;
+  is_liked?: boolean;
+  is_owner?: boolean;
+}
+
+export interface Contact {
+  id: number;
+  username: string;
+  display_name: string;
+  photo: string | null;
+  last_message: string;
+  last_message_type: string;
+  last_timestamp: string;
 }
 
 export interface StoryView {

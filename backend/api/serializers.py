@@ -154,10 +154,17 @@ class StorySerializer(serializers.ModelSerializer):
     likes_count = serializers.IntegerField(source='likes.count', read_only=True)
     comments_count = serializers.IntegerField(source='comments.count', read_only=True)
     is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Story
-        fields = ['id', 'user', 'media_url', 'media_type', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked']
+        fields = ['id', 'user', 'media_url', 'media_type', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user == request.user
+        return False
 
     def get_is_liked(self, obj):
         request = self.context.get('request')
@@ -198,10 +205,17 @@ class ReelSerializer(serializers.ModelSerializer):
     likes_count = serializers.IntegerField(source='likes.count', read_only=True)
     comments_count = serializers.IntegerField(source='comments.count', read_only=True)
     is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Reel
-        fields = ['id', 'user', 'video_url', 'caption', 'created_at', 'user_display_name', 'user_avatar', 'likes_count', 'comments_count', 'is_liked']
+        fields = ['id', 'user', 'video_url', 'caption', 'created_at', 'user_display_name', 'user_avatar', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user == request.user
+        return False
 
     def get_is_liked(self, obj):
         request = self.context.get('request')
@@ -229,3 +243,22 @@ class GiftTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = GiftTransaction
         fields = ['id', 'sender', 'receiver', 'gift', 'created_at']
+class ContactSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    display_name = serializers.SerializerMethodField()
+    photo = serializers.SerializerMethodField()
+    last_message = serializers.CharField()
+    last_message_type = serializers.CharField()
+    last_timestamp = serializers.DateTimeField()
+
+    def get_display_name(self, obj):
+        profile = getattr(obj, 'profile', None)
+        return profile.display_name if profile else obj.username
+
+    def get_photo(self, obj):
+        request = self.context.get('request')
+        profile = getattr(obj, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
+        return None

@@ -114,9 +114,16 @@ def register_push_token(request):
     if not expo_token or not expo_token.startswith('ExponentPushToken'):
         return Response({'error': 'Invalid Expo push token'}, status=400)
 
+    # Legacy store (optional, but keep for compatibility if needed)
     PushToken.objects.update_or_create(
         user=request.user,
         expo_token=expo_token,
         defaults={'device': device},
     )
+    
+    # Store in Profile as requested
+    profile = request.user.profile
+    profile.device_token = expo_token
+    profile.save()
+
     return Response({'status': 'registered'})

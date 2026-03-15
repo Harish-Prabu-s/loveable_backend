@@ -25,6 +25,8 @@ DEBUG = True
 ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4', '10.130.45.184', 'preflagellate-agnus-timidly.ngrok-free.dev']
 CSRF_TRUSTED_ORIGINS = ['https://preflagellate-agnus-timidly.ngrok-free.dev']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 INSTALLED_APPS = [
     'daphne',
