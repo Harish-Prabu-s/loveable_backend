@@ -52,7 +52,6 @@
       "@config-plugins/react-native-webrtc",
       "expo-secure-store",
       "./plugins/withGradleWrapper.cjs",
-      "./plugins/withJitsiMaven.cjs",
       [
         "expo-build-properties",
         {
