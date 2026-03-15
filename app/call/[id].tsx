@@ -15,7 +15,7 @@ import { useWebRTC } from '@/hooks/useWebRTC';
 import { RTCView } from '@/utils/webrtc';
 import { MotiTransitions, smoothTiming } from '@/utils/animations';
 
-export default function CallScreen() {
+function CallScreen() {
     const params = useLocalSearchParams<{
         id: string;
         callType: string;
@@ -424,3 +424,5 @@ const styles = StyleSheet.create({
         shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8
     }
 });
+
+export default CallScreen;
