@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from './AuthContext';
@@ -44,6 +45,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const setupNotifications = async () => {
         try {
+            // Silence push notification warning on Expo Go (SDK 53+)
+            if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+                console.log('[Notification] Skipping expo-notifications setup on Expo Go');
+                return;
+            }
+
             const Notifications = await import('expo-notifications').catch(() => null);
             if (!Notifications) return;
 

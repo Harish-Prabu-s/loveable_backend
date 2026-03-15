@@ -5,6 +5,7 @@ import { useAuth, AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider as AppThemeProvider, useTheme } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { View, ActivityIndicator, Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import GlobalToast from '@/components/ui/GlobalToast';
@@ -12,6 +13,11 @@ import GlobalToast from '@/components/ui/GlobalToast';
 // Push token registration (runs silently after login)
 async function registerForPushNotifications() {
   try {
+    // Silence push notification warning on Expo Go (SDK 53+)
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      return;
+    }
+
     // Dynamically import to avoid crash if expo-notifications not installed
     const Notifications = await import('expo-notifications').catch(() => null);
     if (!Notifications) return;
