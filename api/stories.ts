@@ -1,5 +1,4 @@
 import client, { fetchWithAuth } from './client';
-// ... 
 
 export interface Story {
   id: number;
@@ -28,7 +27,8 @@ export const storiesApi = {
   // Alias for getStories
   list: async (): Promise<Story[]> => {
     const res = await client.get('/stories/');
-    return res.data;
+    const data = res.data;
+    return Array.isArray(data) ? data : (data?.results ?? []);
   },
 
   uploadMedia: async (mediaUri: string, mediaType: 'image' | 'video' = 'image'): Promise<{ url: string }> => {
@@ -78,15 +78,17 @@ export const storiesApi = {
 
   getViews: async (story_id: number): Promise<any[]> => {
     const res = await client.get(`/stories/${story_id}/views/`);
-    return res.data;
+    const data = res.data;
+    return Array.isArray(data) ? data : (data?.results ?? []);
   },
 
-  getComments: async (story_id: number): Promise<{ results: any[] }> => {
+  getComments: async (story_id: number): Promise<any[]> => {
     const res = await client.get(`/stories/${story_id}/comments/`);
-    return res.data;
+    const data = res.data;
+    return Array.isArray(data) ? data : (data?.results ?? []);
   },
 
-  commentStory: async (id: number, text: string): Promise<{ success: boolean; id: number }> => {
+  addComment: async (id: number, text: string): Promise<any> => {
     const res = await client.post(`/stories/${id}/comment/`, { text });
     return res.data;
   },

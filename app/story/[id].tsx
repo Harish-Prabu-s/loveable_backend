@@ -26,6 +26,16 @@ export default function StoryViewScreen() {
     const [showViewers, setShowViewers] = useState(false);
     const heartScale = useRef(new Animated.Value(1)).current;
 
+    const loadViewers = async () => {
+        try {
+            const data = await storiesApi.getViews(storyId);
+            setViewers(data || []);
+            setShowViewers(true);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     useEffect(() => {
         const load = async () => {
             try {
@@ -38,7 +48,7 @@ export default function StoryViewScreen() {
                 }
                 await storiesApi.view(storyId);
                 const commentsData = await storiesApi.getComments(storyId);
-                setComments(commentsData.results || []);
+                setComments(commentsData);
             } catch (e) {
                 console.error(e);
             }

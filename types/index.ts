@@ -262,3 +262,13 @@ export interface ApiError {
   detail?: string;
   [key: string]: unknown;
 }
+
+export interface Contact {
+  id: number;
+  username: string;
+  display_name: string;
+  photo: string | null;
+  last_message: string;
+  last_message_type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
+  last_timestamp: string;
+}

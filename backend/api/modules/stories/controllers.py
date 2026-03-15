@@ -126,7 +126,16 @@ def comment_story_view(request, story_id):
                     data={'type': 'story_comment', 'story_id': story.id}
                 )
 
-        return Response({'success': True, 'id': comment.id})
+        from ...utils import get_absolute_media_url
+        p = getattr(request.user, 'profile', None)
+        return Response({
+            'id': comment.id,
+            'user': request.user.id,
+            'display_name': p.display_name if p else '',
+            'photo': get_absolute_media_url(p.photo, request) if p and p.photo else None,
+            'text': comment.text,
+            'created_at': comment.created_at.isoformat(),
+        })
     except Story.DoesNotExist:
         return Response({'error': 'Story not found'}, status=404)
 
