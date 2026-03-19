@@ -15,11 +15,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return context.resolveRequest(context, 'event-target-shim', platform);
   }
   
-  // Chain to the Expo default resolver so tsconfig paths (@/) still work
-  if (defaultResolveRequest) {
-    return defaultResolveRequest(context, moduleName, platform);
-  }
-  return context.resolveRequest(context, moduleName, platform);
+  // Standard resolution for everything else
+  return defaultResolveRequest ? defaultResolveRequest(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;

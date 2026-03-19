@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notificationsApi } from '@/api/notifications';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthStore } from '@/store/authStore';
+import { useSecurityStore } from '@/store/securityStore';
 import { authApi } from '@/api/auth';
 import { useTheme } from '@/context/ThemeContext';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -63,6 +64,7 @@ function SettingRow({
 export default function SettingsScreen() {
     const { logout: authContextLogout, user: authUser } = useAuth();
     const { user, logout: storeLogout } = useAuthStore();
+    const { toggleBiometrics, setPin } = useSecurityStore();
     const { isDark, setTheme } = useTheme();
     const gender = user?.gender ?? authUser?.gender;
 
@@ -156,7 +158,11 @@ export default function SettingsScreen() {
     // ── App lock picker ───────────────────────────────────────────────────────
     const chooseAppLock = () => {
         const options: any[] = [
-            { text: '🔓 None', onPress: () => update({ app_lock_type: 'none' }) },
+            { text: '🔓 None', onPress: () => {
+                update({ app_lock_type: 'none' });
+                toggleBiometrics(false);
+                setPin(null);
+            } },
             { text: '🔢 PIN', onPress: () => router.push('/settings/set-pin' as any) },
             { text: '🔷 Pattern', onPress: () => router.push('/settings/set-pattern' as any) },
         ];
@@ -294,12 +300,16 @@ export default function SettingsScreen() {
                             iconBg="#0F766E"
                             label="Biometric Auth"
                             right={
-                                <Switch
-                                    value={settings.app_lock_type === 'biometric'}
-                                    onValueChange={(v) => update({ app_lock_type: v ? 'biometric' : 'none' })}
-                                    trackColor={{ false: '#334155', true: '#8B5CF6' }}
-                                    thumbColor="#FFF"
-                                />
+                            <Switch
+                                value={settings.app_lock_type === 'biometric'}
+                                onValueChange={(v) => {
+                                    update({ app_lock_type: v ? 'biometric' : 'none' });
+                                    toggleBiometrics(v);
+                                    if(!v) setPin(null);
+                                }}
+                                trackColor={{ false: '#334155', true: '#8B5CF6' }}
+                                thumbColor="#FFF"
+                            />
                             }
                         />
                     )}

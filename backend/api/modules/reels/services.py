@@ -1,11 +1,34 @@
 from ...models import Reel, ReelLike, ReelComment, User, Message
 from ..chat.services import get_or_create_room
 
-def list_reels(limit: int = 50):
-    return Reel.objects.select_related('user__profile').order_by('-created_at')[:limit]
+from django.db import models
 
-def create_reel(user, video_url: str, caption: str = ''):
-    return Reel.objects.create(user=user, video_url=video_url, caption=caption)
+def list_reels(user, limit: int = 10, page: int = 1, random_flag: bool = False):
+    offset = (page - 1) * limit
+    qs = Reel.objects.select_related('user__profile').filter(
+        models.Q(is_archived=False) & (
+            models.Q(visibility='all') | 
+            models.Q(user=user) | 
+            (models.Q(visibility='close_friends') & models.Q(user__close_friends__close_friend=user))
+        )
+    ).order_by('-created_at').distinct()[offset:offset+limit]
+    
+    qs = list(qs)
+    
+    if random_flag and page == 1:
+        import random
+        random.shuffle(qs)
+        
+    return qs
+
+def create_reel(user, video_url: str, caption: str = '', visibility='all'):
+    reel = Reel.objects.create(user=user, video_url=video_url, caption=caption, visibility=visibility)
+    
+    # Notify Close Friends
+    from ..notifications.services import notify_close_friends_of_content
+    notify_close_friends_of_content(user, 'reel', reel.id)
+    
+    return reel
 
 def toggle_reel_like(reel_id: int, user: User):
     try:
@@ -60,9 +83,32 @@ def delete_reel_service(reel_id: int, user: User):
             return {'error': 'permission denied', 'status': 403}
         
         if reel.video_url:
-            reel.video_url.delete(save=False)
+            try:
+                reel.video_url.delete(save=False)
+            except Exception:
+                pass
             
         reel.delete()
         return {'success': True}
     except Reel.DoesNotExist:
         return {'error': 'reel not found', 'status': 404}
+
+def archive_reel(reel_id: int, user: User):
+    """Archive a reel."""
+    try:
+        reel = Reel.objects.get(pk=reel_id, user=user)
+        reel.is_archived = True
+        reel.save(update_fields=['is_archived'])
+        return True
+    except Reel.DoesNotExist:
+        return False
+
+def unarchive_reel(reel_id: int, user: User):
+    """Unarchive a reel."""
+    try:
+        reel = Reel.objects.get(pk=reel_id, user=user)
+        reel.is_archived = False
+        reel.save(update_fields=['is_archived'])
+        return True
+    except Reel.DoesNotExist:
+        return False

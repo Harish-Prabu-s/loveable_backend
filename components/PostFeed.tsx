@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { postsApi, Post } from '@/api/posts';
+import { archiveApi } from '@/api/archive';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/utils/toast';
 
@@ -71,6 +72,53 @@ export default function PostFeed() {
         }
     };
 
+    const handleArchivePost = async (postId: number) => {
+        try {
+            await archiveApi.archive('post', postId);
+            setPosts(prev => prev.filter(p => p.id !== postId));
+            toast.success("Post archived");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to archive post");
+        }
+    };
+
+    const confirmArchivePost = (postId: number) => {
+        Alert.alert(
+            "Archive Post",
+            "This post will be hidden from your profile and feed. You can find it in your archive.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Archive", onPress: () => handleArchivePost(postId) }
+            ]
+        );
+    };
+
+    const confirmDeletePost = (postId: number) => {
+        Alert.alert(
+            "Delete Post",
+            "This action is permanent and cannot be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => handleDeletePost(postId) }
+            ]
+        );
+    };
+
+    const handleMenuPress = (post: Post) => {
+        if (!post.is_owner) return;
+        
+        Alert.alert(
+            "Post Options",
+            undefined,
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Archive", onPress: () => confirmArchivePost(post.id) },
+                { text: "Delete", style: "destructive", onPress: () => confirmDeletePost(post.id) }
+            ]
+        );
+    };
+
     const renderPost = ({ item, index }: { item: Post, index: number }) => (
         <View style={styles.postContainer}>
             {/* Header */}
@@ -83,13 +131,10 @@ export default function PostFeed() {
                 </View>
                 <View style={styles.headerRight}>
                     {item.is_owner && (
-                        <TouchableOpacity onPress={() => handleDeletePost(item.id)} style={styles.headerBtn}>
-                            <MaterialCommunityIcons name="delete-outline" size={24} color="#EF4444" />
+                        <TouchableOpacity onPress={() => handleMenuPress(item)} style={styles.headerBtn}>
+                            <MaterialCommunityIcons name="dots-vertical" size={24} color="#94A3B8" />
                         </TouchableOpacity>
                     )}
-                    <TouchableOpacity>
-                        <MaterialCommunityIcons name="dots-vertical" size={24} color="#94A3B8" />
-                    </TouchableOpacity>
                 </View>
             </View>
 

@@ -17,6 +17,8 @@ interface IncomingCallData {
 
 interface NotificationContextType {
     incomingCall: IncomingCallData | null;
+    newNotification: any | null;
+    activeChatEvent: any | null;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -25,6 +27,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const { user, token } = useAuth();
     const router = useRouter();
     const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
+    const [newNotification, setNewNotification] = useState<any | null>(null);
+    const [activeChatEvent, setActiveChatEvent] = useState<any | null>(null);
     const [expoToken, setExpoToken] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const notificationListener = useRef<any>(null);
@@ -109,8 +113,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const connect = () => {
             if (isCleaningUp) return;
 
-            // Use ngrok or your backend URL
-            const signalingUrl = `wss://preflagellate-agnus-timidly.ngrok-free.dev/ws/user/${user.id}/`;
+            // Use centralized signaling URL
+            const configSignalingUrl = Constants.expoConfig?.extra?.signalingUrl || 'ws://localhost:9000';
+            const signalingUrl = `${configSignalingUrl}/ws/user/${user.id}/`;
             console.log(`[WS] Connecting to ${signalingUrl}...`);
             const ws = new WebSocket(signalingUrl);
             wsRef.current = ws;
@@ -125,6 +130,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     console.log(`[WS] Received:`, data);
                     if (data.type === 'incoming-call') {
                         setIncomingCall(data);
+                    } else if (data.type === 'new_notification') {
+                        setNewNotification(data.data);
+                    } else if (data.type === 'new_message' || data.type === 'messages_seen') {
+                        setActiveChatEvent(data);
                     }
                 } catch (err) {
                     console.error('[WS] Parse error', err);
@@ -179,7 +188,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
 
     return (
-        <NotificationContext.Provider value={{ incomingCall }}>
+        <NotificationContext.Provider value={{ incomingCall, newNotification, activeChatEvent }}>
             {children}
             {incomingCall && (
                 <Modal transparent animationType="none" visible={!!incomingCall}>

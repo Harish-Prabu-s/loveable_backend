@@ -1,14 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { storiesApi } from '@/api/stories'; // To be implemented
+import { storiesApi } from '@/api/stories';
+import { notificationsApi } from '@/api/notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ScreenCapture from 'expo-screen-capture';
 
 const { width, height } = Dimensions.get('window');
 
 export default function StoryViewer({ visible, story, onClose, onNext, onPrev, onDelete }) {
     const [progress, setProgress] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Prevent screen recording and detect screenshots
+    useEffect(() => {
+        let subscription;
+        if (visible) {
+            ScreenCapture.preventScreenCaptureAsync();
+            subscription = ScreenCapture.addScreenshotListener(() => {
+                if (story && !story.is_owner) {
+                    notificationsApi.notifyScreenshot(story.user, 'story', story.id);
+                }
+            });
+        }
+        
+        return () => {
+            if (visible) {
+                ScreenCapture.allowScreenCaptureAsync();
+            }
+            if (subscription) {
+                subscription.remove();
+            }
+        };
+    }, [visible, story]);
 
     useEffect(() => {
         let timer;
@@ -56,10 +80,23 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                         <View style={styles.headerRight}>
                             {story.is_owner && (
                                 <TouchableOpacity 
-                                    onPress={async () => {
-                                        setIsDeleting(true);
-                                        await onDelete(story.id);
-                                        setIsDeleting(false);
+                                    onPress={() => {
+                                        Alert.alert(
+                                            "Delete Story",
+                                            "Are you sure you want to delete this story?",
+                                            [
+                                                { text: "Cancel", style: "cancel" },
+                                                { 
+                                                    text: "Delete", 
+                                                    style: "destructive",
+                                                    onPress: async () => {
+                                                        setIsDeleting(true);
+                                                        await onDelete(story.id);
+                                                        setIsDeleting(false);
+                                                    }
+                                                }
+                                            ]
+                                        );
                                     }} 
                                     style={styles.headerBtn}
                                     disabled={isDeleting}

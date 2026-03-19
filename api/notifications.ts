@@ -88,4 +88,12 @@ export const notificationsApi = {
     registerPushToken: async (expo_token: string, device?: string): Promise<void> => {
         await apiClient.post('notifications/push-token/register/', { expo_token, device: device || '' });
     },
+
+    notifyScreenshot: async (ownerId: number, contentType: 'story' | 'streak', contentId?: number): Promise<void> => {
+        await apiClient.post('notifications/screenshot/', {
+            owner_id: ownerId,
+            content_type: contentType,
+            content_id: contentId
+        });
+    },
 };

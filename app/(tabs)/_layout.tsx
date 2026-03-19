@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { notificationsApi } from '@/api/notifications';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/context/ThemeContext';
+import { useNotifications } from '@/context/NotificationContext';
 
 function BadgeIcon({ name, color, count }: { name: any; color: string; count: number }) {
   return (
@@ -30,6 +31,7 @@ export default function TabLayout() {
   const { isAuthenticated } = useAuthStore();
   const { colors } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { newNotification } = useNotifications();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -43,6 +45,12 @@ export default function TabLayout() {
     const interval = setInterval(poll, 30_000); // poll every 30s
     return () => clearInterval(interval);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (newNotification) {
+      setUnreadCount(prev => prev + 1);
+    }
+  }, [newNotification]);
 
   return (
     <Tabs

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useAuthStore } from '@/store/authStore';
 import { generateAvatarUrl } from '@/utils/avatar';
+import { chatApi } from '@/api/chat';
 
 type LeagueTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Master';
 
@@ -59,11 +60,20 @@ const { width } = Dimensions.get('window');
 
 export default function LeaderboardScreen() {
     const { user } = useAuthStore();
+    const [activeTab, setActiveTab] = useState<'global' | 'streaks'>('global');
     const [users, setUsers] = useState<LeaderboardUser[]>([]);
+    const [streakUsers, setStreakUsers] = useState<any[]>([]);
 
     useEffect(() => {
-        setUsers(generateMockLeaderboard());
-    }, []);
+        if (activeTab === 'global') {
+            setUsers(generateMockLeaderboard());
+        } else {
+            // Load streaks
+            chatApi.getStreakLeaderboard()
+                .then(data => setStreakUsers(data))
+                .catch(err => console.error(err));
+        }
+    }, [activeTab]);
 
     const currentUserStats: LeaderboardUser = {
         id: 'me',
@@ -128,9 +138,25 @@ export default function LeaderboardScreen() {
                     </SafeAreaView>
                 </View>
 
+                {/* Tabs */}
+                <View style={styles.tabsContainer}>
+                    <TouchableOpacity 
+                        style={[styles.tabButton, activeTab === 'global' && styles.activeTabButton]}
+                        onPress={() => setActiveTab('global')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'global' && styles.activeTabText]}>Global Rank</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.tabButton, activeTab === 'streaks' && styles.activeTabButton]}
+                        onPress={() => setActiveTab('streaks')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'streaks' && styles.activeTabText]}>Top Streaks 🔥</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* List Section (Light Theme) */}
                 <View style={styles.listSection}>
-                    {users.map((u) => {
+                    {activeTab === 'global' ? users.map((u) => {
                         const leagueInfo = getLeague(u.points);
                         const isTop3 = u.rank <= 3;
 
@@ -156,6 +182,39 @@ export default function LeaderboardScreen() {
                                 <View style={styles.itemPointsBox}>
                                     <Text style={styles.itemPoints}>{u.points.toLocaleString()}</Text>
                                     <Text style={styles.itemPointsLabel}>Pts</Text>
+                                </View>
+                            </View>
+                        );
+                    }) : streakUsers.map((streak, index) => {
+                        const isTop3 = index < 3;
+                        // For display, we might show both user1 and user2
+                        return (
+                            <View key={`${streak.user1.id}-${streak.user2.id}`} style={styles.listItem}>
+                                <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>
+                                    #{index + 1}
+                                </Text>
+
+                                <View style={{flexDirection: 'row', marginRight: 12}}>
+                                    <Image
+                                        source={{ uri: streak.user1.photo || generateAvatarUrl(streak.user1.id, undefined) }}
+                                        style={[styles.itemAvatar, {marginRight: -10, borderWidth: 2, borderColor: '#FFF'}]}
+                                    />
+                                    <Image
+                                        source={{ uri: streak.user2.photo || generateAvatarUrl(streak.user2.id, undefined) }}
+                                        style={[styles.itemAvatar, {borderWidth: 2, borderColor: '#FFF'}]}
+                                    />
+                                </View>
+
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.itemName} numberOfLines={1}>
+                                        {streak.user1.display_name} & {streak.user2.display_name}
+                                    </Text>
+                                    <Text style={styles.itemMinutes}>Active Streak</Text>
+                                </View>
+
+                                <View style={styles.itemPointsBox}>
+                                    <Text style={[styles.itemPoints, {color: '#EF4444'}]}>🔥 {streak.streak_count}</Text>
+                                    <Text style={styles.itemPointsLabel}>Days</Text>
                                 </View>
                             </View>
                         );
@@ -269,9 +328,33 @@ const styles = StyleSheet.create({
         color: '#E2E8F0',
         marginLeft: 6,
     },
+    tabsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        marginTop: 16,
+        marginBottom: 8,
+        justifyContent: 'center',
+        gap: 12,
+    },
+    tabButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+        backgroundColor: '#E2E8F0',
+    },
+    activeTabButton: {
+        backgroundColor: '#8B5CF6',
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    activeTabText: {
+        color: '#FFFFFF',
+    },
     listSection: {
         padding: 16,
-        marginTop: -20,
     },
     listItem: {
         flexDirection: 'row',

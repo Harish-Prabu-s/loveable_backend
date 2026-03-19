@@ -15,6 +15,7 @@ export interface Post {
     comments_count: number;
     is_liked: boolean;
     is_owner: boolean;
+    is_archived: boolean;
     created_at: string;
 }
 
@@ -33,9 +34,10 @@ export const postsApi = {
     },
 
     /** Create a new post with optional image upload */
-    createPost: async (caption: string, imageUri?: string): Promise<Post> => {
+    createPost: async (caption: string, imageUri?: string, visibility: string = 'all'): Promise<Post> => {
         const formData = new FormData();
         formData.append('caption', caption);
+        formData.append('visibility', visibility);
         if (imageUri) {
             // @ts-ignore — React Native FormData accepts objects for files
             formData.append('image', {

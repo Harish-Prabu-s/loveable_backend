@@ -77,6 +77,32 @@ def send_friend_request_view(request, user_id: int):
     req, msg = send_friend_request(request.user, user_id)
     if not req:
         return Response({'error': msg}, status=400)
+    
+    # Send notification
+    from ..notifications.push_service import send_push_notification, _get_user_tokens
+    from ...models import Notification as NotificationModel
+    
+    tokens = _get_user_tokens(user_id)
+    profile = getattr(request.user, 'profile', None)
+    sender_name = profile.display_name if profile else request.user.username
+    
+    # In-App Notification
+    NotificationModel.objects.create(
+        recipient_id=user_id,
+        actor=request.user,
+        notification_type='friend_request',
+        message=f"{sender_name} sent you a friend request",
+        object_id=req.id
+    )
+    
+    if tokens:
+        send_push_notification(
+            tokens,
+            title="Friend Request",
+            body=f"{sender_name} sent you a friend request!",
+            data={'type': 'friend_request', 'request_id': req.id}
+        )
+        
     return Response({'status': msg, 'request_id': req.id})
 
 @api_view(['POST'])

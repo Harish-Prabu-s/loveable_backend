@@ -11,6 +11,8 @@ import { router } from 'expo-router';
 
 import { storiesApi } from '@/api/stories';
 import { profilesApi } from '@/api/profiles';
+import { notificationsApi } from '@/api/notifications';
+import * as ScreenCapture from 'expo-screen-capture';
 import type { Story, StoryView } from '@/types';
 import StoryComposer from './StoryComposer';
 import { useAuthStore } from '@/store/authStore';
@@ -90,8 +92,22 @@ export default function StoriesSection() {
       if (currentStory.user !== user.id) {
         storiesApi.view(currentStory.id).catch(console.error);
       }
+
+      // Privacy Protection
+      ScreenCapture.preventScreenCaptureAsync();
+      const subscription = ScreenCapture.addScreenshotListener(() => {
+        if (currentStory.user !== user.id) {
+          notificationsApi.notifyScreenshot(currentStory.user, 'story', currentStory.id)
+            .catch(console.error);
+        }
+      });
+
+      return () => {
+        subscription.remove();
+        ScreenCapture.allowScreenCaptureAsync();
+      };
     }
-  }, [activeStoryGroup, user]);
+  }, [activeStoryGroup, user, activeStoryGroup?.currentIndex]);
 
   const handleNextStory = () => {
     if (!activeStoryGroup) return;

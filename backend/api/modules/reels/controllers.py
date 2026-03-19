@@ -15,7 +15,15 @@ import os
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_reels_view(request):
-    qs = list_reels()
+    try:
+        page = int(request.GET.get('page', 1))
+        limit = int(request.GET.get('limit', 10))
+    except ValueError:
+        page, limit = 1, 10
+        
+    random_flag = request.GET.get('random', 'false').lower() == 'true'
+    
+    qs = list_reels(user=request.user, limit=limit, page=page, random_flag=random_flag)
     return Response(ReelSerializer(qs, many=True, context={'request': request}).data)
 
 @api_view(['POST'])
@@ -43,9 +51,10 @@ def upload_reel_media_view(request):
 def create_reel_view(request):
     video_url = request.data.get('video_url')
     caption = request.data.get('caption', '')
+    visibility = request.data.get('visibility', 'all')
     if not video_url:
         return Response({'error': 'video_url required'}, status=400)
-    reel = create_reel(request.user, video_url, caption)
+    reel = create_reel(request.user, video_url, caption, visibility)
     return Response(ReelSerializer(reel, context={'request': request}).data, status=201)
 
 @api_view(['POST'])
@@ -60,9 +69,20 @@ def like_reel_view(request, pk):
         reel = result['reel']
         if reel.user != request.user:
             from ..notifications.push_service import send_push_notification, _get_user_tokens
+            from ..notifications.services import create_notification
             tokens = _get_user_tokens(reel.user.id)
             profile = getattr(request.user, 'profile', None)
             sender_name = profile.display_name if profile else request.user.username
+            
+            # Persist to DB
+            create_notification(
+                recipient=reel.user,
+                actor=request.user,
+                notification_type='reel_like',
+                message=f"{sender_name} liked your reel!",
+                object_id=reel.id
+            )
+
             if tokens:
                 send_push_notification(
                     tokens, 
@@ -88,9 +108,20 @@ def comment_reel_view(request, pk):
     reel = comment.reel
     if reel.user != request.user:
         from ..notifications.push_service import send_push_notification, _get_user_tokens
+        from ..notifications.services import create_notification
         tokens = _get_user_tokens(reel.user.id)
         profile = getattr(request.user, 'profile', None)
         sender_name = profile.display_name if profile else request.user.username
+        
+        # Persist to DB
+        create_notification(
+            recipient=reel.user,
+            actor=request.user,
+            notification_type='reel_comment',
+            message=f"{sender_name} commented: {text[:30]}...",
+            object_id=reel.id
+        )
+
         if tokens:
             send_push_notification(
                 tokens, 
@@ -139,9 +170,20 @@ def share_reel_view(request, pk: int):
     target_user = result['target_user']
     reel = result['reel']
     from ..notifications.push_service import send_push_notification, _get_user_tokens
+    from ..notifications.services import create_notification
     tokens = _get_user_tokens(target_user.id)
     profile = getattr(request.user, 'profile', None)
     sender_name = profile.display_name if profile else request.user.username
+    
+    # Persist to DB
+    create_notification(
+        recipient=target_user,
+        actor=request.user,
+        notification_type='reel_share',
+        message=f"{sender_name} shared a reel with you.",
+        object_id=reel.id
+    )
+
     if tokens:
         send_push_notification(
             tokens, 

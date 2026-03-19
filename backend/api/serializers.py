@@ -4,7 +4,7 @@ from django.conf import settings
 from .models import (
     Profile, Wallet, CoinTransaction, Payment, Withdrawal,
     Game, LevelProgress, Offer, LeagueTier, CallSession,
-    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel
+    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel, Streak
 )
 from .utils import get_absolute_media_url
 
@@ -15,6 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
+    is_close_friend = serializers.SerializerMethodField()
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     friend_request_status = serializers.SerializerMethodField()
@@ -27,7 +28,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'id', 'user', 'phone_number', 'gender', 'is_verified', 'is_online', 'is_busy',
             'date_joined', 'last_login', 'email', 'display_name', 'bio', 'photo',
             'interests', 'age', 'location', 'language', 'app_lock_enabled',
-            'created_at', 'updated_at', 'is_following', 'followers_count', 'following_count',
+            'created_at', 'updated_at', 'is_following', 'is_close_friend', 'followers_count', 'following_count',
             'friend_request_status'
         ]
 
@@ -44,6 +45,13 @@ class ProfileSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             # Check if Follow model exists and check relation
             return Follow.objects.filter(follower=request.user, following=obj.user).exists()
+        return False
+
+    def get_is_close_friend(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            from .models import CloseFriend
+            return CloseFriend.objects.filter(user=request.user, close_friend=obj.user).exists()
         return False
 
     def get_followers_count(self, obj):
@@ -139,12 +147,18 @@ class DailyRewardSerializer(serializers.ModelSerializer):
 class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
-        fields = ['id', 'caller', 'receiver', 'call_type', 'status', 'started_at', 'ended_at', 'duration_seconds', 'coins_spent', 'created_at']
+        fields = ['id', 'caller', 'receiver', 'call_type', 'status', 'started_at', 'ended_at', 'duration_seconds', 'coins_spent', 'created_at', 'disappearing_messages_enabled', 'disappearing_timer']
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['id', 'room', 'sender', 'content', 'type', 'media_url', 'duration_seconds', 'created_at']
+        fields = ['id', 'room', 'sender', 'content', 'type', 'media_url', 'duration_seconds', 'created_at', 'is_seen', 'expires_at']
+
+
+class StreakSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Streak
+        fields = ['id', 'user1', 'user2', 'streak_count', 'last_interaction_date', 'freezes_available']
 
 class StorySerializer(serializers.ModelSerializer):
     user_display_name = serializers.CharField(source='user.profile.display_name', read_only=True)

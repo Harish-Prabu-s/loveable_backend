@@ -3,18 +3,26 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 
 
-def get_feed():
-    """Return all posts ordered newest first."""
-    return Post.objects.select_related('user__profile').order_by('-created_at')
+from django.db import models
+
+def get_feed(user):
+    """Return all posts ordered newest first, respecting visibility."""
+    return Post.objects.select_related('user__profile').filter(
+        models.Q(is_archived=False) & (
+            models.Q(visibility='all') | 
+            models.Q(user=user) | 
+            (models.Q(visibility='close_friends') & models.Q(user__close_friends__close_friend=user))
+        )
+    ).order_by('-created_at').distinct()
 
 
 import base64
 import re
 import uuid
 
-def create_post(user, caption: str, image=None):
+def create_post(user, caption: str, image=None, visibility='all'):
     """Create and return a new post, optionally saving an uploaded image file."""
-    post = Post(user=user, caption=caption)
+    post = Post(user=user, caption=caption, visibility=visibility)
     if image:
         if isinstance(image, str):
             # Try parsing it as a base64 data URI
@@ -37,6 +45,11 @@ def create_post(user, caption: str, image=None):
             path = default_storage.save(filename, ContentFile(image.read()))
             post.image = path
     post.save()
+    
+    # Notify Close Friends
+    from ..notifications.services import notify_close_friends_of_content
+    notify_close_friends_of_content(user, 'post', post.id)
+    
     return post
 
 
@@ -63,6 +76,26 @@ def delete_post(post_id: int, user):
     try:
         post = Post.objects.get(id=post_id, user=user)
         post.delete()
+        return True
+    except Post.DoesNotExist:
+        return False
+
+def archive_post(post_id: int, user):
+    """Archive a post."""
+    try:
+        post = Post.objects.get(id=post_id, user=user)
+        post.is_archived = True
+        post.save(update_fields=['is_archived'])
+        return True
+    except Post.DoesNotExist:
+        return False
+
+def unarchive_post(post_id: int, user):
+    """Unarchive a post."""
+    try:
+        post = Post.objects.get(id=post_id, user=user)
+        post.is_archived = False
+        post.save(update_fields=['is_archived'])
         return True
     except Post.DoesNotExist:
         return False

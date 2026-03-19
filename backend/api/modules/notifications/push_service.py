@@ -366,3 +366,39 @@ def send_refund_notification(user_id: int) -> dict:
         return {'sent': 0, 'errors': 0}
 
     return send_push_notification(tokens, title='', body=message, data={'type': 'refund'})
+def send_call_push_notification(caller_name: str, callee_id: int, session_id: int, call_type: str) -> dict:
+    """
+    Send a push notification for an incoming call.
+    """
+    CALL_MESSAGES = {
+        'hi': f"{caller_name} aapko call kar rahe hain… 📞",
+        'ta': f"{caller_name} ungalukku call panraaru… 📞",
+        'te': f"{caller_name} mee kosam call chestunaaru… 📞",
+        'en': f"{caller_name} is calling you… 📞",
+        'ml': f"{caller_name} ninne call cheyyunnu… 📞",
+        'gu': f"{caller_name} tane call kare che… 📞",
+        'bn': f"{caller_name} tomake call korche… 📞",
+    }
+
+    try:
+        from api.models import Profile
+        profile = Profile.objects.get(user_id=callee_id)
+        lang = profile.language or 'en'
+    except Exception:
+        lang = 'en'
+
+    message = CALL_MESSAGES.get(lang, CALL_MESSAGES['en'])
+    tokens = _get_user_tokens(callee_id)
+
+    if not tokens:
+        return {'sent': 0, 'errors': 0}
+
+    # High priority for calls
+    data = {
+        'type': 'incoming-call',
+        'sessionId': session_id,
+        'callerName': caller_name,
+        'callType': call_type,
+    }
+
+    return send_push_notification(tokens, title='Incoming Call', body=message, data=data)

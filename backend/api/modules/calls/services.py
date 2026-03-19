@@ -56,6 +56,18 @@ def initiate_call(caller, callee, call_type: str) -> CallSession:
         }
     )
 
+    # Notify callee via Push Notification (for background/killed state)
+    try:
+        from api.modules.notifications.push_service import send_call_push_notification
+        send_call_push_notification(
+            caller_name=caller.profile.display_name if hasattr(caller, 'profile') else 'User',
+            callee_id=callee.id,
+            session_id=session.id,
+            call_type='video' if call_type == 'VIDEO' else 'audio'
+        )
+    except Exception as e:
+        print(f"AG_PUSH_DEBUG: Failed to send call push notification: {e}")
+
     return session
 
 

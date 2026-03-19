@@ -1,8 +1,8 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from ...serializers import RoomSerializer, MessageSerializer, ContactSerializer
-from .services import get_or_create_room, list_my_rooms, list_messages, send_message, presence_status, mark_room_status
+from ...serializers import RoomSerializer, MessageSerializer, ContactSerializer, StreakSerializer
+from .services import get_or_create_room, list_my_rooms, list_messages, send_message, presence_status, mark_room_status, mark_messages_seen
 from django.db.models import Q, Max
 from django.contrib.auth.models import User
 
@@ -27,6 +27,29 @@ def my_rooms_view(request):
 def messages_view(request, room_id: int):
     qs = list_messages(room_id)
     return Response(MessageSerializer(qs, many=True).data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_seen_view(request, room_id: int):
+    mark_messages_seen(room_id, request.user)
+    return Response({'status': 'ok'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_disappearing_view(request, room_id: int):
+    from ...models import Room
+    room = Room.objects.get(id=room_id)
+    if room.caller != request.user and room.receiver != request.user:
+        return Response({'error': 'forbidden'}, status=403)
+    
+    enabled = request.data.get('enabled', False)
+    timer = int(request.data.get('timer', 0))
+    
+    room.disappearing_messages_enabled = enabled
+    room.disappearing_timer = timer
+    room.save()
+    
+    return Response(RoomSerializer(room).data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -113,7 +136,51 @@ def contact_list_view(request):
         other_user.last_message = last_msg.content
         other_user.last_message_type = last_msg.type
         other_user.last_timestamp = last_msg.created_at
+
+        # Attach Streak Info
+        from ...models import Streak
+        u1, u2 = (user, other_user) if user.id < other_user.id else (other_user, user)
+        streak = Streak.objects.filter(user1=u1, user2=u2).first()
+        if streak:
+            other_user.streak_count = streak.streak_count
+            other_user.streak_last_interaction = streak.last_interaction_date
+        else:
+            other_user.streak_count = 0
+            other_user.streak_last_interaction = None
         
         contacts_data.append(other_user)
         
     return Response(ContactSerializer(contacts_data, many=True, context={'request': request}).data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def streak_leaderboard_view(request):
+    from ...models import Streak
+    from django.db.models import Q
+    user = request.user
+    
+    # Get top 50 streaks overall where the streak count > 0
+    # or per the user's friends, but let's just do global top streaks
+    streaks = Streak.objects.filter(streak_count__gte=1).order_by('-streak_count')[:50]
+    
+    data = []
+    for streak in streaks:
+        user1 = streak.user1
+        user2 = streak.user2
+        data.append({
+            'streak_count': streak.streak_count,
+            'last_interaction_date': streak.last_interaction_date,
+            'user1': {
+                'id': user1.id,
+                'username': user1.username,
+                'display_name': getattr(user1.profile, 'display_name', user1.username),
+                'photo': user1.profile.photo.url if user1.profile.photo else None,
+            },
+            'user2': {
+                'id': user2.id,
+                'username': user2.username,
+                'display_name': getattr(user2.profile, 'display_name', user2.username),
+                'photo': user2.profile.photo.url if user2.profile.photo else None,
+            }
+        })
+    return Response(data)

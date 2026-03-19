@@ -6,6 +6,7 @@ import { storiesApi } from '@/api/stories'; // To be implemented
 
 export default function CreateStory({ visible, onClose, onCreated }) {
     const [media, setMedia] = useState<string | null>(null);
+    const [visibility, setVisibility] = useState<'all' | 'close_friends'>('all');
     const [loading, setLoading] = useState(false);
 
     const pickImage = async () => {
@@ -29,9 +30,10 @@ export default function CreateStory({ visible, onClose, onCreated }) {
             const response = await storiesApi.uploadMedia(media, 'image');
 
             // 2. Create story with URL
-            await storiesApi.createStory(response.url, 'image');
+            await storiesApi.createStory(response.url, 'image', visibility);
 
             setMedia(null);
+            setVisibility('all');
             if (onCreated) onCreated();
             onClose();
         } catch (e) {
@@ -58,6 +60,25 @@ export default function CreateStory({ visible, onClose, onCreated }) {
                         <View style={{ width: 28 }} /> // Placeholder
                     )}
                 </View>
+
+                {media && (
+                    <View style={styles.visibilityRow}>
+                        <TouchableOpacity 
+                            style={[styles.visibilityBtn, visibility === 'all' && styles.visibilityBtnActive]} 
+                            onPress={() => setVisibility('all')}
+                        >
+                            <MaterialCommunityIcons name="earth" size={18} color={visibility === 'all' ? '#FFF' : '#94A3B8'} />
+                            <Text style={[styles.visibilityText, visibility === 'all' && styles.visibilityTextActive]}>Everyone</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.visibilityBtn, visibility === 'close_friends' && styles.visibilityBtnActive]} 
+                            onPress={() => setVisibility('close_friends')}
+                        >
+                            <MaterialCommunityIcons name="heart-multiple" size={18} color={visibility === 'close_friends' ? '#FFF' : '#94A3B8'} />
+                            <Text style={[styles.visibilityText, visibility === 'close_friends' && styles.visibilityTextActive]}>Close Friends</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 <View style={styles.content}>
                     {media ? (
@@ -125,5 +146,35 @@ const styles = StyleSheet.create({
         color: '#F8FAFC',
         marginTop: 12,
         fontWeight: '500',
+    },
+    visibilityRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        padding: 16,
+        gap: 12,
+        backgroundColor: '#0F172A',
+    },
+    visibilityBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    visibilityBtnActive: {
+        backgroundColor: '#8B5CF6',
+        borderColor: '#A78BFA',
+    },
+    visibilityText: {
+        color: '#94A3B8',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    visibilityTextActive: {
+        color: '#FFF',
     }
 });

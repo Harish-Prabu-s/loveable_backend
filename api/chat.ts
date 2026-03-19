@@ -43,4 +43,15 @@ export const chatApi = {
     const res = await apiClient.get('chat/contact-list/');
     return Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
   },
+  toggleDisappearing: async (room_id: number, enabled: boolean, timer: number): Promise<Room> => {
+    const res = await apiClient.post(`chat/rooms/${room_id}/toggle-disappearing/`, { enabled, timer });
+    return res.data;
+  },
+  markSeen: async (room_id: number): Promise<void> => {
+    await apiClient.post(`chat/messages/${room_id}/mark-seen/`);
+  },
+  getStreakLeaderboard: async (): Promise<any[]> => {
+    const res = await apiClient.get('chat/streaks/leaderboard/');
+    return res.data;
+  },
 };

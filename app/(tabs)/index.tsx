@@ -37,6 +37,7 @@ import StoryViewer from '@/components/StoryViewer';
 import CreateStory from '@/components/CreateStory';
 import { storiesApi, Story } from '@/api/stories';
 import CreateReel from '@/components/CreateReel';
+import { archiveApi } from '@/api/archive';
 
 const { width } = Dimensions.get('window');
 
@@ -69,11 +70,13 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
   const [caption, setCaption] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
+  const [visibility, setVisibility] = useState<'all' | 'close_friends'>('all');
   const { colors } = useTheme();
 
   const resetForm = () => {
     setCaption('');
     setImageUri(null);
+    setVisibility('all');
   };
 
   const handleClose = () => {
@@ -121,7 +124,7 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
     }
     setPosting(true);
     try {
-      const newPost = await postsApi.createPost(caption.trim(), imageUri ?? undefined);
+      const newPost = await postsApi.createPost(caption.trim(), imageUri ?? undefined, visibility);
       onPosted(newPost);
       handleClose();
     } catch (e: any) {
@@ -200,6 +203,33 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
             </TouchableOpacity>
           </View>
 
+          {/* Visibility Section */}
+          <View style={[createStyles.visibilityRow, { borderTopColor: colors.border }]}>
+            <Text style={[createStyles.visibilityLabel, { color: colors.textSecondary }]}>Who can see this?</Text>
+            <View style={createStyles.visibilityOptions}>
+              <TouchableOpacity
+                style={[
+                  createStyles.visibilityOption,
+                  visibility === 'all' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
+                ]}
+                onPress={() => setVisibility('all')}
+              >
+                <MaterialCommunityIcons name="earth" size={20} color={visibility === 'all' ? colors.primary : colors.textMuted} />
+                <Text style={[createStyles.visibilityText, { color: visibility === 'all' ? colors.primary : colors.textMuted }]}>Everyone</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  createStyles.visibilityOption,
+                  visibility === 'close_friends' && { backgroundColor: '#10B98120', borderColor: '#10B981' }
+                ]}
+                onPress={() => setVisibility('close_friends')}
+              >
+                <MaterialCommunityIcons name="heart-multiple" size={20} color={visibility === 'close_friends' ? '#10B981' : colors.textMuted} />
+                <Text style={[createStyles.visibilityText, { color: visibility === 'close_friends' ? '#10B981' : colors.textMuted }]}>Close Friends</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <Text style={[createStyles.charCount, { color: colors.textMuted }]}>{caption.length}/500</Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -247,6 +277,15 @@ const createStyles = StyleSheet.create({
   },
   mediaBtnLabel: { fontSize: 12, fontWeight: '600' },
   charCount: { fontSize: 12, textAlign: 'right', marginTop: 8 },
+  visibilityRow: { marginTop: 24, paddingTop: 16, borderTopWidth: 1 },
+  visibilityLabel: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  visibilityOptions: { flexDirection: 'row', gap: 12 },
+  visibilityOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12,
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  visibilityText: { fontSize: 14, fontWeight: '600' },
 });
 
 import { CommentSheet } from '@/components/CommentSheet';
@@ -300,6 +339,64 @@ function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }
     setShowShare(false);
   };
 
+  const handleArchive = async () => {
+    Alert.alert(
+      "Archive Post",
+      "This post will be moved to your archive and hidden from others.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Archive", 
+          onPress: async () => {
+            try {
+              await archiveApi.archive('post', post.id);
+              toast.success("Post archived");
+              // We should probably trigger a refresh or local removal
+              DeviceEventEmitter.emit('posts:changed');
+            } catch (e) {
+              toast.error("Failed to archive post");
+            }
+          } 
+        }
+      ]
+    );
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post permanently?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await archiveApi.delete('post', post.id);
+              toast.success("Post deleted");
+              DeviceEventEmitter.emit('posts:changed');
+            } catch (e) {
+              toast.error("Failed to delete post");
+            }
+          } 
+        }
+      ]
+    );
+  };
+
+  const handleMenuPress = () => {
+    Alert.alert(
+      "Post Options",
+      undefined,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Archive", onPress: handleArchive },
+        { text: "Delete", style: "destructive", onPress: handleDelete }
+      ]
+    );
+  };
+
   return (
     <View style={[postStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Post Header */}
@@ -317,7 +414,12 @@ function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }
             <Text style={[postStyles.timeText, { color: colors.textMuted }]}>{timeAgo(post.created_at)}</Text>
           </View>
         </TouchableOpacity>
-        <MaterialCommunityIcons name="dots-horizontal" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+        {post.is_owner && (
+          <TouchableOpacity onPress={handleMenuPress}>
+            <MaterialCommunityIcons name="dots-horizontal" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Caption */}
@@ -606,6 +708,18 @@ export default function HomeScreen() {
             </LinearGradient>
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Profile</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/games' as any)}>
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.actionIcon}>
+              <MaterialCommunityIcons name="gamepad-variant" size={24} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Games</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/streaks' as any)}>
+            <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.actionIcon}>
+              <MaterialCommunityIcons name="fire" size={24} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Streaks</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Mood Grid ── */}
@@ -730,6 +844,15 @@ export default function HomeScreen() {
           const idx = stories.findIndex(s => s.id === activeStory?.id);
           if (idx > 0) setActiveStory(stories[idx - 1]);
         }}
+        onDelete={async (id) => {
+          try {
+            await storiesApi.deleteStory(id);
+            setStories(prev => prev.filter(s => s.id !== id));
+            setShowStoryViewer(false);
+          } catch (e: any) {
+            Alert.alert('Error', 'Could not delete story');
+          }
+        }}
       />
 
       <CreateStory
@@ -805,10 +928,10 @@ const styles = StyleSheet.create({
   },
   // Quick actions
   quickActions: {
-    flexDirection: 'row', justifyContent: 'space-between',
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 20,
     paddingHorizontal: 24, marginTop: 16,
   },
-  actionItem: { alignItems: 'center', gap: 8 },
+  actionItem: { alignItems: 'center', gap: 8, width: 64 },
   actionIcon: {
     width: 56, height: 56, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',

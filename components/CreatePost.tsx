@@ -7,6 +7,7 @@ import { postsApi } from '@/api/posts';
 export default function CreatePost({ visible, onClose, onCreated }) {
     const [media, setMedia] = useState<string | null>(null);
     const [caption, setCaption] = useState('');
+    const [visibility, setVisibility] = useState('all');
     const [loading, setLoading] = useState(false);
 
     const pickImage = async () => {
@@ -29,9 +30,10 @@ export default function CreatePost({ visible, onClose, onCreated }) {
         }
         setLoading(true);
         try {
-            await postsApi.createPost(caption, media);
+            await postsApi.createPost(caption, media, visibility);
             setMedia(null);
             setCaption('');
+            setVisibility('all');
             if (onCreated) onCreated();
             onClose();
         } catch (e) {
@@ -57,6 +59,15 @@ export default function CreatePost({ visible, onClose, onCreated }) {
 
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                     <ScrollView contentContainerStyle={styles.content}>
+                        <View style={styles.visibilityArea}>
+                            <Text style={styles.visibilityLabel}>Share with:</Text>
+                            <TouchableOpacity onPress={() => setVisibility('all')} style={[styles.visibilityBtn, visibility === 'all' && styles.visibilityBtnActive]}>
+                                <Text style={[styles.visibilityBtnText, visibility === 'all' && styles.visibilityBtnTextActive]}>🌍 All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setVisibility('close_friends')} style={[styles.visibilityBtn, visibility === 'close_friends' && styles.visibilityBtnActive]}>
+                                <Text style={[styles.visibilityBtnText, visibility === 'close_friends' && styles.visibilityBtnTextActive]}>💚 Close Friends</Text>
+                            </TouchableOpacity>
+                        </View>
                         <View style={styles.inputArea}>
                             <TouchableOpacity style={styles.imageSelector} onPress={pickImage}>
                                 {media ? (
@@ -142,5 +153,35 @@ const styles = StyleSheet.create({
         fontSize: 16,
         minHeight: 80,
         textAlignVertical: 'top',
+    },
+    visibilityArea: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+        gap: 8,
+    },
+    visibilityLabel: {
+        color: '#94A3B8',
+        marginRight: 8,
+    },
+    visibilityBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    visibilityBtnActive: {
+        backgroundColor: '#10B98120',
+        borderColor: '#10B981',
+    },
+    visibilityBtnText: {
+        color: '#94A3B8',
+        fontSize: 14,
+    },
+    visibilityBtnTextActive: {
+        color: '#10B981',
+        fontWeight: 'bold',
     }
 });

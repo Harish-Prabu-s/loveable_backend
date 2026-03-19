@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter, router } from 'expo-router';
 import { notificationsApi, type Notification } from '@/api/notifications';
 import { getMediaUrl } from '@/utils/media';
 import { generateAvatarUrl } from '@/utils/avatar';
+import { useNotifications } from '@/context/NotificationContext';
 
 const NOTIFICATION_ICONS: Record<string, { name: any; color: string }> = {
     follow_request: { name: 'account-plus', color: '#8B5CF6' },
@@ -21,6 +22,9 @@ const NOTIFICATION_ICONS: Record<string, { name: any; color: string }> = {
     friend_request: { name: 'account-heart', color: '#EC4899' },
     friend_accepted: { name: 'account-heart-outline', color: '#10B981' },
     gift: { name: 'gift', color: '#F59E0B' },
+    streak_upload: { name: 'fire', color: '#EF4444' },
+    streak_comment: { name: 'comment-text-outline', color: '#EF4444' },
+    screenshot: { name: 'camera-off', color: '#EF4444' },
 };
 
 function NotificationItem({ item, onRespond }: {
@@ -38,6 +42,8 @@ function NotificationItem({ item, onRespond }: {
             onPress={() => {
                 if (item.type === 'story_like' || item.type === 'story_comment' || item.type === 'story_post') {
                     if (item.object_id) router.push(`/story/${item.object_id}` as any);
+                } else if (item.type === 'streak_upload' || item.type === 'streak_comment') {
+                    if (item.object_id) router.push(`/streak/${item.object_id}` as any);
                 } else if (item.actor) {
                     router.push(`/user/${item.actor.id}` as any);
                 }
@@ -52,7 +58,7 @@ function NotificationItem({ item, onRespond }: {
             <View style={styles.notifContent}>
                 <Text style={styles.notifMessage}>{item.message || item.type.replace(/_/g, ' ')}</Text>
                 <Text style={styles.notifTime}>{new Date(item.created_at).toLocaleDateString()}</Text>
-                {item.type === 'follow_request' && onRespond && (
+                {(item.type === 'follow_request' || item.type === 'friend_request') && onRespond && (
                     <View style={styles.actionRow}>
                         <TouchableOpacity style={styles.acceptBtn} onPress={() => onRespond(item.object_id!, 'accept')}>
                             <Text style={styles.acceptBtnText}>Accept</Text>
@@ -69,10 +75,12 @@ function NotificationItem({ item, onRespond }: {
 }
 
 export default function NotificationsScreen() {
+    const router = useRouter(); // Use the imported useRouter
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const { newNotification } = useNotifications();
 
     const loadNotifications = useCallback(async () => {
         try {
@@ -91,15 +99,31 @@ export default function NotificationsScreen() {
         loadNotifications();
     }, []);
 
+    useEffect(() => {
+        if (newNotification) {
+            setNotifications(prev => {
+                // Prevent duplicate notifications
+                if (prev.find(n => n.id === newNotification.id)) return prev;
+                return [newNotification, ...prev];
+            });
+            setUnreadCount(prev => prev + 1);
+        }
+    }, [newNotification]);
+
     const markAllRead = async () => {
         await notificationsApi.markRead();
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
     };
 
-    const handleFollowResponse = async (requestId: number, action: 'accept' | 'reject') => {
+    const handleResponse = async (requestId: number, action: 'accept' | 'reject', type: string) => {
         try {
-            await notificationsApi.respondFollowRequest(requestId, action);
+            if (type === 'follow_request') {
+                await notificationsApi.respondFollowRequest(requestId, action);
+            } else if (type === 'friend_request') {
+                const { profilesApi } = await import('@/api/profiles');
+                await profilesApi.respondFriendRequest(requestId, action);
+            }
             Alert.alert(action === 'accept' ? '✓ Accepted' : 'Declined');
             await loadNotifications();
         } catch (e) {
@@ -107,8 +131,8 @@ export default function NotificationsScreen() {
         }
     };
 
-    const followRequests = (notifications || []).filter(n => n.type === 'follow_request');
-    const otherNotifications = (notifications || []).filter(n => n.type !== 'follow_request');
+    const requestNotifications = (notifications || []).filter(n => n.type === 'follow_request' || n.type === 'friend_request');
+    const otherNotifications = (notifications || []).filter(n => n.type !== 'follow_request' && n.type !== 'friend_request');
 
     return (
         <SafeAreaView style={styles.container}>
@@ -139,12 +163,12 @@ export default function NotificationsScreen() {
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadNotifications(); }} tintColor="#8B5CF6" />}
                     contentContainerStyle={{ paddingBottom: 30 }}
                 >
-                    {/* Follow Requests Section */}
-                    {followRequests.length > 0 && (
+                    {/* Requests Section */}
+                    {requestNotifications.length > 0 && (
                         <>
-                            <Text style={styles.sectionLabel}>Follow Requests</Text>
-                            {followRequests.map(n => (
-                                <NotificationItem key={n.id} item={n} onRespond={handleFollowResponse} />
+                            <Text style={styles.sectionLabel}>Requests</Text>
+                            {requestNotifications.map(n => (
+                                <NotificationItem key={n.id} item={n} onRespond={(id, act) => handleResponse(id, act, n.type)} />
                             ))}
                         </>
                     )}

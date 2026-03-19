@@ -36,6 +36,7 @@ export interface Profile {
   updated_at: string;
   language?: string;
   is_following?: boolean;
+  is_close_friend?: boolean;
   followers_count?: number;
   following_count?: number;
   is_online?: boolean;
@@ -105,6 +106,8 @@ export interface Room {
   duration_seconds: number;
   coins_spent: number;
   created_at: string;
+  disappearing_messages_enabled?: boolean;
+  disappearing_timer?: number;
 }
 
 export interface Call {
@@ -132,6 +135,8 @@ export interface Message {
   media_url?: string;
   duration_seconds?: number;
   created_at: string;
+  is_seen?: boolean;
+  expires_at?: string | null;
 }
 
 export interface Story {
@@ -157,6 +162,22 @@ export interface StoryView {
   viewer_name: string;
   viewer_avatar: string | null;
   viewed_at: string;
+}
+
+export interface StreakUpload {
+  id: number;
+  user: Profile;
+  media_url: string;
+  media_type: 'image' | 'video';
+  visibility: 'all' | 'close_friends';
+  created_at: string;
+}
+
+export interface StreakComment {
+  id: number;
+  user: Profile;
+  text: string;
+  created_at: string;
 }
 
 // Wallet Types
@@ -271,4 +292,6 @@ export interface Contact {
   last_message: string;
   last_message_type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
   last_timestamp: string;
+  streak_count?: number;
+  streak_last_interaction?: string | null;
 }

@@ -62,3 +62,7 @@ class UserConsumer(AsyncWebsocketConsumer):
     async def call_notification(self, event):
         # Event sent from services.py
         await self.send(text_data=json.dumps(event['content']))
+
+    async def user_notification(self, event):
+        # Generic event for push notifications inside the app
+        await self.send(text_data=json.dumps(event['content']))

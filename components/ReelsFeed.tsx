@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { Video, ResizeMode, Audio } from 'expo-av';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { reelsApi, Reel } from '@/api/reels';
@@ -8,6 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { toast } from '@/utils/toast';
 import { CommentSheet } from './CommentSheet';
 import { ShareSheet } from './ShareSheet';
+import { archiveApi } from '@/api/archive';
 import { useIsFocused } from '@react-navigation/native';
 
 const { height, width } = Dimensions.get('window');
@@ -112,8 +113,46 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
         setShowShare(false);
     };
 
+    const confirmArchive = () => {
+        Alert.alert(
+            "Archive Reel",
+            "This reel will be moved to your archive.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Archive", onPress: async () => {
+                    try {
+                        await archiveApi.archive('reel', item.id);
+                        toast.success("Reel archived");
+                        onDelete(item.id); // Re-using onDelete to remove from local list
+                    } catch (e) {
+                        toast.error("Failed to archive reel");
+                    }
+                }}
+            ]
+        );
+    };
+
     const handleDelete = () => {
-        onDelete(item.id);
+        Alert.alert(
+            "Delete Reel",
+            "Are you sure you want to delete this reel? This is permanent.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) }
+            ]
+        );
+    };
+
+    const handleMenuPress = () => {
+        Alert.alert(
+            "Reel Options",
+            undefined,
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Archive", onPress: confirmArchive },
+                { text: "Delete", style: "destructive", onPress: handleDelete }
+            ]
+        );
     };
 
     const handleRetry = () => {
@@ -200,12 +239,9 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
                 <TouchableOpacity style={styles.actionBtn} onPress={() => setShowShare(true)}>
                     <MaterialCommunityIcons name="send-outline" size={32} color="#FFF" style={{ transform: [{ rotate: '-45deg' }] }} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
-                    <MaterialCommunityIcons name="dots-vertical" size={28} color="#FFF" />
-                </TouchableOpacity>
                 {item.is_owner && (
-                    <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
-                        <MaterialCommunityIcons name="delete-outline" size={28} color="#EF4444" />
+                    <TouchableOpacity style={styles.actionBtn} onPress={handleMenuPress}>
+                        <MaterialCommunityIcons name="dots-vertical" size={32} color="#FFF" />
                     </TouchableOpacity>
                 )}
             </View>
@@ -247,25 +283,61 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
 export default function ReelsFeed() {
     const [reels, setReels] = useState<Reel[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    
     const isFocused = useIsFocused();
     const [activeViewableItemIndex, setActiveViewableItemIndex] = useState(0);
     const [flatListHeight, setFlatListHeight] = useState(height);
 
     useFocusEffect(
         useCallback(() => {
-            fetchReels();
+            fetchReels(1, true);
         }, [])
     );
 
-    const fetchReels = async () => {
+    const fetchReels = async (pageNum = 1, isInitial = false) => {
+        if (!hasMore && !isInitial) return;
+        if (loadingMore) return;
+
         try {
-            const data = await reelsApi.getReels();
-            console.log(`[Reels] Fetched ${data.length} reels. First reel URL:`, data[0]?.video_url);
-            setReels(data);
+            if (isInitial) setLoading(true);
+            else setLoadingMore(true);
+
+            // Fetch 10 items. Page 1 requests random order.
+            const data = await reelsApi.getReels(pageNum, 10, isInitial);
+            
+            if (data.length < 10) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
+
+            if (isInitial) {
+                setReels(data);
+                setPage(1);
+            } else {
+                setReels(prev => {
+                    // Filter duplicates to strict guarantee no dups
+                    const existingIds = new Set(prev.map(r => r.id));
+                    const newReels = data.filter(r => !existingIds.has(r.id));
+                    return [...prev, ...newReels];
+                });
+                setPage(pageNum);
+            }
         } catch (e) {
             console.error(e);
+            toast.error("Failed to load reels");
         } finally {
             setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    const handleLoadMore = () => {
+        if (!loading && !loadingMore && hasMore) {
+            fetchReels(page + 1, false);
         }
     };
 
@@ -291,8 +363,22 @@ export default function ReelsFeed() {
 
     if (loading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center' }]}>
-                <ActivityIndicator size="large" color="#FFF" />
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={{ color: '#FFF', marginTop: 10, fontWeight: '600' }}>Loading Reels...</Text>
+            </View>
+        );
+    }
+    
+    if (reels.length === 0 && !loading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                <MaterialCommunityIcons name="movie-play-outline" size={64} color="#64748B" />
+                <Text style={{ color: '#FFF', marginTop: 16, fontSize: 18, fontWeight: 'bold' }}>No Reels Available</Text>
+                <Text style={{ color: '#94A3B8', marginTop: 8, textAlign: 'center' }}>We couldn't find any reels to show right now.</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => fetchReels(1, true)}>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Refresh</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -320,6 +406,15 @@ export default function ReelsFeed() {
                 decelerationRate="fast"
                 snapToInterval={flatListHeight}
                 snapToAlignment="start"
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={{ height: 100, justifyContent: 'center', alignItems: 'center' }}>
+                            <ActivityIndicator size="small" color="#8B5CF6" />
+                        </View>
+                    ) : null
+                }
             />
         </View>
     );

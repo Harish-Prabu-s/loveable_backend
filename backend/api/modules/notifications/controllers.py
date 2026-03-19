@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .services import (
     get_notifications, mark_notifications_read, get_unread_count,
     send_follow_request, respond_to_follow_request,
+    notify_screenshot,
 )
 from ...models import Notification, FollowRequest, PushToken
 from django.contrib.auth.models import User
@@ -127,3 +128,16 @@ def register_push_token(request):
     profile.save()
 
     return Response({'status': 'registered'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def screenshot_notification_view(request):
+    owner_id = request.data.get('owner_id')
+    content_type = request.data.get('content_type') # 'story' or 'streak'
+    content_id = request.data.get('content_id')
+    
+    if not owner_id or not content_type:
+        return Response({'error': 'owner_id and content_type are required'}, status=400)
+    
+    notify_screenshot(request.user, int(owner_id), content_type, content_id)
+    return Response({'status': 'notified'})

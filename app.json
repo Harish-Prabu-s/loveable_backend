@@ -43,6 +43,8 @@
       "bundler": "metro"
     },
     "extra": {
+      "signalingUrl": "wss://preflagellate-agnus-timidly.ngrok-free.dev",
+      "apiUrl": "http://localhost:8000/api",
       "eas": {
         "projectId": "88e8dc0b-8da0-4e8e-8d0a-6771e435dc93"
       }

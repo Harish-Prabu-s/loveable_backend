@@ -77,9 +77,33 @@ def respond_friend_request(user: User, request_id: int, action: str):
         if action == 'accept':
             req.status = 'accepted'
             req.save()
-            # Auto-follow each other?
+            # Auto-follow each other
             Follow.objects.get_or_create(follower=req.from_user, following=req.to_user)
             Follow.objects.get_or_create(follower=req.to_user, following=req.from_user)
+            
+            # Notify the sender that their request was accepted
+            from ..notifications.services import create_notification
+            from ..notifications.push_service import send_push_notification, _get_user_tokens
+            
+            profile = getattr(user, 'profile', None)
+            sender_name = profile.display_name if profile else user.username
+            
+            create_notification(
+                recipient=req.from_user,
+                actor=user,
+                notification_type='friend_accepted',
+                message=f"{sender_name} accepted your friend request!",
+                object_id=req.id
+            )
+            
+            tokens = _get_user_tokens(req.from_user.id)
+            if tokens:
+                send_push_notification(
+                    tokens,
+                    title="Friend Request Accepted!",
+                    body=f"{sender_name} accepted your friend request!",
+                    data={'type': 'friend_accepted', 'user_id': user.id}
+                )
         elif action == 'reject':
             req.status = 'rejected'
             req.save()

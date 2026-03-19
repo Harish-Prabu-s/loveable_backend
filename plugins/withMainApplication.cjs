@@ -39,8 +39,8 @@ const withMainApplication = (config) => {
         console.log('[withMainApplication] Removed ReactNativeApplicationEntryPoint import');
       }
 
-      // Fix 2: Add SoLoader import if not already present
-      if (!contents.includes('import com.facebook.soloader.SoLoader')) {
+      // Fix 2: Add SoLoader and WebRTCModulePackage imports
+      if (!contents.includes('import com.oney.WebRTCModule.WebRTCModulePackage')) {
         contents = contents.replace(
           'import com.facebook.react.defaults.DefaultReactNativeHost',
           'import com.facebook.react.defaults.DefaultReactNativeHost\nimport com.facebook.soloader.SoLoader\nimport com.oney.WebRTCModule.WebRTCModulePackage'
@@ -49,26 +49,21 @@ const withMainApplication = (config) => {
       }
 
       // Fix 3: Replace the bad ReleaseLevel block + loadReactNative call with SoLoader.init
+      // Passing 'this' to load() as first argument for RN 0.81 compatibility
       if (contents.includes('loadReactNative(this)')) {
         contents = contents.replace(
           /\s*DefaultNewArchitectureEntryPoint\.releaseLevel = try \{[\s\S]*?\} catch \(e: IllegalArgumentException\) \{[\s\S]*?\}\s*\n\s*loadReactNative\(this\)/,
-          '\n    SoLoader.init(this, false)\n    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {\n      // Disabling Bridgeless mode for stability in 0.81.5\n      load(true, true, false)\n    }'
+          '\n    SoLoader.init(this, false)\n    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {\n      // Disabling Bridgeless mode for stability in 0.81.5\n      load(this, true, false)\n    }'
         );
         console.log('[withMainApplication] Replaced loadReactNative with SoLoader.init (Bridgeless disabled)');
       }
 
-      // Fix 4: Remove ReleaseLevel and DefaultNewArchitectureEntryPoint imports (non-.load version)
-      contents = contents.replace(
-        /import com\.facebook\.react\.common\.ReleaseLevel\n?/g,
-        ''
-      );
-      contents = contents.replace(
-        /import com\.facebook\.react\.defaults\.DefaultNewArchitectureEntryPoint\n?/g,
-        ''
-      );
+      // Fix 4: Remove unwanted imports
+      contents = contents.replace(/import com\.facebook\.react\.common\.ReleaseLevel\n?/g, '');
+      contents = contents.replace(/import com\.facebook\.react\.defaults\.DefaultNewArchitectureEntryPoint\n?/g, '');
 
-      // Fix 5: Ensure DefaultNewArchitectureEntryPoint.load is imported
-      if (!contents.includes('DefaultNewArchitectureEntryPoint.load')) {
+      // Fix 5: Ensure DefaultNewArchitectureEntryPoint.load is imported correctly
+      if (!contents.includes('import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load')) {
         contents = contents.replace(
           'import com.facebook.react.defaults.DefaultReactNativeHost',
           'import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load\nimport com.facebook.react.defaults.DefaultReactNativeHost'
@@ -76,7 +71,7 @@ const withMainApplication = (config) => {
         console.log('[withMainApplication] Added DefaultNewArchitectureEntryPoint.load import');
       }
 
-      // Fix 6: Manually add WebRTCModulePackage if autolinking fails
+      // Fix 6: Manually add WebRTCModulePackage if autolinking fails or for redundancy
       if (!contents.includes('add(WebRTCModulePackage())')) {
         contents = contents.replace(
           '// add(MyReactNativePackage())',

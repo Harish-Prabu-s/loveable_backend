@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notificationsApi } from '@/api/notifications';
+import { useSecurityStore } from '@/store/securityStore';
 
 const PIN_LENGTH = 4;
 
@@ -14,6 +15,7 @@ export default function SetPinScreen() {
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [step, setStep] = useState<'enter' | 'confirm'>('enter');
+    const { setPin: setStorePin } = useSecurityStore();
 
     const handleDigit = (digit: string) => {
         if (step === 'enter') {
@@ -49,7 +51,7 @@ export default function SetPinScreen() {
             return;
         }
         try {
-            await AsyncStorage.setItem('app_lock_pin', p1);
+            await setStorePin(p1);
             await notificationsApi.updateSettings({ app_lock_type: 'pin' } as any);
             Alert.alert('✓ PIN Set', 'App lock PIN has been saved.', [
                 { text: 'OK', onPress: () => router.back() },

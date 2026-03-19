@@ -3,6 +3,9 @@ from . import views
 
 urlpatterns = [
     path('auth/', include('api.modules.auth.urls')),
+    path('friends/', include('api.modules.friends.urls')),
+    path('close-friends/', include('api.modules.close_friends.urls')),
+    path('streaks/', include('api.modules.streaks.urls')),
 
     path('wallet/', include('api.modules.wallet.urls')),
     path('games/', include('api.modules.games.urls')),
@@ -17,6 +20,7 @@ urlpatterns = [
     path('uploads/', include('api.modules.uploads.urls')),
     path('admin/', include('api.modules.admin.urls')),
     path('posts/', include('api.modules.posts.urls')),
+    path('archive/', include('api.modules.archive.urls')),
     path('settings/', include('api.modules.settings.urls')),
     path('notifications/', include('api.modules.notifications.urls')),
     path('betmatch/', include('api.modules.betmatch.urls')),

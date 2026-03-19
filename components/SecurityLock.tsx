@@ -7,11 +7,12 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSecurityStore } from '@/store/securityStore';
 import { toast } from '@/utils/toast';
 import { LinearGradient } from 'expo-linear-gradient';
+import PatternLock from './lock/PatternLock';
 
 const { width, height } = Dimensions.get('window');
 
 export const SecurityLock = () => {
-    const { isLocked, pin, setLocked, biometricsEnabled } = useSecurityStore();
+    const { isLocked, pin, pattern, setLocked, biometricsEnabled } = useSecurityStore();
     const [enteredPin, setEnteredPin] = useState('');
     const [error, setError] = useState(false);
 
@@ -78,6 +79,19 @@ export const SecurityLock = () => {
         }
     };
 
+    const handlePatternComplete = (enteredPattern: number[]) => {
+        if (enteredPattern.join(',') === pattern) {
+            setLocked(false);
+            setError(false);
+        } else {
+            Vibration.vibrate(100);
+            setError(true);
+            setTimeout(() => {
+                setError(false);
+            }, 800);
+        }
+    };
+
     if (!isLocked) return null;
 
     return (
@@ -103,7 +117,27 @@ export const SecurityLock = () => {
                     <Text style={styles.title}>Vibely Security</Text>
                     <Text style={styles.subtitle}>Authentication required to continue</Text>
 
-                    <View style={styles.dotsContainer}>
+                    {pattern ? (
+                        <View style={{ marginTop: 20 }}>
+                            <PatternLock 
+                                onComplete={handlePatternComplete} 
+                                error={error}
+                                title="" 
+                            />
+                            {biometricsEnabled && (
+                                <TouchableOpacity 
+                                    style={[styles.key, { borderColor: 'transparent', backgroundColor: 'transparent', alignSelf: 'center', marginTop: 40 }]} 
+                                    onPress={handleBiometricAuth}
+                                    activeOpacity={0.6}
+                                >
+                                    <MaterialCommunityIcons name="fingerprint" size={48} color="#8B5CF6" />
+                                    <Text style={{color: '#8B5CF6', marginTop: 8}}>Use Biometrics</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    ) : (
+                        <>
+                            <View style={styles.dotsContainer}>
                         {[0, 1, 2, 3].map((i) => (
                             <MotiView
                                 key={i}
@@ -144,15 +178,17 @@ export const SecurityLock = () => {
                         >
                             <Text style={styles.keyText}>0</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={[styles.key, { borderColor: 'transparent', backgroundColor: 'transparent' }]} 
-                            onPress={handleDelete}
-                            onLongPress={() => setEnteredPin('')}
-                            activeOpacity={0.6}
-                        >
-                            <MaterialCommunityIcons name="backspace-outline" size={28} color="#94A3B8" />
-                        </TouchableOpacity>
-                    </View>
+                            <TouchableOpacity 
+                                style={[styles.key, { borderColor: 'transparent', backgroundColor: 'transparent' }]} 
+                                onPress={handleDelete}
+                                onLongPress={() => setEnteredPin('')}
+                                activeOpacity={0.6}
+                            >
+                                <MaterialCommunityIcons name="backspace-outline" size={28} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+                        </>
+                    )}
 
                     <TouchableOpacity style={styles.forgotBtn} onPress={() => toast.info("Please use your fingerprint or contact support")}>
                         <Text style={styles.forgotText}>Forgot PIN?</Text>

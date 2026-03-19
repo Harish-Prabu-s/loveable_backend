@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { storiesApi } from '@/api/stories';
+import { notificationsApi } from '@/api/notifications';
 import { useAuthStore } from '@/store/authStore';
 import { getMediaUrl } from '@/utils/media';
 import { generateAvatarUrl } from '@/utils/avatar';
+import * as ScreenCapture from 'expo-screen-capture';
 
 export default function StoryViewScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +27,21 @@ export default function StoryViewScreen() {
     const [showComments, setShowComments] = useState(false);
     const [showViewers, setShowViewers] = useState(false);
     const heartScale = useRef(new Animated.Value(1)).current;
+
+    // Prevent screen recording and detect screenshots
+    useEffect(() => {
+        ScreenCapture.preventScreenCaptureAsync();
+        const subscription = ScreenCapture.addScreenshotListener(() => {
+            if (story && story.user !== user?.id) {
+                notificationsApi.notifyScreenshot(story.user, 'story', storyId);
+            }
+        });
+
+        return () => {
+            ScreenCapture.allowScreenCaptureAsync();
+            subscription.remove();
+        };
+    }, [story, storyId]);
 
     const loadViewers = async () => {
         try {

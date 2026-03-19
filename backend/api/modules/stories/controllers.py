@@ -11,7 +11,7 @@ from ...models import Story
 @permission_classes([IsAuthenticated])
 def list_stories_view(request):
     from .services import get_active_stories
-    qs = get_active_stories()
+    qs = get_active_stories(request.user)
     return Response(StorySerializer(qs, many=True, context={'request': request}).data)
 
 @api_view(['POST'])
@@ -19,9 +19,10 @@ def list_stories_view(request):
 def create_story_view(request):
     media_url = request.data.get('media_url')
     media_type = request.data.get('media_type', 'image')
+    visibility = request.data.get('visibility', 'all')
     if not media_url:
         return Response({'error': 'media_url required'}, status=400)
-    story = create_story(request.user, media_url, media_type)
+    story = create_story(request.user, media_url, media_type, visibility)
     return Response(StorySerializer(story, context={'request': request}).data, status=201)
 
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -87,13 +88,25 @@ def like_story_view(request, story_id):
         # Send notification to content owner
         if story.user != request.user:
             from ..notifications.push_service import send_push_notification
+            from ..notifications.services import create_notification
             from ...models import PushToken
             tokens = list(PushToken.objects.filter(user=story.user).values_list('expo_token', flat=True))
+            sender_name = getattr(request.user.profile, 'display_name', '') if hasattr(request.user, 'profile') else request.user.username
+            
+            # Persist to DB
+            create_notification(
+                recipient=story.user,
+                actor=request.user,
+                notification_type='story_like',
+                message=f"{sender_name} liked your story!",
+                object_id=story.id
+            )
+
             if tokens:
                 send_push_notification(
                     tokens, 
                     title="New Story Like!", 
-                    body=f"{request.user.display_name or request.user.username} liked your story!",
+                    body=f"{sender_name} liked your story!",
                     data={'type': 'story_like', 'story_id': story.id}
                 )
 
@@ -115,9 +128,20 @@ def comment_story_view(request, story_id):
         # Send notification to content owner
         if story.user != request.user:
             from ..notifications.push_service import send_push_notification, _get_user_tokens
+            from ..notifications.services import create_notification
             tokens = _get_user_tokens(story.user.id)
             profile = getattr(request.user, 'profile', None)
             sender_name = profile.display_name if profile else request.user.username
+            
+            # Persist to DB
+            create_notification(
+                recipient=story.user,
+                actor=request.user,
+                notification_type='story_comment',
+                message=f"{sender_name} commented on your story: {text[:30]}...",
+                object_id=story.id
+            )
+
             if tokens:
                 send_push_notification(
                     tokens, 

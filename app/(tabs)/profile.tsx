@@ -271,6 +271,21 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
           </TouchableOpacity>
 
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/close-friends' as any)}>
+            <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
+              <MaterialCommunityIcons name="heart-multiple" size={24} color="#10B981" />
+            </View>
+            <Text style={[styles.menuLabel, { color: colors.text }]}>Close Friends</Text>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/archive' as any)}>
+            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+              <MaterialCommunityIcons name="archive-outline" size={24} color="#0EA5E9" />
+            </View>
+            <Text style={[styles.menuLabel, { color: colors.text }]}>Archive</Text>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+          </TouchableOpacity>
+
           {/* Notification Toggle */}
           <View style={[styles.menuItem, { borderBottomColor: colors.border }]}>
             <View style={[styles.iconContainer, { backgroundColor: '#FEF9C3' }]}>

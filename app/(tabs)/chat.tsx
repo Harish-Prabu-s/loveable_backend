@@ -16,6 +16,9 @@ import { chatApi } from '@/api/chat';
 import { router } from 'expo-router';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { getMediaUrl } from '@/utils/media';
+import { archiveApi } from '@/api/archive';
+import { toast } from '@/utils/toast';
+import { Alert } from 'react-native';
 
 export default function ChatScreen() {
   const [contacts, setContacts] = useState<any[]>([]);
@@ -45,9 +48,45 @@ export default function ChatScreen() {
   };
 
   const filteredContacts = (Array.isArray(contacts) ? contacts : []).filter(contact =>
-    contact.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.last_message?.toLowerCase().includes(searchQuery.toLowerCase())
+    (contact.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    contact.last_message?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    !contact.is_archived
   );
+
+  const archiveChat = async (roomId: number) => {
+    try {
+      await archiveApi.archive('chat', roomId);
+      setContacts(prev => prev.filter(c => c.room_id !== roomId));
+      toast.success("Chat archived");
+    } catch (e) {
+      toast.error("Failed to archive chat");
+    }
+  };
+
+  const handleLongPress = (contact: any) => {
+    Alert.alert(
+      "Chat Options",
+      `Manage your conversation with ${contact.display_name || contact.username}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Archive Chat", onPress: () => archiveChat(contact.room_id) },
+        { text: "Delete Chat", style: "destructive", onPress: () => {
+          Alert.alert("Delete Chat", "Are you sure? This will delete all messages.", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: async () => {
+              try {
+                await archiveApi.delete('chat', contact.room_id);
+                setContacts(prev => prev.filter(c => c.room_id !== contact.room_id));
+                toast.success("Chat deleted");
+              } catch (e) {
+                toast.error("Failed to delete chat");
+              }
+            }}
+          ]);
+        }}
+      ]
+    );
+  };
 
   if (loading && !refreshing) {
     return (
@@ -104,6 +143,7 @@ export default function ChatScreen() {
                 // The receiver logic in [id].tsx should handle this
                 router.push({ pathname: '/chat/[id]' as any, params: { id: contact.id, isUser: 'true' } });
               }}
+              onLongPress={() => handleLongPress(contact)}
             >
               <Image
                 source={{
@@ -113,7 +153,17 @@ export default function ChatScreen() {
               />
               <View style={styles.chatInfo}>
                 <View style={styles.chatHeader}>
-                  <Text style={styles.roomName} numberOfLines={1}>{contact.display_name || contact.username}</Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.roomName} numberOfLines={1}>{contact.display_name || contact.username}</Text>
+                    {contact.streak_count && contact.streak_count > 0 ? (
+                      <View style={styles.streakBadge}>
+                        <Text style={styles.streakEmoji}>
+                          {contact.streak_count >= 100 ? '💯' : '🔥'}
+                        </Text>
+                        <Text style={styles.streakText}>{contact.streak_count}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.time}>{contact.last_timestamp ? new Date(contact.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</Text>
                 </View>
                 <View style={styles.chatFooter}>
@@ -214,8 +264,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#F1F5F9',
+    marginRight: 6,
+  },
+  nameRow: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 8,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  streakEmoji: {
+    fontSize: 12,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginLeft: 2,
   },
   time: {
     fontSize: 12,

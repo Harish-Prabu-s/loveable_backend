@@ -12,17 +12,18 @@ export interface Reel {
     comments_count: number;
     is_liked: boolean;
     is_owner: boolean;
+    is_archived: boolean;
 }
 
 export const reelsApi = {
-    getReels: async (): Promise<Reel[]> => {
-        const res = await client.get('/reels/');
+    getReels: async (page: number = 1, limit: number = 10, random: boolean = false): Promise<Reel[]> => {
+        const res = await client.get(`/reels/?page=${page}&limit=${limit}${random ? '&random=true' : ''}`);
         const data = res.data;
         return Array.isArray(data) ? data : (data?.results ?? []);
     },
 
-    createReel: async (video_url: string, caption: string): Promise<Reel> => {
-        const res = await client.post('/reels/create/', { video_url, caption });
+    createReel: async (video_url: string, caption: string, visibility: string = 'all'): Promise<Reel> => {
+        const res = await client.post('/reels/create/', { video_url, caption, visibility });
         return res.data;
     },
 

@@ -64,7 +64,8 @@ def create_post_view(request):
         if not caption and not image:
             return Response({'error': 'caption or image required', 'debug_files': list(request.FILES.keys()), 'debug_data': list(request.data.keys())}, status=400)
 
-        post = create_post(request.user, caption, image)
+        visibility = request.data.get('visibility', 'all')
+        post = create_post(request.user, caption, image, visibility)
         return Response(_serialize_post(post, request.user, request), status=201)
     except Exception as e:
         import traceback
@@ -86,9 +87,20 @@ def like_view(request, post_id: int):
             post = Post.objects.get(pk=post_id)
             if post.user != request.user:
                 from ..notifications.push_service import send_push_notification, _get_user_tokens
+                from ..notifications.services import create_notification
                 tokens = _get_user_tokens(post.user.id)
                 profile = getattr(request.user, 'profile', None)
                 sender_name = profile.display_name if profile else request.user.username
+                
+                # Persist to DB
+                create_notification(
+                    recipient=post.user,
+                    actor=request.user,
+                    notification_type='post_like',
+                    message=f"{sender_name} liked your post!",
+                    object_id=post.id
+                )
+
                 if tokens:
                     send_push_notification(
                         tokens, 
@@ -117,9 +129,20 @@ def comment_view(request, post_id: int):
         # Send notification to content owner
         if post.user != request.user:
             from ..notifications.push_service import send_push_notification, _get_user_tokens
+            from ..notifications.services import create_notification
             tokens = _get_user_tokens(post.user.id)
             profile = getattr(request.user, 'profile', None)
             sender_name = profile.display_name if profile else request.user.username
+            
+            # Persist to DB
+            create_notification(
+                recipient=post.user,
+                actor=request.user,
+                notification_type='post_comment',
+                message=f"{sender_name} commented: {text[:30]}...",
+                object_id=post.id
+            )
+
             if tokens:
                 send_push_notification(
                     tokens, 
@@ -161,9 +184,20 @@ def share_post_view(request, post_id: int):
 
         # Send notification to target user
         from ..notifications.push_service import send_push_notification, _get_user_tokens
+        from ..notifications.services import create_notification
         tokens = _get_user_tokens(target_user.id)
         profile = getattr(request.user, 'profile', None)
         sender_name = profile.display_name if profile else request.user.username
+        
+        # Persist to DB
+        create_notification(
+            recipient=target_user,
+            actor=request.user,
+            notification_type='post_share',
+            message=f"{sender_name} shared a post with you.",
+            object_id=post.id
+        )
+
         if tokens:
             send_push_notification(
                 tokens, 

@@ -23,6 +23,8 @@ export default function PublicProfileScreen() {
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [isCloseFriend, setIsCloseFriend] = useState(false);
+    const [togglingCF, setTogglingCF] = useState(false);
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -32,6 +34,7 @@ export default function PublicProfileScreen() {
                 setProfile(data);
                 // If the backend doesn't return `is_following`, we default to false for now
                 setIsFollowing(data.is_following || false);
+                setIsCloseFriend(data.is_close_friend || false);
             } catch (error) {
                 console.error('Failed to load public profile:', error);
                 Alert.alert('Error', 'Failed to load user profile.');
@@ -97,9 +100,51 @@ export default function PublicProfileScreen() {
         try {
             await profilesApi.sendFriendRequest(profile.user);
             Alert.alert('Success', 'Friend request sent!');
+            // Refresh profile to show "Request Sent"
+            const data = await profilesApi.getById(Number(id));
+            setProfile(data);
         } catch (error) {
             console.error('Failed to send friend request:', error);
             Alert.alert('Error', 'Could not send friend request.');
+        }
+    };
+
+    const handleFriendResponse = async (action: 'accept' | 'reject') => {
+        if (!profile || !profile.friend_request_status?.id) return;
+        try {
+            await profilesApi.respondFriendRequest(profile.friend_request_status.id, action);
+            Alert.alert(action === 'accept' ? '✓ Accepted' : 'Declined');
+            // Refresh profile
+            const data = await profilesApi.getById(Number(id));
+            setProfile(data);
+            if (data.friend_request_status) {
+                // updates will be reflected by the data
+            }
+        } catch (error) {
+            console.error('Failed to respond to friend request:', error);
+            Alert.alert('Error', 'Could not process the request.');
+        }
+    };
+
+    const handleCloseFriendToggle = async () => {
+        if (!profile || togglingCF) return;
+        setTogglingCF(true);
+        const nextState = !isCloseFriend;
+        setIsCloseFriend(nextState); // Optimistic
+
+        try {
+            const { closeFriendsApi } = await import('@/api/closeFriends');
+            if (nextState) {
+                await closeFriendsApi.add(profile.user);
+            } else {
+                await closeFriendsApi.remove(profile.user);
+            }
+        } catch (error) {
+            console.error('Failed to toggle close friend:', error);
+            setIsCloseFriend(!nextState); // Revert
+            Alert.alert('Error', 'Could not update close friends list.');
+        } finally {
+            setTogglingCF(false);
         }
     };
 
@@ -185,12 +230,46 @@ export default function PublicProfileScreen() {
                             </Text>
                         </TouchableOpacity>
 
+                        {profile?.friend_request_status?.status === 'pending' && profile.friend_request_status.direction === 'received' ? (
+                            <View style={styles.responseRow}>
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, styles.acceptBtn]}
+                                    onPress={() => handleFriendResponse('accept')}
+                                >
+                                    <Text style={styles.acceptBtnText}>Accept</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, styles.rejectBtn]}
+                                    onPress={() => handleFriendResponse('reject')}
+                                >
+                                    <Text style={styles.rejectBtnText}>Decline</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.actionBtn, styles.friendRequestBtn, (profile?.friend_request_status?.status === 'pending' || profile?.friend_request_status?.status === 'accepted') && styles.friendRequestActiveBtn]}
+                                onPress={handleFriendRequest}
+                                disabled={profile?.friend_request_status?.status === 'pending' || profile?.friend_request_status?.status === 'accepted'}
+                            >
+                                <MaterialCommunityIcons 
+                                    name={profile?.friend_request_status?.status === 'accepted' ? "account-heart" : "account-heart-outline"} 
+                                    size={20} 
+                                    color={profile?.friend_request_status ? "#3B82F6" : "#94A3B8"} 
+                                />
+                                <Text style={[styles.actionBtnText, { color: profile?.friend_request_status ? '#3B82F6' : '#94A3B8' }]}>
+                                    {profile?.friend_request_status?.status === 'accepted' ? 'Friends' : 
+                                     profile?.friend_request_status?.status === 'pending' ? 
+                                     (profile.friend_request_status.direction === 'sent' ? 'Request Sent' : 'Respond') 
+                                     : 'Add Friend'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
                         <TouchableOpacity
-                            style={[styles.actionBtn, styles.friendRequestBtn]}
-                            onPress={handleFriendRequest}
+                            style={[styles.actionBtn, isCloseFriend ? styles.closeFriendActiveBtn : styles.closeFriendBtn]}
+                            onPress={handleCloseFriendToggle}
                         >
-                            <MaterialCommunityIcons name="account-heart" size={20} color="#3B82F6" />
-                            <Text style={[styles.actionBtnText, { color: '#3B82F6' }]}>Add Friend</Text>
+                            <MaterialCommunityIcons name={isCloseFriend ? "star" : "star-outline"} size={22} color={isCloseFriend ? "#10B981" : "#94A3B8"} />
                         </TouchableOpacity>
                     </View>
 
@@ -391,10 +470,49 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#3B82F6',
     },
+    friendRequestActiveBtn: {
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: '#3B82F6',
+    },
+    responseRow: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 10,
+    },
+    acceptBtn: {
+        backgroundColor: '#8B5CF6',
+    },
+    acceptBtnText: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
+    rejectBtn: {
+        backgroundColor: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    rejectBtnText: {
+        color: '#94A3B8',
+        fontWeight: '600',
+    },
     actionBtnText: {
         fontSize: 15,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    closeFriendBtn: {
+        flex: 0,
+        width: 50,
+        backgroundColor: 'rgba(148, 163, 184, 0.1)',
+        borderWidth: 1.5,
+        borderColor: '#334155',
+    },
+    closeFriendActiveBtn: {
+        flex: 0,
+        width: 50,
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderWidth: 1.5,
+        borderColor: '#10B981',
     },
     dividerH: {
         height: 1,

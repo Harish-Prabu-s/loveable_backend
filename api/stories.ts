@@ -62,8 +62,8 @@ export const storiesApi = {
     return await response.json();
   },
 
-  createStory: async (media_url: string, media_type: string = 'image'): Promise<Story> => {
-    const res = await client.post('/stories/create/', { media_url, media_type });
+  createStory: async (media_url: string, media_type: string = 'image', visibility: string = 'all'): Promise<Story> => {
+    const res = await client.post('/stories/create/', { media_url, media_type, visibility });
     return res.data;
   },
 

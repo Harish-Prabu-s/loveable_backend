@@ -2,20 +2,29 @@ from django.utils import timezone
 from datetime import timedelta
 from ...models import Story, StoryView
 
-def get_active_stories():
+def get_active_stories(user):
     """
-    Returns stories that haven't expired (24h default).
+    Returns stories that haven't expired (24h default) and are visible to the user.
     """
     now = timezone.now()
-    # Stories expire after 24 hours if expires_at is null, otherwise use expires_at
-    from django.db.models import Q
+    from django.db import models
     return Story.objects.filter(
-        Q(expires_at__gt=now) | Q(expires_at__isnull=True, created_at__gt=now - timedelta(hours=24))
-    ).select_related('user__profile').prefetch_related('views').order_by('-created_at')
+        models.Q(expires_at__gt=now) | models.Q(expires_at__isnull=True, created_at__gt=now - timedelta(hours=24))
+    ).filter(
+        models.Q(visibility='all') | 
+        models.Q(user=user) | 
+        (models.Q(visibility='close_friends') & models.Q(user__close_friends__close_friend=user))
+    ).select_related('user__profile').prefetch_related('views').order_by('-created_at').distinct()
 
-def create_story(user, media_url: str, media_type: str = 'image'):
+def create_story(user, media_url: str, media_type: str = 'image', visibility='all'):
     expires_at = timezone.now() + timedelta(hours=24)
-    return Story.objects.create(user=user, media_url=media_url, media_type=media_type, expires_at=expires_at)
+    story = Story.objects.create(user=user, media_url=media_url, media_type=media_type, expires_at=expires_at, visibility=visibility)
+    
+    # Notify Close Friends
+    from ..notifications.services import notify_close_friends_of_content
+    notify_close_friends_of_content(user, 'story', story.id)
+    
+    return story
 
 def record_view(story_id: int, user):
     story = Story.objects.get(id=story_id)

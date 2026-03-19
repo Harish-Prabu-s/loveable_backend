@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import {
-  RTCPeerConnection as NativeRTCPeerConnection,
-  RTCIceCandidate as NativeRTCIceCandidate,
-  RTCSessionDescription as NativeRTCSessionDescription,
-  mediaDevices as nativeMediaDevices,
-  MediaStream as NativeMediaStream,
-} from '@/src/utils/webrtc';
-
-// Use native WebRTC on mobile, mocks on web
-const RTCPeerConnection = NativeRTCPeerConnection;
-const RTCIceCandidate = NativeRTCIceCandidate;
-const RTCSessionDescription = NativeRTCSessionDescription;
-const mediaDevices = nativeMediaDevices;
-const MediaStream = NativeMediaStream;
+  RTCView,
+  RTCPeerConnection,
+  RTCIceCandidate,
+  RTCSessionDescription,
+  mediaDevices,
+  MediaStream,
+} from '@/utils/webrtc';
 
 export type WebRTCCallKind = "audio" | "video" | "voice";
 
@@ -40,6 +35,9 @@ type SignalingMessage =
   };
 
 function getSignalingUrl(): string {
+  const extra = Constants.expoConfig?.extra;
+  if (extra?.signalingUrl) return String(extra.signalingUrl).replace(/\/$/, "");
+  
   const env = typeof process !== "undefined" ? process.env : (global as any).__ENV__;
   if (env?.EXPO_PUBLIC_SIGNALING_WS_URL) return String(env.EXPO_PUBLIC_SIGNALING_WS_URL).replace(/\/$/, "");
   if (env?.VITE_SIGNALING_WS_URL) return String(env.VITE_SIGNALING_WS_URL).replace(/\/$/, "");

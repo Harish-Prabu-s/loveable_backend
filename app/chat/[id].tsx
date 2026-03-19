@@ -10,9 +10,11 @@ import { useAuthStore } from '@/store/authStore';
 import { chatApi } from '@/api/chat';
 import { profilesApi } from '@/api/profiles';
 import { monetizationApi } from '@/api/vibely';
+import { useNotifications } from '@/context/NotificationContext';
 import type { Message as ApiMessage, Room } from '@/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MotiView, AnimatePresence } from 'moti';
+import { Switch } from 'react-native';
 import { MotiTransitions } from '@/utils/animations';
 
 
@@ -28,12 +30,15 @@ type UiMessage = {
     sender: 'me' | 'other';
     timestamp: number;
     type: 'text' | 'image' | 'audio' | 'video' | 'voice' | 'game_invite' | 'post_share' | 'reel_share';
+    is_seen?: boolean;
+    expires_at?: string | null;
 };
 
 export default function ChatScreen() {
     const { id: userIdStr } = useLocalSearchParams();
     const userId = Number(userIdStr);
     const { user } = useAuthStore();
+    const { activeChatEvent } = useNotifications();
     const isFemale = user?.gender === 'F';
 
     const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -45,6 +50,9 @@ export default function ChatScreen() {
     const [loading, setLoading] = useState(true);
     const [chatCost, setChatCost] = useState(1); // coin cost per message
     const [replyTo, setReplyTo] = useState<UiMessage | null>(null);
+
+    const [disappearingEnabled, setDisappearingEnabled] = useState(false);
+    const [disappearingTimer, setDisappearingTimer] = useState(0);
 
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -95,8 +103,49 @@ export default function ChatScreen() {
             sender: Number(m.sender) === Number(user?.id) ? 'me' : 'other',
             timestamp: new Date(m.created_at).getTime(),
             type,
+            is_seen: m.is_seen,
+            expires_at: m.expires_at,
         };
     };
+
+    useEffect(() => {
+        // Interval to clean up expired messages in the UI eagerly 
+        const interval = setInterval(() => {
+            setMessages(prev => prev.filter(m => {
+                if(m.expires_at) {
+                    const expiry = new Date(m.expires_at).getTime();
+                    if(Date.now() >= expiry) {
+                        return false;
+                    }
+                }
+                return true;
+            }));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Handle incoming WebSockets from NotificationContext
+    useEffect(() => {
+        if(!activeChatEvent || !room) return;
+        
+        if (activeChatEvent.type === 'new_message' && activeChatEvent.message?.room === room.id) {
+            const raw = activeChatEvent.message;
+            // Prevent duplicates
+            setMessages(prev => {
+                if(prev.find(m => m.id === String(raw.id))) return prev;
+                return [...prev, toUi(raw)];
+            });
+            // Mark new immediately seen
+            chatApi.markSeen(room.id).catch(console.error);
+
+            setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+        } else if (activeChatEvent.type === 'messages_seen' && activeChatEvent.room_id === room.id) {
+            // Re-fetch room messages to get updated expiry timers
+            chatApi.getMessages(room.id).then(msgs => setMessages(msgs.map(toUi))).catch(console.error);
+        }
+    }, [activeChatEvent]);
 
     useEffect(() => {
         const init = async () => {
@@ -120,8 +169,14 @@ export default function ChatScreen() {
 
                 const r = await chatApi.createRoom(userId);
                 setRoom(r);
+                setDisappearingEnabled(!!r.disappearing_messages_enabled);
+                setDisappearingTimer(r.disappearing_timer || 0);
+
                 const msgs = await chatApi.getMessages(r.id);
                 setMessages(msgs.map(toUi));
+                
+                // Mark loaded messages as seen
+                await chatApi.markSeen(r.id);
             } catch (e) {
                 console.error('chat init error', e);
             } finally {
@@ -160,10 +215,36 @@ export default function ChatScreen() {
         }, 100);
 
         try {
-            await chatApi.sendMessage(room.id, textToSend);
+            const m = await chatApi.sendMessage(room.id, textToSend);
+            
+            // Re-map the new message to UI format securely
+            const uiMsg = toUi(m);
+            setMessages(prev => {
+                const newArr = [...prev];
+                const idx = newArr.findIndex(x => x.id === newMessage.id);
+                if(idx >= 0) {
+                    newArr[idx] = uiMsg; 
+                }
+                return newArr;
+            });
+            
         } catch (e) {
             console.error('send message error', e);
             Alert.alert('Error', 'Failed to send message');
+        }
+    };
+    
+    const toggleDisappearing = async (value: boolean) => {
+        if(!room) return;
+        try {
+            setDisappearingEnabled(value);
+            const timer = value ? 5 : 0; // default 5 seconds
+            setDisappearingTimer(timer);
+            await chatApi.toggleDisappearing(room.id, value, timer);
+        } catch(e) {
+            // Revert on error
+            setDisappearingEnabled(!value);
+            Alert.alert("Error", "Could not toggle settings.");
         }
     };
 
@@ -205,6 +286,21 @@ export default function ChatScreen() {
                     </View>
 
                     <View style={styles.headerRight}>
+                        <TouchableOpacity style={[styles.iconButton, { marginRight: 4 }]} onPress={() =>
+                            router.push({ pathname: '/game/matchmaking', params: { coupleTarget: userId, coupleName: otherProfileName } })
+                        }>
+                            <MaterialCommunityIcons name="gamepad-variant-outline" size={24} color="#EC4899" />
+                        </TouchableOpacity>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginRight: 4}}>
+                            <MaterialCommunityIcons name="timer-sand" size={18} color={disappearingEnabled ? "#8B5CF6" : "#64748B"} />
+                            <Switch 
+                                value={disappearingEnabled}
+                                onValueChange={toggleDisappearing}
+                                thumbColor={disappearingEnabled ? '#8B5CF6' : '#94A3B8'}
+                                trackColor={{false: '#334155', true: '#C4B5FD'}}
+                                style={{transform: [{scaleX: .7}, {scaleY: .7}], marginLeft: 2}}
+                            />
+                        </View>
                         <TouchableOpacity style={styles.iconButton} onPress={() =>
                             router.push({ pathname: '/call/[id]' as any, params: { id: userId, callType: 'audio', calleeName: otherProfileName } })
                         }>
@@ -286,9 +382,21 @@ export default function ChatScreen() {
                                                 </Text>
                                             </TouchableOpacity>
                                         )}
-                                        <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextOther]}>
-                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
+                                        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: isMe ? 'flex-end' : 'flex-start'}}>
+                                            <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextOther]}>
+                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
+                                            
+                                            {/* Disappearing Message Timer Indicator */}
+                                            {msg.expires_at && (
+                                                <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 6}}>
+                                                    <MaterialCommunityIcons name="timer-sand" size={12} color={isMe ? "rgba(255,255,255,0.7)" : "#94A3B8"} />
+                                                    <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextOther, {marginLeft: 2}]}>
+                                                        {Math.max(0, Math.floor((new Date(msg.expires_at).getTime() - Date.now()) / 1000))}s
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
                                 </MotiView>
                             );
