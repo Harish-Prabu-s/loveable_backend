@@ -82,7 +82,7 @@
     "expo-media-library": "~18.2.1",
     "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.23",
-    "expo-screen-capture": "^55.0.9",
+    "expo-screen-capture": "~8.0.9",
     "expo-secure-store": "~15.0.8",
     "expo-sensors": "~15.0.8",
     "expo-status-bar": "~3.0.9",
@@ -145,5 +145,17 @@
     "event-target-shim": "6.0.2",
     "react": "19.1.0",
     "react-dom": "19.1.0"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-webrtc",
+          "react-native-vector-icons",
+          "@capacitor-firebase/authentication"
+        ],
+        "listUnknownPackages": false
+      }
+    }
   }
 }
