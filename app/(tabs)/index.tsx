@@ -414,7 +414,6 @@ function PostCard({ post, onLike }: { post: Post; onLike: (id: number) => void }
             <Text style={[postStyles.timeText, { color: colors.textMuted }]}>{timeAgo(post.created_at)}</Text>
           </View>
         </TouchableOpacity>
-        </TouchableOpacity>
         {post.is_owner && (
           <TouchableOpacity onPress={handleMenuPress}>
             <MaterialCommunityIcons name="dots-horizontal" size={20} color={colors.textMuted} />

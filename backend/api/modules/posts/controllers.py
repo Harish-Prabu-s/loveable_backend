@@ -39,7 +39,7 @@ def _serialize_post(post, request_user, request=None):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def feed_view(request):
-    posts = get_feed()
+    posts = get_feed(request.user)
     data = [_serialize_post(p, request.user, request) for p in posts]
     return Response(data)
 
