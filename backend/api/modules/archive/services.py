@@ -81,11 +81,11 @@ def get_archived_content(user, content_type: str):
     if content_type == 'post':
         from ...serializers import PostSerializer
         items = Post.objects.filter(user=user, is_archived=True).order_by('-created_at')
-        return PostSerializer(items, many=True).data
+        return PostSerializer(items, many=True, context={'request_user': user}).data
     elif content_type == 'reel':
         from ...serializers import ReelSerializer
         items = Reel.objects.filter(user=user, is_archived=True).order_by('-created_at')
-        return ReelSerializer(items, many=True).data
+        return ReelSerializer(items, many=True, context={'request_user': user}).data
     elif content_type == 'chat':
         from ...serializers import RoomSerializer
         items = Room.objects.filter(models.Q(caller=user) | models.Q(receiver=user), is_archived=True).order_by('-created_at')

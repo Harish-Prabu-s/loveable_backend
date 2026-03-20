@@ -11,8 +11,8 @@ def add_close_friend(request):
         return Response({'error': 'user_id is required'}, status=400)
     cf, msg = add_close_friend_service(request.user, user_id)
     if not cf:
-        return Response({'error': msg}, status=400)
-    return Response({'status': msg})
+        return Response({'success': False, 'error': msg}, status=400)
+    return Response({'success': True, 'message': msg})
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -22,8 +22,8 @@ def remove_close_friend(request):
         return Response({'error': 'user_id is required'}, status=400)
     success, msg = remove_close_friend_service(request.user, user_id)
     if not success:
-        return Response({'error': msg}, status=400)
-    return Response({'status': msg})
+        return Response({'success': False, 'error': msg}, status=400)
+    return Response({'success': True, 'message': msg})
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

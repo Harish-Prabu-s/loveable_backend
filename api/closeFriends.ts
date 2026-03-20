@@ -20,12 +20,12 @@ export const closeFriendsApi = {
     },
 
     add: async (closeFriendId: number): Promise<{ success: boolean; message: string }> => {
-        const res = await client.post('/close-friends/add/', { close_friend_id: closeFriendId });
+        const res = await client.post('/close-friends/add/', { user_id: closeFriendId });
         return res.data;
     },
 
     remove: async (closeFriendId: number): Promise<{ success: boolean; message: string }> => {
-        const res = await client.post('/close-friends/remove/', { close_friend_id: closeFriendId });
+        const res = await client.post('/close-friends/remove/', { user_id: closeFriendId });
         return res.data;
     }
 };

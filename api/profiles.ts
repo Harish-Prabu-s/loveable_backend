@@ -21,7 +21,9 @@ export const profilesApi = {
       name: 'photo.jpg',
     });
     // Use the specialized endpoint with filename sanitization
-    await apiClient.post('auth/upload-avatar/', formData);
+    await apiClient.post('auth/upload-avatar/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     // Return the updated profile
     const response = await apiClient.get('profiles/me/');
     return response.data;

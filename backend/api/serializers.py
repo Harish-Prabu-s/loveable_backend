@@ -4,7 +4,7 @@ from django.conf import settings
 from .models import (
     Profile, Wallet, CoinTransaction, Payment, Withdrawal,
     Game, LevelProgress, Offer, LeagueTier, CallSession,
-    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel, Streak
+    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel, Streak, Post, PostLike
 )
 from .utils import get_absolute_media_url
 
@@ -276,3 +276,58 @@ class ContactSerializer(serializers.Serializer):
         if profile:
             return get_absolute_media_url(profile.photo, request)
         return None
+
+class PostSerializer(serializers.ModelSerializer):
+    profile_id = serializers.IntegerField(source='user.profile.id', read_only=True)
+    display_name = serializers.CharField(source='user.profile.display_name', read_only=True)
+    username = serializers.CharField(source='user.profile.display_name', read_only=True)
+    photo = serializers.SerializerMethodField()
+    gender = serializers.CharField(source='user.profile.gender', read_only=True)
+    image = serializers.SerializerMethodField()
+    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
+    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'user', 'profile_id', 'display_name', 'username', 'photo', 'gender',
+            'caption', 'image', 'likes_count', 'comments_count', 'is_liked', 'is_owner',
+            'created_at'
+        ]
+
+    def get_photo(self, obj):
+        request = self.context.get('request')
+        profile = getattr(obj.user, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
+        return None
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        return get_absolute_media_url(obj.image, request)
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        user = None
+        if request and request.user.is_authenticated:
+            user = request.user
+        else:
+            user = self.context.get('request_user')
+            
+        if user:
+            return PostLike.objects.filter(post=obj, user=user).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        user = None
+        if request and request.user.is_authenticated:
+            user = request.user
+        else:
+            user = self.context.get('request_user')
+            
+        if user:
+            return obj.user == user
+        return False

@@ -97,7 +97,9 @@ export const authApi = {
       type: 'image/jpeg',
       name: 'avatar.jpg',
     });
-    const response = await apiClient.post('auth/upload-avatar/', formData);
+    const response = await apiClient.post('auth/upload-avatar/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return response.data;
   },
 
