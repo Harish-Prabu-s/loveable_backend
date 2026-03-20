@@ -73,7 +73,17 @@ def send_friend_request(user: User, target_user_id: int):
 def respond_friend_request(user: User, request_id: int, action: str):
     # action: 'accept' or 'reject'
     try:
-        req = FriendRequest.objects.get(id=request_id, to_user=user, status='pending')
+        req = FriendRequest.objects.get(id=request_id, to_user=user)
+        
+        # If it's already in the target state, just return it (idempotency)
+        if req.status == action + 'ed':
+            return req
+            
+        # If it's already processed but into a DIFFERENT state (e.g. was rejected, now trying to accept)
+        # We only allow responding to 'pending' requests.
+        if req.status != 'pending':
+            return None
+
         if action == 'accept':
             req.status = 'accepted'
             req.save()
