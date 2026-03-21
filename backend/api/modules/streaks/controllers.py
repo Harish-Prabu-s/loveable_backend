@@ -70,3 +70,11 @@ def get_streak_upload(request, upload_id):
         'visibility': upload.visibility,
         'created_at': upload.created_at
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def view_streaks_snapchat(request):
+    view_type = request.query_params.get('type', 'friends')
+    from .services import get_streaks_list_service
+    data = get_streaks_list_service(request.user, view_type, request)
+    return Response(data)

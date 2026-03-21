@@ -15,18 +15,18 @@ def create_notification(recipient: User, actor: User, notification_type: str, me
         message=message,
         object_id=object_id,
     )
-
-    # Real-time WebSockets update
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    channel_layer = get_channel_layer()
+    
     try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-        channel_layer = get_channel_layer()
         if channel_layer:
-            actor_profile = getattr(actor, 'profile', None)
+            actor_profile = getattr(actor, 'profile', None) if actor else None
+            # Real-time WebSockets update (Notification Channel)
             async_to_sync(channel_layer.group_send)(
-                f'user_{recipient.id}',
+                f'notifications_{recipient.id}',
                 {
-                    'type': 'user_notification',
+                    'type': 'send_notification',
                     'content': {
                         'type': 'new_notification',
                         'data': {
@@ -39,7 +39,6 @@ def create_notification(recipient: User, actor: User, notification_type: str, me
                             'actor': {
                                 'id': actor.id,
                                 'display_name': getattr(actor_profile, 'display_name', '') if actor_profile else '',
-                                # Photo serialization might need request context, omit or send basic URL if needed
                             } if actor else None
                         }
                     }
@@ -114,33 +113,59 @@ def get_unread_count(user: User) -> int:
 
 def notify_close_friends_of_content(uploader: User, content_type: str, object_id: int):
     """
-    Notify users who have the uploader in their Close Friends list about new content.
+    Optimized: Notify users who have the uploader in their Close Friends list.
+    Uses bulk creation and pre-fetched tokens to handle large follower counts.
     """
-    # People who have added 'uploader' as their close friend
-    close_friendships = CloseFriend.objects.filter(close_friend=uploader).select_related('user')
+    from ..notifications.push_service import send_push_notification
+    from ...models import PushToken
     
-    from ..notifications.push_service import send_push_notification, _get_user_tokens
+    # 1. Fetch all close friend relationships in one query
+    close_friendships = CloseFriend.objects.filter(close_friend=uploader).select_related('user')
+    if not close_friendships.exists():
+        return
+
     uploader_profile = getattr(uploader, 'profile', None)
     sender_name = uploader_profile.display_name if uploader_profile else uploader.username
+    message = f"🌟 {sender_name} just uploaded a new {content_type}!"
     
-    for cf in close_friendships:
-        recipient = cf.user
-        message = f"🌟 {sender_name} just uploaded a new {content_type}!"
-        create_notification(
-            recipient=recipient,
+    # 2. Prepare Notification objects for bulk creation
+    notif_objects = [
+        Notification(
+            recipient=cf.user,
             actor=uploader,
             notification_type=f'close_friend_{content_type}',
             message=message,
             object_id=object_id
-        )
-        
-        if tokens:
-            send_push_notification(
-                tokens,
-                title="🌟 Close Friend Update",
-                body=message,
-                data={'type': f'close_friend_{content_type}', 'object_id': object_id, 'user_id': uploader.id}
-            )
+        ) for cf in close_friendships
+    ]
+    Notification.objects.bulk_create(notif_objects)
+
+    # 3. Bulk fetch tokens for all recipients to avoid N+1
+    recipient_ids = [cf.user_id for cf in close_friendships]
+    all_tokens = PushToken.objects.filter(user_id__in=recipient_ids)
+    
+    # Map users to their tokens
+    token_map = {}
+    for t in all_tokens:
+        if t.user_id not in token_map:
+            token_map[t.user_id] = []
+        token_map[t.user_id].append(t.expo_token)
+    
+    # 4. Send push notifications using pre-fetched tokens
+    # Note: real-time WebSocket updates are skipped here for mass notifications 
+    # to maintain high performance for the uploader's request.
+    for user_id in recipient_ids:
+        user_tokens = token_map.get(user_id)
+        if user_tokens:
+            try:
+                send_push_notification(
+                    user_tokens,
+                    title="🌟 Close Friend Update",
+                    body=message,
+                    data={'type': f'close_friend_{content_type}', 'object_id': object_id, 'user_id': uploader.id}
+                )
+            except Exception:
+                pass # Don't block if one push fails
 
 def notify_screenshot(actor, owner_id, content_type, content_id):
     """

@@ -41,32 +41,39 @@ def list_messages(room_id: int):
     return Message.objects.filter(room_id=room_id).order_by('created_at')
 
 def mark_messages_seen(room_id: int, user: User):
-    room = Room.objects.get(id=room_id)
-    # Mark messages not sent by standard user as seen if they aren't already
-    unseen_msgs = Message.objects.filter(room_id=room_id, is_seen=False).exclude(sender=user)
-    
-    if room.disappearing_messages_enabled and room.disappearing_timer > 0:
-        expiry_time = timezone.now() + timedelta(seconds=room.disappearing_timer)
-        unseen_msgs.update(is_seen=True, expires_at=expiry_time)
-    else:
-        unseen_msgs.update(is_seen=True)
+    try:
+        room = Room.objects.get(id=room_id)
+        # Identify the recipient of the seen notification
+        other_user = room.receiver if room.caller == user else room.caller
         
-    # Notify sender that their messages were read
-    other_user = room.caller if room.receiver == user else room.receiver
-    from channels.layers import get_channel_layer
-    from asgiref.sync import async_to_sync
-    channel_layer = get_channel_layer()
-    if channel_layer:
-        async_to_sync(channel_layer.group_send)(
-            f'user_{other_user.id}',
-            {
-                'type': 'user_notification',
-                'content': {
-                    'type': 'messages_seen',
-                    'room_id': room.id
+        unseen_msgs = Message.objects.filter(room_id=room_id, is_seen=False).exclude(sender=user)
+        
+        if room.disappearing_messages_enabled and room.disappearing_timer > 0:
+            expiry_time = timezone.now() + timedelta(seconds=room.disappearing_timer)
+            unseen_msgs.update(is_seen=True, expires_at=expiry_time)
+        else:
+            unseen_msgs.update(is_seen=True)
+            
+        # Notify sender that their messages were read
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f'chat_{other_user.id}',
+                {
+                    'type': 'send_message',
+                    'content': {
+                        'type': 'messages_seen',
+                        'room_id': room.id
+                    }
                 }
-            }
-        )
+            )
+    except Room.DoesNotExist:
+        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error marking messages seen: {e}")
 
 def send_message(
     room_id: int,
@@ -91,16 +98,16 @@ def send_message(
         duration_seconds=duration_seconds,
     )
     
-    # Notify Receiver in Real-Time
+    # Notify Receiver in Real-Time (Chat Channel)
     from channels.layers import get_channel_layer
     from asgiref.sync import async_to_sync
     from ...serializers import MessageSerializer
     channel_layer = get_channel_layer()
     if channel_layer:
         async_to_sync(channel_layer.group_send)(
-            f'user_{other_user.id}',
+            f'chat_{other_user.id}',
             {
-                'type': 'user_notification',
+                'type': 'send_message',
                 'content': {
                     'type': 'new_message',
                     'message': MessageSerializer(msg).data
@@ -123,36 +130,46 @@ def send_message(
         
     return msg
 
-def update_streak(user1: User, user2: User):
-    # Ensure consistent ordering for unique constraint
-    u1, u2 = (user1, user2) if user1.id < user2.id else (user2, user1)
-    
-    streak, created = Streak.objects.get_or_create(user1=u1, user2=u2)
-    now = timezone.now()
-
-    if created or not streak.last_interaction_date:
-        streak.streak_count = 1
-        streak.last_interaction_date = now
-    else:
-        # Check if they already interacted today
-        delta = now - streak.last_interaction_date
+def update_streak(sender: User, receiver: User):
+    """
+    Optimized streak logic with error handling and last_uploader tracking.
+    """
+    try:
+        # Ensure consistent ordering for unique constraint
+        u1, u2 = (sender, receiver) if sender.id < receiver.id else (receiver, sender)
         
-        if delta.days == 0 and now.date() == streak.last_interaction_date.date():
-            # Interacted today already, do nothing
-            pass
-        elif delta.days == 1 or (delta.days == 0 and now.date() > streak.last_interaction_date.date()):
-            # Interacted next day, increment streak
-            streak.streak_count += 1
+        streak, created = Streak.objects.get_or_create(user1=u1, user2=u2)
+        now = timezone.now()
+        
+        # Track who last sent a message to progress the streak
+        streak.last_uploader = sender
+        
+        if created or not streak.last_interaction_date:
+            streak.streak_count = 1
             streak.last_interaction_date = now
         else:
-            # Over 1 day missed
-            if streak.freezes_available > 0:
-                streak.freezes_available -= 1
+            delta = now - streak.last_interaction_date
+            
+            # If same day, don't increment but update uploader
+            if delta.days == 0 and now.date() == streak.last_interaction_date.date():
+                pass 
+            # If exactly next day, increment
+            elif delta.days == 1 or (delta.days == 0 and now.date() > streak.last_interaction_date.date()):
+                streak.streak_count += 1
                 streak.last_interaction_date = now
             else:
-                streak.streak_count = 1 # Reset
-                streak.last_interaction_date = now
-    streak.save()
+                # Streak lost, check freezes
+                if streak.freezes_available > 0:
+                    streak.freezes_available -= 1
+                    streak.last_interaction_date = now # Use freeze to save streak
+                else:
+                    streak.streak_count = 1 # Reset
+                    streak.last_interaction_date = now
+        
+        streak.save()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to update streak: {e}")
 
 def mark_room_status(room_id: int, status: str, duration_seconds: int = 0, coins_spent: int = 0):
     room = Room.objects.filter(id=room_id).first()

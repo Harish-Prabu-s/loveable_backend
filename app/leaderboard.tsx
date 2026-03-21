@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useAuthStore } from '@/store/authStore';
 import { generateAvatarUrl } from '@/utils/avatar';
-import { chatApi } from '@/api/chat';
+import { gamificationApi } from '@/api/gamification';
 
 type LeagueTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Master';
 
@@ -60,20 +60,38 @@ const { width } = Dimensions.get('window');
 
 export default function LeaderboardScreen() {
     const { user } = useAuthStore();
-    const [activeTab, setActiveTab] = useState<'global' | 'streaks'>('global');
+    const [activeTab, setActiveTab] = useState<'global' | 'streaks' | 'video' | 'audio'>('global');
     const [users, setUsers] = useState<LeaderboardUser[]>([]);
     const [streakUsers, setStreakUsers] = useState<any[]>([]);
+    const [videoUsers, setVideoUsers] = useState<any[]>([]);
+    const [audioUsers, setAudioUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'global') {
-            setUsers(generateMockLeaderboard());
-        } else {
-            // Load streaks
-            chatApi.getStreakLeaderboard()
-                .then(data => setStreakUsers(data))
-                .catch(err => console.error(err));
-        }
+        loadData();
     }, [activeTab]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            if (activeTab === 'global') {
+                setUsers(generateMockLeaderboard());
+            } else if (activeTab === 'streaks') {
+                const data = await gamificationApi.getStreakLeaderboard();
+                setStreakUsers(data);
+            } else if (activeTab === 'video') {
+                const data = await gamificationApi.getVideoCallLeaderboard();
+                setVideoUsers(data);
+            } else if (activeTab === 'audio') {
+                const data = await gamificationApi.getAudioCallLeaderboard();
+                setAudioUsers(data);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const currentUserStats: LeaderboardUser = {
         id: 'me',
@@ -139,86 +157,109 @@ export default function LeaderboardScreen() {
                 </View>
 
                 {/* Tabs */}
-                <View style={styles.tabsContainer}>
+                <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    contentContainerStyle={styles.tabsContainer}
+                    style={{ maxHeight: 60 }}
+                >
                     <TouchableOpacity 
                         style={[styles.tabButton, activeTab === 'global' && styles.activeTabButton]}
                         onPress={() => setActiveTab('global')}
                     >
-                        <Text style={[styles.tabText, activeTab === 'global' && styles.activeTabText]}>Global Rank</Text>
+                        <Text style={[styles.tabText, activeTab === 'global' && styles.activeTabText]}>Global</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.tabButton, activeTab === 'streaks' && styles.activeTabButton]}
                         onPress={() => setActiveTab('streaks')}
                     >
-                        <Text style={[styles.tabText, activeTab === 'streaks' && styles.activeTabText]}>Top Streaks 🔥</Text>
+                        <Text style={[styles.tabText, activeTab === 'streaks' && styles.activeTabText]}>Streaks 🔥</Text>
                     </TouchableOpacity>
-                </View>
+                    <TouchableOpacity 
+                        style={[styles.tabButton, activeTab === 'video' && styles.activeTabButton]}
+                        onPress={() => setActiveTab('video')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'video' && styles.activeTabText]}>Video 🎥</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.tabButton, activeTab === 'audio' && styles.activeTabButton]}
+                        onPress={() => setActiveTab('audio')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'audio' && styles.activeTabText]}>Audio 🎧</Text>
+                    </TouchableOpacity>
+                </ScrollView>
 
-                {/* List Section (Light Theme) */}
+                {/* List Section */}
                 <View style={styles.listSection}>
-                    {activeTab === 'global' ? users.map((u) => {
-                        const leagueInfo = getLeague(u.points);
-                        const isTop3 = u.rank <= 3;
-
-                        return (
-                            <View key={u.id} style={styles.listItem}>
-                                <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>
-                                    #{u.rank}
-                                </Text>
-
-                                <Image
-                                    source={{ uri: generateAvatarUrl(u.id, undefined) }}
-                                    style={styles.itemAvatar}
-                                />
-
-                                <View style={styles.itemInfo}>
-                                    <Text style={styles.itemName}>{u.name}</Text>
-                                    <View style={styles.itemSubtext}>
-                                        <Text style={[styles.itemLeague, { color: leagueInfo.color }]}>{leagueInfo.tier}</Text>
-                                        <Text style={styles.itemMinutes}> • {u.callMinutes} min calls</Text>
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 20 }} />
+                    ) : (
+                        activeTab === 'global' ? users.map((u) => {
+                            const leagueInfo = getLeague(u.points);
+                            const isTop3 = u.rank <= 3;
+                            return (
+                                <View key={u.id} style={styles.listItem}>
+                                    <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>#{u.rank}</Text>
+                                    <Image source={{ uri: generateAvatarUrl(u.id, undefined) }} style={styles.itemAvatar} />
+                                    <View style={styles.itemInfo}>
+                                        <Text style={styles.itemName}>{u.name}</Text>
+                                        <View style={styles.itemSubtext}>
+                                            <Text style={[styles.itemLeague, { color: leagueInfo.color }]}>{leagueInfo.tier}</Text>
+                                            <Text style={styles.itemMinutes}> • {u.callMinutes} min calls</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.itemPointsBox}>
+                                        <Text style={styles.itemPoints}>{u.points.toLocaleString()}</Text>
+                                        <Text style={styles.itemPointsLabel}>Pts</Text>
                                     </View>
                                 </View>
-
-                                <View style={styles.itemPointsBox}>
-                                    <Text style={styles.itemPoints}>{u.points.toLocaleString()}</Text>
-                                    <Text style={styles.itemPointsLabel}>Pts</Text>
-                                </View>
-                            </View>
-                        );
-                    }) : streakUsers.map((streak, index) => {
-                        const isTop3 = index < 3;
-                        // For display, we might show both user1 and user2
-                        return (
-                            <View key={`${streak.user1.id}-${streak.user2.id}`} style={styles.listItem}>
-                                <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>
-                                    #{index + 1}
-                                </Text>
-
-                                <View style={{flexDirection: 'row', marginRight: 12}}>
-                                    <Image
-                                        source={{ uri: streak.user1.photo || generateAvatarUrl(streak.user1.id, undefined) }}
-                                        style={[styles.itemAvatar, {marginRight: -10, borderWidth: 2, borderColor: '#FFF'}]}
-                                    />
-                                    <Image
-                                        source={{ uri: streak.user2.photo || generateAvatarUrl(streak.user2.id, undefined) }}
-                                        style={[styles.itemAvatar, {borderWidth: 2, borderColor: '#FFF'}]}
-                                    />
-                                </View>
-
-                                <View style={styles.itemInfo}>
-                                    <Text style={styles.itemName} numberOfLines={1}>
-                                        {streak.user1.display_name} & {streak.user2.display_name}
-                                    </Text>
-                                    <Text style={styles.itemMinutes}>Active Streak</Text>
-                                </View>
-
-                                <View style={styles.itemPointsBox}>
-                                    <Text style={[styles.itemPoints, {color: '#EF4444'}]}>🔥 {streak.streak_count}</Text>
-                                    <Text style={styles.itemPointsLabel}>Days</Text>
-                                </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        }) : 
+                        activeTab === 'streaks' ? streakUsers.map((item, index) => {
+                            const isTop3 = index < 3;
+                            return (
+                                <TouchableOpacity key={item.user_id} style={styles.listItem} onPress={() => router.push(`/user/${item.user_id}` as any)}>
+                                    <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>#{index + 1}</Text>
+                                    <Image source={{ uri: item.profile_pic || generateAvatarUrl(item.user_id, 'M') }} style={styles.itemAvatar} />
+                                    <View style={styles.itemInfo}>
+                                        <Text style={styles.itemName}>{item.display_name || item.username}</Text>
+                                        <Text style={styles.itemMinutes}>@{item.username}</Text>
+                                    </View>
+                                    <View style={styles.itemPointsBox}>
+                                        <Text style={[styles.itemPoints, { color: '#EF4444' }]}>🔥 {item.streak_count}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        }) :
+                        (activeTab === 'video' ? videoUsers : audioUsers).map((item, index) => {
+                            const isVideo = activeTab === 'video';
+                            const isTop3 = index < 3;
+                            const formatDuration = (seconds: number) => {
+                                const hrs = Math.floor(seconds / 3600);
+                                const mins = Math.floor((seconds % 3600) / 60);
+                                if (hrs > 0) return `${hrs}h ${mins}m`;
+                                return `${mins}m`;
+                            };
+                            return (
+                                <TouchableOpacity key={item.user_id} style={styles.listItem} onPress={() => router.push(`/user/${item.user_id}` as any)}>
+                                    <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>#{index + 1}</Text>
+                                    <Image source={{ uri: item.profile_pic || generateAvatarUrl(item.user_id, 'M') }} style={styles.itemAvatar} />
+                                    <View style={styles.itemInfo}>
+                                        <Text style={styles.itemName}>{item.display_name || item.username}</Text>
+                                        <Text style={styles.itemMinutes}>@{item.username}</Text>
+                                    </View>
+                                    <View style={styles.itemPointsBox}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <MaterialCommunityIcons name={isVideo ? "video" : "phone"} size={14} color={isVideo ? "#3B82F6" : "#10B981"} />
+                                            <Text style={[styles.itemPoints, { color: isVideo ? "#3B82F6" : "#10B981" }]}>
+                                                {formatDuration(item.total_duration)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
                 </View>
             </ScrollView>
         </View>

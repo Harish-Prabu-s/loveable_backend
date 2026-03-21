@@ -189,4 +189,31 @@ EBDSMS_DEVICE_ID = os.environ.get('EBDSMS_DEVICE_ID', '')
 # Fast2SMS Settings
 FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '')
 
-# Application definition
+# ==============================================================================
+# SENIOR BACKEND ARCHITECT: PRODUCTION READINESS GUIDE
+# ==============================================================================
+# To scale this system to millions of users, follow these mandatory steps:
+#
+# 1. DATABASE:
+#    - Switch from 'sqlite3' to 'postgresql'.
+#    - Add 'CONN_MAX_AGE: 60' to database settings to reuse connections.
+#    - Ensure all queried fields have 'db_index=True' in models.py.
+#
+# 2. CACHING & REAL-TIME:
+#    - Change CHANNEL_LAYERS from 'InMemoryChannelLayer' to 'RedisChannelLayer'.
+#    - Implement 'django-redis' as the DEFAULT CACHE backend.
+#    - Cache frequently accessed data like user profiles and top leaderboards.
+#
+# 3. ASYNC WORKERS:
+#    - Introduce Celery or Django-Q for background tasks.
+#    - Offload push notifications and "Notify Close Friends" loops to workers.
+#
+# 4. PERFORMANCE MONITORING:
+#    - Install 'django-debug-toolbar' in dev to monitor N+1 queries.
+#    - Use 'Sentry' or 'New Relic' in production for APM.
+#
+# 5. SECURITY HARDENING:
+#    - Set 'DEBUG = False'.
+#    - Enable 'AUTH_PASSWORD_VALIDATORS'.
+#    - Set 'SECURE_SSL_REDIRECT = True' and use proper 'CORS_ALLOWED_ORIGINS'.
+# ==============================================================================

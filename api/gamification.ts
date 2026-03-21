@@ -24,4 +24,19 @@ export const gamificationApi = {
     const results = Array.isArray(data) ? data : (data?.results ?? []);
     return { ...data, results };
   },
+
+  getStreakLeaderboard: async (): Promise<any[]> => {
+    const response = await apiClient.get('leaderboard/streaks/');
+    return response.data;
+  },
+
+  getVideoCallLeaderboard: async (): Promise<any[]> => {
+    const response = await apiClient.get('leaderboard/video-call-time/');
+    return response.data;
+  },
+
+  getAudioCallLeaderboard: async (): Promise<any[]> => {
+    const response = await apiClient.get('leaderboard/audio-call-time/');
+    return response.data;
+  },
 };

@@ -713,13 +713,24 @@ export default function HomeScreen() {
             </LinearGradient>
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Games</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/streaks' as any)}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/streaks-view' as any)}>
             <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.actionIcon}>
               <MaterialCommunityIcons name="fire" size={24} color="#FFFFFF" />
             </LinearGradient>
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Streaks</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── Floating Streaks Button ── */}
+        <TouchableOpacity 
+          style={styles.floatingStreaksBtn} 
+          onPress={() => router.push('/streaks-view' as any)}
+        >
+          <LinearGradient colors={['#EF4444', '#F97316']} style={styles.floatingStreaksGrad}>
+            <MaterialCommunityIcons name="fire" size={28} color="#FFF" />
+            <Text style={styles.floatingStreaksText}>Streaks</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* ── Mood Grid ── */}
         <View style={[styles.moodSection, { backgroundColor: colors.surface }]}>
@@ -908,6 +919,30 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
   coinText: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  floatingStreaksBtn: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    zIndex: 99,
+  },
+  floatingStreaksGrad: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingStreaksText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
   // Create Post Banner
   createPostBanner: {
     flexDirection: 'row', alignItems: 'center',

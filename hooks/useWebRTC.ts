@@ -98,12 +98,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       if (!signalingBase) return;
       try {
         const normalized = signalingBase.replace(/\/$/, "");
-        const ws = new WebSocket(`${normalized}/ws/call/${roomId}/`);
+        const ws = new WebSocket(`${normalized}/ws/call/room/${roomId}/`);
         wsRef.current = ws;
 
         ws.onmessage = async (event) => {
           try {
-            const data: SignalingMessage = JSON.parse(event.data);
+            const envelope = JSON.parse(event.data);
+            const data: SignalingMessage = envelope.message || envelope; // Handle nested or flat
             if (data.roomId !== roomId) return;
 
             if (data.type === "call-offer") {

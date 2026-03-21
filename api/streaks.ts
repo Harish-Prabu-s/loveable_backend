@@ -56,4 +56,9 @@ export const streaksApi = {
     const response = await apiClient.post(`streaks/${uploadId}/comment/`, { text });
     return response.data;
   },
+
+  getSnapchatStreaks: async (type: 'friends' | 'all' = 'friends'): Promise<any[]> => {
+    const response = await apiClient.get(`streaks/view/`, { params: { type } });
+    return response.data;
+  },
 };

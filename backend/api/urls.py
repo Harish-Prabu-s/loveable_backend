@@ -24,6 +24,7 @@ urlpatterns = [
     path('settings/', include('api.modules.settings.urls')),
     path('notifications/', include('api.modules.notifications.urls')),
     path('betmatch/', include('api.modules.betmatch.urls')),
+    path('leaderboard/', include('api.modules.leaderboard.urls')),
     path('calls/', include('api.modules.calls.urls')),
     path('league/', include('api.modules.league.urls')),
     path('levels/', include('api.modules.levels.urls')),

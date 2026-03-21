@@ -29,7 +29,7 @@ export default function PublicProfileScreen() {
     useEffect(() => {
         const loadProfile = async () => {
             try {
-                if (!id) return;
+                if (!id || isNaN(Number(id))) return;
                 const data = await profilesApi.getById(Number(id));
                 setProfile(data);
                 // If the backend doesn't return `is_following`, we default to false for now

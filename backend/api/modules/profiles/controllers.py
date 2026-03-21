@@ -22,7 +22,8 @@ def list_profiles_view(request):
     is_online = request.GET.get('is_online')
     is_busy = request.GET.get('is_busy')
     
-    qs = Profile.objects.exclude(user=request.user)
+    # Optimized for user discovery
+    qs = Profile.objects.exclude(user=request.user).select_related('user')
     
     if search:
         qs = qs.filter(display_name__icontains=search)
@@ -31,7 +32,8 @@ def list_profiles_view(request):
         qs = qs.filter(is_online=True)
         
     if is_busy == 'false':
-        # Filter out users who are currently in a pending or active room
+        # Efficiency hint: for millions of users, this should be a cached 'is_busy' flag on the Profile model itself
+        # to avoid joining with the Room table every time.
         qs = qs.exclude(user__rooms_started__status__in=['pending', 'active'])
         qs = qs.exclude(user__rooms_received__status__in=['pending', 'active'])
         
@@ -49,19 +51,7 @@ def profile_by_id(request, user_id: int):
 @permission_classes([IsAuthenticated])
 def follow_view(request, user_id: int):
     follow_user(request.user, user_id)
-    
-    # Send notification to the user being followed
-    from ..notifications.push_service import send_push_notification, _get_user_tokens
-    tokens = _get_user_tokens(user_id)
-    profile = getattr(request.user, 'profile', None)
-    sender_name = profile.display_name if profile else request.user.username
-    if tokens:
-        send_push_notification(
-            tokens, 
-            title="New Follower!", 
-            body=f"{sender_name} started following you!",
-            data={'type': 'follow', 'user_id': request.user.id}
-        )
+    return Response({'status': 'followed'})
     
     return Response({'status': 'followed'})
 
@@ -77,31 +67,7 @@ def send_friend_request_view(request, user_id: int):
     req, msg = send_friend_request(request.user, user_id)
     if not req:
         return Response({'error': msg}, status=400)
-    
-    # Send notification
-    from ..notifications.push_service import send_push_notification, _get_user_tokens
-    from ...models import Notification as NotificationModel
-    
-    tokens = _get_user_tokens(user_id)
-    profile = getattr(request.user, 'profile', None)
-    sender_name = profile.display_name if profile else request.user.username
-    
-    # In-App Notification
-    NotificationModel.objects.create(
-        recipient_id=user_id,
-        actor=request.user,
-        notification_type='friend_request',
-        message=f"{sender_name} sent you a friend request",
-        object_id=req.id
-    )
-    
-    if tokens:
-        send_push_notification(
-            tokens,
-            title="Friend Request",
-            body=f"{sender_name} sent you a friend request!",
-            data={'type': 'friend_request', 'request_id': req.id}
-        )
+    return Response({'status': msg, 'request_id': req.id})
         
     return Response({'status': msg, 'request_id': req.id})
 

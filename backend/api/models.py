@@ -303,6 +303,7 @@ class Streak(models.Model):
     user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='streaks_user2')
     streak_count = models.IntegerField(default=0)
     last_interaction_date = models.DateTimeField(null=True, blank=True)
+    last_uploader = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='streaks_last_uploader')
     freezes_available = models.IntegerField(default=0)
 
     class Meta:

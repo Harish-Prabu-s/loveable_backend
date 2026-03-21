@@ -35,37 +35,57 @@ def update_my_profile(user, data, files=None):
     return p
 
 def follow_user(user: User, target_user_id: int):
+    """Follow a user and notify them."""
     if user.id == target_user_id:
         return None
     try:
+        from ..notifications.services import create_notification
+        from ..notifications.push_service import send_push_notification, _get_user_tokens
+        
         target = User.objects.get(id=target_user_id)
         follow, created = Follow.objects.get_or_create(follower=user, following=target)
+        
+        if created:
+            profile = getattr(user, 'profile', None)
+            sender_name = profile.display_name if profile else user.username
+            create_notification(recipient=target, actor=user, notification_type='follow', message=f"{sender_name} started following you!")
+            tokens = _get_user_tokens(target_user_id)
+            if tokens:
+                send_push_notification(tokens, title="New Follower!", body=f"{sender_name} started following you!", data={'type': 'follow', 'user_id': user.id})
         return follow
     except User.DoesNotExist:
         return None
 
 def unfollow_user(user: User, target_user_id: int):
+    """Unfollow a user."""
     Follow.objects.filter(follower=user, following_id=target_user_id).delete()
 
 def send_friend_request(user: User, target_user_id: int):
+    """Send a friend request and notify the target user."""
     if user.id == target_user_id:
         return None, "Cannot friend yourself"
     try:
+        from ..notifications.services import create_notification
+        from ..notifications.push_service import send_push_notification, _get_user_tokens
+        
         target = User.objects.get(id=target_user_id)
-        # Check existing
-        existing = FriendRequest.objects.filter(
-            (models.Q(from_user=user, to_user=target) | models.Q(from_user=target, to_user=user))
-        ).first()
+        existing = FriendRequest.objects.filter((models.Q(from_user=user, to_user=target) | models.Q(from_user=target, to_user=user))).first()
         
         if existing:
-            if existing.status == 'accepted':
-                return existing, "Already friends"
-            if existing.status == 'pending':
-                return existing, "Request already pending"
-            # If rejected, maybe allow new request? For now, just return existing.
+            if existing.status == 'accepted': return existing, "Already friends"
+            if existing.status == 'pending': return existing, "Request already pending"
             return existing, "Request exists"
 
         req = FriendRequest.objects.create(from_user=user, to_user=target, status='pending')
+        
+        # Notify
+        profile = getattr(user, 'profile', None)
+        sender_name = profile.display_name if profile else user.username
+        create_notification(recipient=target, actor=user, notification_type='friend_request', message=f"{sender_name} sent you a friend request", object_id=req.id)
+        tokens = _get_user_tokens(target_user_id)
+        if tokens:
+            send_push_notification(tokens, title="Friend Request", body=f"{sender_name} sent you a friend request!", data={'type': 'friend_request', 'request_id': req.id})
+            
         return req, "Request sent"
     except User.DoesNotExist:
         return None, "User not found"

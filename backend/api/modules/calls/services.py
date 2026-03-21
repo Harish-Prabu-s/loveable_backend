@@ -40,18 +40,19 @@ def initiate_call(caller, callee, call_type: str) -> CallSession:
     callee.profile.is_busy = True
     callee.profile.save(update_fields=['is_busy'])
 
-    # Notify callee via WebSocket
+    # Notify callee via WebSocket (Call Channel)
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        f'user_{callee.id}',
+        f'call_{callee.id}',
         {
-            'type': 'call_notification',
+            'type': 'incoming_call',
             'content': {
                 'type': 'incoming-call',
                 'sessionId': session.id,
                 'callerName': caller.profile.display_name if hasattr(caller, 'profile') else 'User',
                 'callerPhoto': caller.profile.photo.url if hasattr(caller, 'profile') and caller.profile.photo else None,
-                'callType': 'video' if call_type == 'VIDEO' else 'audio'
+                'callType': 'video' if call_type == 'VIDEO' else 'audio',
+                'callerId': caller.id
             }
         }
     )

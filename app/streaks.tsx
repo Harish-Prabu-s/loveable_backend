@@ -48,8 +48,9 @@ export default function StreaksScreen() {
         
         return (
             <TouchableOpacity 
+                key={item.user_id || index}
                 style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => router.push(`/user/${item.user_id}` as any)}
+                onPress={() => item.user_id && router.push(`/user/${item.user_id}` as any)}
             >
                 <View style={styles.rankContainer}>
                     <Text style={[styles.rankText, { color: rankColor, fontSize: isTop3 ? 20 : 16, fontWeight: isTop3 ? '800' : '600' }]}>

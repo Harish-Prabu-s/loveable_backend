@@ -41,3 +41,42 @@ def claim_daily_reward(user: User, day: int):
 
 def leaderboard(limit: int = 50):
     return LevelProgress.objects.select_related('user').order_by('-xp')[:limit]
+
+from django.db.models import Sum, Max, Q, Count, Case, When, IntegerField, F
+from django.db.models.functions import Greatest
+
+def get_streak_leaderboard_service(limit: int = 50):
+    """
+    Optimized: Get top users by their highest streak in a single query.
+    """
+    # We find the maximum streak_count for each user, considering they could be user1 or user2.
+    # We use a combined approach with annotate.
+    return User.objects.filter(is_active=True).annotate(
+        max_streak_u1=Max('streaks_user1__streak_count'),
+        max_streak_u2=Max('streaks_user2__streak_count')
+    ).annotate(
+        streak_count=Greatest(
+            F('max_streak_u1'), 
+            F('max_streak_u2'),
+            default=0,
+            output_field=IntegerField()
+        )
+    ).filter(streak_count__gt=0).select_related('profile').order_by('-streak_count')[:limit]
+
+def get_call_time_leaderboard_service(call_type: str, limit: int = 50):
+    """
+    Optimized: Get top users by total call duration in a single query.
+    """
+    # Sum duration from both calls_made and calls_received roles.
+    return User.objects.filter(is_active=True).annotate(
+        total_made=Sum('calls_made__duration_seconds', filter=Q(calls_made__call_type=call_type.upper())),
+        total_received=Sum('calls_received__duration_seconds', filter=Q(calls_received__call_type=call_type.upper()))
+    ).annotate(
+        total_duration=Case(
+            When(total_made__isnull=False, total_received__isnull=False, then=F('total_made') + F('total_received')),
+            When(total_made__isnull=False, then=F('total_made')),
+            When(total_received__isnull=False, then=F('total_received')),
+            default=0,
+            output_field=IntegerField()
+        )
+    ).filter(total_duration__gt=0).select_related('profile').order_by('-total_duration')[:limit]

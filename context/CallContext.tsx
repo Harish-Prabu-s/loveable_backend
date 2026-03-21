@@ -21,21 +21,12 @@ interface CallState {
   roomId?: number;
 }
 
-interface IncomingCallState {
-  roomId: number;
-  fromUserId: number;
-  callType: 'voice' | 'video';
-}
-
 interface CallContextType {
   callState: CallState;
   startCall: (type: CallType, targetMeta?: { gender?: 'M' | 'F' | 'O'; level?: number; userId?: number }) => Promise<void>;
   switchCallType: (newType: CallType) => void;
   endCall: (reason?: string) => void;
   toggleMinimize: () => void;
-  incomingCall: IncomingCallState | null;
-  acceptIncomingCall: () => Promise<void>;
-  rejectIncomingCall: () => Promise<void>;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -65,7 +56,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const autoConnectRef = useRef(false);
   const lastCallTypeRef = useRef<CallType | null>(null);
-  const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(null);
+
 
   const isHighRateTime = useCallback(() => {
     const now = new Date();
@@ -286,40 +277,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCallState(prev => ({ ...prev, isMinimized: !prev.isMinimized }));
   }, []);
 
-  const acceptIncomingCall = useCallback(async () => {
-    if (!incomingCall || !user?.id) return;
-    try {
-      await chatApi.startCallOnRoom(incomingCall.roomId);
-    } catch (e) {
-      console.error('Failed to mark incoming room as active', e);
-    }
-
-    setCallState({
-      isActive: true,
-      isMinimized: false,
-      isCaller: false,
-      type: incomingCall.callType,
-      duration: 0,
-      costPerMinute: 0,
-      otherUserId: incomingCall.fromUserId,
-      coinsSpent: 0,
-      roomId: incomingCall.roomId,
-    });
-    setIncomingCall(null);
-    notify('success', 'CALL_STARTED_FREE', { type: incomingCall.callType });
-  }, [incomingCall, user?.id]);
-
-  const rejectIncomingCall = useCallback(async () => {
-    if (!incomingCall) return;
-    try {
-      await chatApi.endCallOnRoom(incomingCall.roomId, 0, 0);
-    } catch (e) {
-      console.error('Failed to mark incoming room as ended', e);
-    }
-    setIncomingCall(null);
-    notify('info', 'CALL_ENDED', { message: 'Call rejected' });
-  }, [incomingCall]);
-
   // Ensure wallet is loaded
   useEffect(() => {
     if (user?.id) {
@@ -327,47 +284,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user?.id, fetchWallet]);
 
-  // Poll for incoming calls (rooms where current user is receiver and status is pending)
+  // Wallet loading
   useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-
-    const pollIncoming = async () => {
-      try {
-        if (cancelled || callState.isActive) return;
-        const rooms = await chatApi.getRooms();
-        const pending = rooms.find(
-          (r) => r.status === 'pending' && r.receiver === user.id
-        );
-        if (!pending) {
-          if (!cancelled) {
-            setIncomingCall((prev) => (prev ? null : prev));
-          }
-          return;
-        }
-        if (cancelled) return;
-        setIncomingCall((prev) => {
-          if (prev && prev.roomId === pending.id) return prev;
-          const callType: CallType =
-            pending.call_type === 'video' ? 'video' : 'voice';
-          return {
-            roomId: pending.id,
-            fromUserId: pending.caller,
-            callType,
-          };
-        });
-      } catch (e) {
-        console.error('Failed to poll incoming calls', e);
-      }
-    };
-
-    void pollIncoming();
-    const id = setInterval(pollIncoming, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [user?.id, callState.isActive]);
+    if (user?.id) {
+      fetchWallet();
+    }
+  }, [user?.id, fetchWallet]);
 
   useEffect(() => {
     if (callState.isActive) {
@@ -442,9 +364,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchCallType,
         endCall,
         toggleMinimize,
-        incomingCall,
-        acceptIncomingCall,
-        rejectIncomingCall,
       }}
     >
       {children}

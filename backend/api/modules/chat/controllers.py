@@ -9,12 +9,15 @@ from django.contrib.auth.models import User
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_room_view(request):
-    receiver_id = request.data.get('receiver_id')
-    call_type = request.data.get('call_type', 'audio')
-    if not receiver_id:
-        return Response({'error': 'receiver_id required'}, status=400)
-    room = get_or_create_room(request.user, int(receiver_id), call_type)
-    return Response(RoomSerializer(room).data, status=201)
+    try:
+        receiver_id = request.data.get('receiver_id')
+        call_type = request.data.get('call_type', 'audio')
+        if not receiver_id:
+            return Response({'error': 'receiver_id required'}, status=400)
+        room = get_or_create_room(request.user, int(receiver_id), call_type)
+        return Response(RoomSerializer(room).data, status=201)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -37,46 +40,43 @@ def mark_seen_view(request, room_id: int):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_disappearing_view(request, room_id: int):
-    from ...models import Room
-    room = Room.objects.get(id=room_id)
-    if room.caller != request.user and room.receiver != request.user:
-        return Response({'error': 'forbidden'}, status=403)
-    
-    enabled = request.data.get('enabled', False)
-    timer = int(request.data.get('timer', 0))
-    
-    room.disappearing_messages_enabled = enabled
-    room.disappearing_timer = timer
-    room.save()
-    
-    return Response(RoomSerializer(room).data)
+    try:
+        from ...models import Room
+        room = Room.objects.get(id=room_id)
+        if room.caller != request.user and room.receiver != request.user:
+            return Response({'error': 'forbidden'}, status=403)
+        
+        enabled = request.data.get('enabled', False)
+        timer = int(request.data.get('timer', 0))
+        
+        room.disappearing_messages_enabled = enabled
+        room.disappearing_timer = timer
+        room.save()
+        
+        return Response(RoomSerializer(room).data)
+    except Room.DoesNotExist:
+        return Response({'error': 'Room not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_message_view(request, room_id: int):
-    content = request.data.get('content')
-    msg_type = request.data.get('type', 'text')
-    media_url = request.data.get('media_url')
-    duration_seconds = int(request.data.get('duration_seconds', 0))
-    if not content and not media_url:
-        return Response({'error': 'content required'}, status=400)
-    msg = send_message(room_id, request.user, content or '', msg_type, media_url, duration_seconds)
-    
-    # Send push notification to the other person in the room
-    recipient = msg.room.caller if msg.room.receiver == request.user else msg.room.receiver
-    from ..notifications.push_service import send_push_notification, _get_user_tokens
-    tokens = _get_user_tokens(recipient.id)
-    profile = getattr(request.user, 'profile', None)
-    sender_name = profile.display_name if profile else request.user.username
-    if tokens:
-        send_push_notification(
-            tokens, 
-            title=f"Message from {sender_name}", 
-            body=content[:50] + "..." if content and len(content) > 50 else (content or "Sent a file"),
-            data={'type': 'chat_message', 'room_id': room_id, 'sender_id': request.user.id}
-        )
-
-    return Response(MessageSerializer(msg).data, status=201)
+    try:
+        content = request.data.get('content')
+        msg_type = request.data.get('type', 'text')
+        media_url = request.data.get('media_url')
+        duration_seconds = int(request.data.get('duration_seconds', 0))
+        
+        if not content and not media_url:
+            return Response({'error': 'content or media required'}, status=400)
+            
+        msg = send_message(room_id, request.user, content or '', msg_type, media_url, duration_seconds)
+        return Response(MessageSerializer(msg).data, status=201)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error sending message: {e}")
+        return Response({'error': 'Failed to send message'}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -109,78 +109,98 @@ def presence_view(request, user_id: int):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def contact_list_view(request):
-    from ...models import Room, Message
-    user = request.user
-    
-    # Get all rooms where user is caller or receiver
-    rooms = Room.objects.filter(Q(caller=user) | Q(receiver=user)).prefetch_related('messages')
-    
-    contacts_data = []
-    seen_users = set()
-    
-    # Sort rooms by latest message
-    rooms = rooms.annotate(last_msg_time=Max('messages__created_at')).filter(last_msg_time__isnull=False).order_by('-last_msg_time')
-    
-    for room in rooms:
-        other_user = room.receiver if room.caller == user else room.caller
-        if other_user.id in seen_users:
-            continue
-            
-        last_msg = room.messages.order_by('-created_at').first()
-        if not last_msg:
-            continue
-            
-        seen_users.add(other_user.id)
+    try:
+        user = request.user
+        # Efficiently fetch all rooms and their latest message in one go
+        from django.db.models import Prefetch
+        from ...models import Room, Message, Streak
         
-        # We'll attach the last message info to the user object for the serializer
-        other_user.last_message = last_msg.content
-        other_user.last_message_type = last_msg.type
-        other_user.last_timestamp = last_msg.created_at
+        # Custom prefetch for the latest message per room
+        latest_message_qs = Message.objects.order_by('-created_at')
+        
+        rooms = Room.objects.filter(Q(caller=user) | Q(receiver=user)) \
+            .select_related('caller__profile', 'receiver__profile') \
+            .prefetch_related(Prefetch('messages', queryset=latest_message_qs, to_attr='latest_msgs')) \
+            .annotate(last_msg_time=Max('messages__created_at')) \
+            .filter(last_msg_time__isnull=False) \
+            .order_by('-last_msg_time')
 
-        # Attach Streak Info
-        from ...models import Streak
-        u1, u2 = (user, other_user) if user.id < other_user.id else (other_user, user)
-        streak = Streak.objects.filter(user1=u1, user2=u2).first()
-        if streak:
-            other_user.streak_count = streak.streak_count
-            other_user.streak_last_interaction = streak.last_interaction_date
-        else:
-            other_user.streak_count = 0
-            other_user.streak_last_interaction = None
+        # Prefetch all relevant streaks for these users to avoid N+1 in the loop
+        other_user_ids = [r.receiver_id if r.caller_id == user.id else r.caller_id for r in rooms]
         
-        contacts_data.append(other_user)
-        
-    return Response(ContactSerializer(contacts_data, many=True, context={'request': request}).data)
+        streaks = {
+            (min(user.id, s.user1_id, s.user2_id), max(user.id, s.user1_id, s.user2_id)): s
+            for s in Streak.objects.filter(
+                (Q(user1=user) & Q(user2_id__in=other_user_ids)) | 
+                (Q(user2=user) & Q(user1_id__in=other_user_ids))
+            )
+        }
+
+        contacts_data = []
+        seen_users = set()
+
+        for room in rooms:
+            other_user = room.receiver if room.caller == user else room.caller
+            if other_user.id in seen_users:
+                continue
+                
+            last_msg = room.latest_msgs[0] if room.latest_msgs else None
+            if not last_msg:
+                continue
+                
+            seen_users.add(other_user.id)
+            
+            # Attach transient data for serializer
+            other_user.last_message = last_msg.content
+            other_user.last_message_type = last_msg.type
+            other_user.last_timestamp = last_msg.created_at
+
+            # Attach Streak Info from our pre-fetched dictionary
+            u1_id, u2_id = (user.id, other_user.id) if user.id < other_user.id else (other_user.id, user.id)
+            streak = streaks.get((u1_id, u2_id))
+            
+            other_user.streak_count = streak.streak_count if streak else 0
+            other_user.streak_last_interaction = streak.last_interaction_date if streak else None
+            
+            contacts_data.append(other_user)
+            
+        return Response(ContactSerializer(contacts_data, many=True, context={'request': request}).data)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error in contact_list_view: {e}")
+        return Response([])
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def streak_leaderboard_view(request):
-    from ...models import Streak
-    from django.db.models import Q
-    user = request.user
-    
-    # Get top 50 streaks overall where the streak count > 0
-    # or per the user's friends, but let's just do global top streaks
-    streaks = Streak.objects.filter(streak_count__gte=1).order_by('-streak_count')[:50]
-    
-    data = []
-    for streak in streaks:
-        user1 = streak.user1
-        user2 = streak.user2
-        data.append({
-            'streak_count': streak.streak_count,
-            'last_interaction_date': streak.last_interaction_date,
-            'user1': {
-                'id': user1.id,
-                'username': user1.username,
-                'display_name': getattr(user1.profile, 'display_name', user1.username),
-                'photo': user1.profile.photo.url if user1.profile.photo else None,
-            },
-            'user2': {
-                'id': user2.id,
-                'username': user2.username,
-                'display_name': getattr(user2.profile, 'display_name', user2.username),
-                'photo': user2.profile.photo.url if user2.profile.photo else None,
-            }
-        })
-    return Response(data)
+    try:
+        from ...models import Streak
+        
+        # Get top 50 streaks overall where the streak count > 0 with efficient joins
+        streaks = Streak.objects.filter(streak_count__gte=1) \
+            .select_related('user1__profile', 'user2__profile') \
+            .order_by('-streak_count')[:50]
+        
+        data = []
+        for streak in streaks:
+            user1 = streak.user1
+            user2 = streak.user2
+            data.append({
+                'streak_count': streak.streak_count,
+                'last_interaction_date': streak.last_interaction_date,
+                'user1': {
+                    'id': user1.id,
+                    'username': user1.username,
+                    'display_name': getattr(user1.profile, 'display_name', user1.username),
+                    'photo': user1.profile.photo.url if user1.profile.photo else None,
+                },
+                'user2': {
+                    'id': user2.id,
+                    'username': user2.username,
+                    'display_name': getattr(user2.profile, 'display_name', user2.username),
+                    'photo': user2.profile.photo.url if user2.profile.photo else None,
+                }
+            })
+        return Response(data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

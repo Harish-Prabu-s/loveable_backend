@@ -9,27 +9,28 @@ from ...models import PostLike
 from ...utils import get_absolute_media_url
 
 def _serialize_post(post, request_user, request=None):
-    """Serialize a Post instance into the shape the frontend expects."""
+    """Serialize a Post instance efficiently using annotated data."""
     p = getattr(post.user, 'profile', None)
-
-    # Build URLs using centralized helper
     image_url = get_absolute_media_url(post.image, request)
     photo_url = get_absolute_media_url(p.photo, request) if p else None
 
-    is_liked = PostLike.objects.filter(post=post, user=request_user).exists()
+    # Use annotated values or fallbacks if not available (e.g. for single post)
+    likes_count = getattr(post, 'likes_count', PostLike.objects.filter(post=post).count())
+    comments_count = getattr(post, 'comments_count', post.comments.count())
+    is_liked = getattr(post, 'is_liked', PostLike.objects.filter(post=post, user=request_user).exists())
 
     return {
         'id': post.id,
         'user': post.user.id,
         'profile_id': p.id if p else None,
         'display_name': p.display_name if p else '',
-        'username': p.display_name if p else '',  # no separate username field
+        'username': p.display_name if p else '',
         'photo': photo_url,
         'gender': p.gender if p else '',
         'caption': post.caption,
         'image': image_url,
-        'likes_count': PostLike.objects.filter(post=post).count(),
-        'comments_count': post.comments.count(),
+        'likes_count': likes_count,
+        'comments_count': comments_count,
         'is_liked': is_liked,
         'is_owner': post.user == request_user,
         'created_at': post.created_at.isoformat(),
@@ -79,37 +80,7 @@ def like_view(request, post_id: int):
     result = toggle_like(post_id, request.user)
     if result is None:
         return Response({'error': 'post not found'}, status=404)
-    
-    # Send notification to content owner if liked
-    if result.get('is_liked'):
-        from ...models import Post
-        try:
-            post = Post.objects.get(pk=post_id)
-            if post.user != request.user:
-                from ..notifications.push_service import send_push_notification, _get_user_tokens
-                from ..notifications.services import create_notification
-                tokens = _get_user_tokens(post.user.id)
-                profile = getattr(request.user, 'profile', None)
-                sender_name = profile.display_name if profile else request.user.username
-                
-                # Persist to DB
-                create_notification(
-                    recipient=post.user,
-                    actor=request.user,
-                    notification_type='post_like',
-                    message=f"{sender_name} liked your post!",
-                    object_id=post.id
-                )
-
-                if tokens:
-                    send_push_notification(
-                        tokens, 
-                        title="New Like!", 
-                        body=f"{sender_name} liked your post!",
-                        data={'type': 'post_like', 'post_id': post.id}
-                    )
-        except Post.DoesNotExist:
-            pass
+    return Response(result)
 
     return Response(result)
 
@@ -117,41 +88,18 @@ def like_view(request, post_id: int):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def comment_view(request, post_id: int):
-    from ...models import Post, PostComment, PushToken
     text = request.data.get('text', '').strip()
     if not text:
         return Response({'error': 'text required'}, status=400)
     
     try:
-        post = Post.objects.get(pk=post_id)
-        comment = PostComment.objects.create(post=post, user=request.user, text=text)
-        
-        # Send notification to content owner
-        if post.user != request.user:
-            from ..notifications.push_service import send_push_notification, _get_user_tokens
-            from ..notifications.services import create_notification
-            tokens = _get_user_tokens(post.user.id)
-            profile = getattr(request.user, 'profile', None)
-            sender_name = profile.display_name if profile else request.user.username
-            
-            # Persist to DB
-            create_notification(
-                recipient=post.user,
-                actor=request.user,
-                notification_type='post_comment',
-                message=f"{sender_name} commented: {text[:30]}...",
-                object_id=post.id
-            )
-
-            if tokens:
-                send_push_notification(
-                    tokens, 
-                    title="New Comment!", 
-                    body=f"{sender_name} commented: {text[:30]}...",
-                    data={'type': 'post_comment', 'post_id': post.id}
-                )
-
+        from .services import add_comment
+        comment = add_comment(post_id, request.user, text)
+        if not comment:
+            return Response({'error': 'post not found'}, status=404)
         return Response({'success': True, 'id': comment.id}, status=201)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
     except Post.DoesNotExist:
         return Response({'error': 'post not found'}, status=404)
 
@@ -164,51 +112,13 @@ def share_post_view(request, post_id: int):
         return Response({'error': 'target_user_id required'}, status=400)
     
     try:
-        post = Post.objects.get(pk=post_id)
-        target_user = User.objects.get(pk=target_user_id)
-        
-        # Create/Find Chat Room
-        from ..chat.services import get_or_create_room
-        room = get_or_create_room(request.user, target_user.id, 'audio') # Default to audio if new
-        
-        # Create Message for sharing
-        from ...utils import get_absolute_media_url
-        msg_media_url = get_absolute_media_url(post.image, request)
-        Message.objects.create(
-            room=room,
-            sender=request.user,
-            content=f"[POST_SHARE:{post.id}]",
-            type='post_share',
-            media_url=msg_media_url
-        )
-
-        # Send notification to target user
-        from ..notifications.push_service import send_push_notification, _get_user_tokens
-        from ..notifications.services import create_notification
-        tokens = _get_user_tokens(target_user.id)
-        profile = getattr(request.user, 'profile', None)
-        sender_name = profile.display_name if profile else request.user.username
-        
-        # Persist to DB
-        create_notification(
-            recipient=target_user,
-            actor=request.user,
-            notification_type='post_share',
-            message=f"{sender_name} shared a post with you.",
-            object_id=post.id
-        )
-
-        if tokens:
-            send_push_notification(
-                tokens, 
-                title="Shared Post", 
-                body=f"{sender_name} shared a post with you.",
-                data={'type': 'post_share', 'post_id': post.id, 'from_user_id': request.user.id}
-            )
-        
+        from .services import share_post
+        success = share_post(post_id, request.user, target_user_id, request)
+        if not success:
+            return Response({'error': 'post or user not found'}, status=404)
         return Response({'success': True})
-    except (Post.DoesNotExist, User.DoesNotExist):
-        return Response({'error': 'post or user not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 
 @api_view(['GET', 'POST'])
