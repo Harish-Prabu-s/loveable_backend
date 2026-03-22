@@ -123,6 +123,20 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="account" size={24} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="streaks"
+        options={{
+          title: 'Streaks',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="fire" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: 'Trophy',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="trophy-variant" size={24} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
