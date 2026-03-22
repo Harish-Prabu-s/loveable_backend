@@ -92,7 +92,10 @@ export default function LeaderboardScreen() {
         const crownColor = item.rank === 1 ? '#FFD700' : item.rank === 2 ? '#C0C0C0' : '#CD7F32';
 
         return (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity 
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => router.push(`/user/${item.id}` as any)}
+            >
                 <View style={styles.rankCol}>
                     <Text style={[styles.rankText, { color: isTop3 ? colors.primary : colors.textSecondary }]}>
                         {item.rank}
@@ -115,7 +118,7 @@ export default function LeaderboardScreen() {
                     <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
                     <Text style={[styles.streakText, { color: colors.text }]}>{item.streak}</Text>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -133,7 +136,11 @@ export default function LeaderboardScreen() {
 
             <View style={styles.topThreeContainer}>
                 {leaderboard.slice(0, 3).map((user, idx) => (
-                    <View key={user.id} style={[styles.topUser, idx === 0 && styles.firstPlace]}>
+                    <TouchableOpacity 
+                        key={user.id} 
+                        style={[styles.topUser, idx === 0 && styles.firstPlace]}
+                        onPress={() => router.push(`/user/${user.id}` as any)}
+                    >
                         <View style={styles.topAvatarWrap}>
                             <LinearGradient
                                 colors={idx === 0 ? ['#FFD700', '#FFA500'] : idx === 1 ? ['#C0C0C0', '#808080'] : ['#CD7F32', '#8B4513']}
@@ -153,7 +160,7 @@ export default function LeaderboardScreen() {
                             <MaterialCommunityIcons name="fire" size={14} color="#EF4444" />
                             <Text style={[styles.topStreakTxt, { color: colors.textSecondary }]}>{user.streak}</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 ))}
             </View>
 

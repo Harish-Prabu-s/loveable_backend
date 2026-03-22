@@ -81,8 +81,12 @@ function StreakCircle({ item, isMe, onAddPress, onPress }: any) {
             Animated.timing(scale, { toValue: 0.88, duration: 90, useNativeDriver: true }),
             Animated.timing(scale, { toValue: 1, duration: 90, useNativeDriver: true }),
         ]).start(() => {
-            if (isMe) onAddPress?.();
-            else if (item) onPress?.(item);
+            if (isMe) {
+                if (item?.media) onPress?.(item);
+                else onAddPress?.();
+            } else if (item) {
+                onPress?.(item);
+            }
         });
     };
     const gradColors: [string, string, string] = item?.is_active
@@ -99,13 +103,22 @@ function StreakCircle({ item, isMe, onAddPress, onPress }: any) {
                     end={{ x: 1, y: 1 }}
                 >
                     <View style={[styles.circleInner, { backgroundColor: colors.background }]}>
-                        <Image source={{ uri: avatar(item?.photo, isMe ? 'me' : item?.user_id, item?.gender) }} style={styles.circleImg} />
+                        <Image 
+                            source={{ uri: isMe ? avatar(item?.photo, 'me') : (item?.media?.media_url || avatar(item?.photo, item?.user_id, item?.gender)) }} 
+                            style={styles.circleImg} 
+                        />
                         {isMe && (
-                            <View style={styles.addOverlay}>
+                            <TouchableOpacity 
+                                style={styles.addOverlay} 
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    onAddPress?.();
+                                }}
+                            >
                                 <View style={styles.addBubble}>
                                     <MaterialCommunityIcons name="plus" size={14} color="#FFF" />
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         )}
                     </View>
                 </LinearGradient>
@@ -133,11 +146,17 @@ function UserListItem({ item, onPress, onChatPress }: any) {
                 {hasMedia ? (
                     <LinearGradient colors={['#FF6B35', '#EF4444', '#7C3AED']} style={styles.listGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                         <View style={[styles.listInner, { backgroundColor: colors.background }]}>
-                            <Image source={{ uri: avatar(item.photo, item.user_id) }} style={styles.listAvatar} />
+                            <Image 
+                                source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} 
+                                style={styles.listAvatar} 
+                            />
                         </View>
                     </LinearGradient>
                 ) : (
-                    <Image source={{ uri: avatar(item.photo, item.user_id) }} style={[styles.listAvatarPlain, { borderColor: colors.border }]} />
+                    <Image 
+                        source={{ uri: avatar(item.photo, item.user_id) }} 
+                        style={[styles.listAvatarPlain, { borderColor: colors.border }]} 
+                    />
                 )}
             </View>
             <View style={styles.listInfo}>
@@ -259,8 +278,8 @@ const styles = StyleSheet.create({
     circleGrad: { width: 68, height: 68, borderRadius: 34, padding: 2, alignItems: 'center', justifyContent: 'center' },
     circleInner: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: '#000' },
     circleImg: { width: 64, height: 64 },
-    addOverlay: { position: 'absolute', bottom: 0, right: 0 },
-    addBubble: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
+    addOverlay: { position: 'absolute', bottom: -2, right: -2 },
+    addBubble: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
     circleLabel: { fontSize: 11, marginTop: 6, fontWeight: '500' },
     flameBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 },
     flameBadgeTxt: { color: '#FFF', fontSize: 10, fontWeight: '700' },
@@ -412,8 +431,14 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
     const [commentCount, setCommentCount] = useState(0);
     const [showComments, setShowComments] = useState(false);
 
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const lastTap = useRef(0);
+    const mediaList = user?.media_list || (user?.media ? [user.media] : []);
+    const currentMedia = mediaList[currentIndex];
+
     useEffect(() => {
         if (user) { 
+            setCurrentIndex(0);
             setLiked(user.media?.has_liked ?? false); 
             setFired(user.media?.has_fired ?? false); 
             setLikeCount(user.media?.likes_count ?? 0); 
@@ -421,6 +446,15 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
             setShowComments(false); 
         }
     }, [user]);
+
+    useEffect(() => {
+        if (currentMedia) {
+            setLiked(currentMedia.has_liked ?? false);
+            setFired(currentMedia.has_fired ?? false);
+            setLikeCount(currentMedia.likes_count ?? 0);
+            setCommentCount(currentMedia.comments_count ?? 0);
+        }
+    }, [currentMedia]);
 
     useEffect(() => {
         if (visible) {
@@ -436,6 +470,39 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
         }
     }, [visible, fadeAnim, slideAnim]);
 
+    const handleViewerPress = (e: any) => {
+        const x = e.nativeEvent.locationX;
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+            // Double tap - Like
+            handleLikeToggle();
+            lastTap.current = 0;
+            return;
+        }
+        lastTap.current = now;
+
+        // Single tap - Navigation
+        if (x < SCREEN_W * 0.3) {
+            // Left - Prev
+            if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+            else onPrev?.();
+        } else {
+            // Right - Next
+            if (currentIndex < mediaList.length - 1) setCurrentIndex(currentIndex + 1);
+            else onNext?.();
+        }
+    };
+
+    const handleLikeToggle = async () => {
+        if (currentMedia?.id) {
+            const res = await streaksApi.toggleLike(currentMedia.id);
+            setLiked(res.liked);
+            setLikeCount(c => res.liked ? c + 1 : c - 1);
+        }
+    };
+
     if (!visible || !user) return null;
     const imgUrl = user.media?.media_url ?? `https://picsum.photos/seed/${user.user_id}/800/1200`;
 
@@ -446,7 +513,9 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
                 <View style={styles.viewerDim} />
             </View>
             <View style={styles.viewerSheet}>
-                <Image source={{ uri: imgUrl }} style={styles.viewerImg} resizeMode="cover" />
+                <TouchableOpacity activeOpacity={1} onPress={handleViewerPress} style={StyleSheet.absoluteFill}>
+                    <Image source={{ uri: currentMedia?.media_url || imgUrl }} style={styles.viewerImg} resizeMode="cover" />
+                </TouchableOpacity>
                 <SafeAreaView style={styles.viewerTopBar} edges={['top']}>
                     <View style={styles.viewerHeader}>
                         <TouchableOpacity onPress={onPrev} style={styles.viewerNavBtn}><MaterialCommunityIcons name="chevron-left" size={26} color="#FFF" /></TouchableOpacity>
@@ -459,21 +528,15 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
                     </View>
                 </SafeAreaView>
                 <View style={[styles.actionsBar, { paddingBottom: insets.bottom + 16 }]}>
-                    <TouchableOpacity style={styles.actionItem} onPress={async () => {
-                        if (user.media?.id) {
-                            const res = await streaksApi.toggleLike(user.media.id);
-                            setLiked(res.liked);
-                            setLikeCount(c => res.liked ? c + 1 : c - 1);
-                        }
-                    }}>
+                    <TouchableOpacity style={styles.actionItem} onPress={handleLikeToggle}>
                         <MaterialCommunityIcons name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? '#EF4444' : '#FFF'} /><Text style={styles.actionCount}>{likeCount}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionItem} onPress={() => setShowComments(true)}>
                         <MaterialCommunityIcons name="comment-processing-outline" size={28} color="#FFF" /><Text style={styles.actionCount}>{commentCount}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionItem} onPress={async () => {
-                        if (user.media?.id) {
-                            const res = await streaksApi.toggleFire(user.media.id);
+                        if (currentMedia?.id) {
+                            const res = await streaksApi.toggleFire(currentMedia.id);
                             setFired(res.fired);
                         }
                     }}>
@@ -481,10 +544,10 @@ function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
                     </TouchableOpacity>
                 </View>
             </View>
-            {user.media?.id && (
+            {currentMedia?.id && (
                 <CommentsModal 
                     visible={showComments} 
-                    uploadId={user.media.id} 
+                    uploadId={currentMedia.id} 
                     onClose={() => setShowComments(false)}
                     onCommentAdded={() => setCommentCount(c => c + 1)}
                 />

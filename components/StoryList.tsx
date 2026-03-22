@@ -24,8 +24,12 @@ export default function StoryList({ stories, onStoryPress, onCreatePress }) {
                     <Text style={styles.username} numberOfLines={1}>Your Story</Text>
                 </TouchableOpacity>
 
-                {/* Other Users' Stories */}
-                {stories?.map((story, index) => (
+                {/* Other Users' Stories - Grouped by user */}
+                {Object.values(stories?.reduce((acc: any, story: any) => {
+                    const userId = story.user;
+                    if (!acc[userId]) acc[userId] = story;
+                    return acc;
+                }, {} as any) || {}).map((story: any, index: number) => (
                     <TouchableOpacity key={story.id || index} style={styles.storyContainer} onPress={() => onStoryPress(story)}>
                         <View style={[styles.storyRing, !story.viewed && styles.unviewedRing]}>
                             <Image

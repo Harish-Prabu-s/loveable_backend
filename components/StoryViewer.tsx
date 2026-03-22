@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { storiesApi } from '@/api/stories';
@@ -11,6 +11,9 @@ const { width, height } = Dimensions.get('window');
 export default function StoryViewer({ visible, story, onClose, onNext, onPrev, onDelete }) {
     const [progress, setProgress] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isLiked, setIsLiked] = useState(story?.is_liked || false);
+    const [likesCount, setLikesCount] = useState(story?.likes_count || 0);
+    const lastTap = useRef(0);
 
     // Prevent screen recording and detect screenshots
     useEffect(() => {
@@ -34,12 +37,26 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
         };
     }, [visible, story]);
 
+    const handleLike = async () => {
+        if (story) {
+            try {
+                const res = await storiesApi.like(story.id);
+                setIsLiked(res.liked);
+                setLikesCount(res.likes_count);
+            } catch (e) {
+                console.error("Failed to like story", e);
+            }
+        }
+    };
+
     useEffect(() => {
         let timer;
         if (visible && story) {
             setProgress(0);
             // Record view
             storiesApi.viewStory(story.id).catch(() => { });
+            setIsLiked(story.is_liked || false);
+            setLikesCount(story.likes_count || 0);
 
             timer = setInterval(() => {
                 setProgress((prev) => {
@@ -112,8 +129,34 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
 
                     {/* Controls Overlay */}
                     <View style={styles.controlsOverlay}>
-                        <TouchableOpacity style={styles.leftControl} onPress={onPrev} />
-                        <TouchableOpacity style={styles.rightControl} onPress={onNext} />
+                        <TouchableOpacity 
+                            activeOpacity={1} 
+                            style={styles.leftControl} 
+                            onPress={(e) => {
+                                const now = Date.now();
+                                if (now - lastTap.current < 300) {
+                                    handleLike();
+                                    lastTap.current = 0;
+                                } else {
+                                    lastTap.current = now;
+                                    onPrev();
+                                }
+                            }} 
+                        />
+                        <TouchableOpacity 
+                            activeOpacity={1} 
+                            style={styles.rightControl} 
+                            onPress={(e) => {
+                                const now = Date.now();
+                                if (now - lastTap.current < 300) {
+                                    handleLike();
+                                    lastTap.current = 0;
+                                } else {
+                                    lastTap.current = now;
+                                    onNext();
+                                }
+                            }} 
+                        />
                     </View>
 
                     {/* Media */}

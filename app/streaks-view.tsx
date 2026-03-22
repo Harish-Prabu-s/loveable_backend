@@ -63,7 +63,10 @@ export default function StreaksViewScreen() {
                 }}
             >
                 <View style={styles.avatarContainer}>
-                    <Image source={{ uri: getAvatar(item.profile_pic, item.user_id) }} style={styles.avatar} />
+                    <Image 
+                        source={{ uri: item.media?.media_url || getAvatar(item.photo, item.user_id) }} 
+                        style={styles.avatar} 
+                    />
                     {item.media && <View style={styles.storyRing} />}
                 </View>
 

@@ -539,7 +539,10 @@ export default function HomeScreen() {
       setLevel(levelData);
       setRecommendedUsers(usersData || []);
       setPosts(feedData || []);
-      setStories(storiesData || []);
+      const sortedStories = (storiesData || []).sort((a: Story, b: Story) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      setStories(sortedStories);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -720,17 +723,6 @@ export default function HomeScreen() {
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Streaks</Text>
           </TouchableOpacity>
         </View>
-
-        {/* ── Floating Streaks Button ── */}
-        <TouchableOpacity 
-          style={styles.floatingStreaksBtn} 
-          onPress={() => router.push('/streaks-view' as any)}
-        >
-          <LinearGradient colors={['#EF4444', '#F97316']} style={styles.floatingStreaksGrad}>
-            <MaterialCommunityIcons name="fire" size={28} color="#FFF" />
-            <Text style={styles.floatingStreaksText}>Streaks</Text>
-          </LinearGradient>
-        </TouchableOpacity>
 
         {/* ── Mood Grid ── */}
         <View style={[styles.moodSection, { backgroundColor: colors.surface }]}>

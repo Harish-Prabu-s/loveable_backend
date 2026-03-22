@@ -29,6 +29,7 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
     const [showShare, setShowShare] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [key, setKey] = useState(0); // For retrying/re-mounting video
+    const lastTap = useRef(0);
 
     useEffect(() => {
         // Enable audio mixing so user device is not completely hijacked
@@ -161,6 +162,22 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
         setKey(prev => prev + 1);
     };
 
+    const handleVideoPress = () => {
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+            // Double tap - Like
+            handleLike();
+            lastTap.current = 0;
+            return;
+        }
+        lastTap.current = now;
+
+        // Single tap - Play/Pause
+        togglePlayPause();
+    };
+
     const togglePlayPause = () => {
         if (isPlaying) {
             videoRef.current?.pauseAsync();
@@ -173,7 +190,7 @@ const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisi
 
     return (
         <View style={styles.reelContainer}>
-            <TouchableOpacity activeOpacity={1} onPress={togglePlayPause} style={StyleSheet.absoluteFill}>
+            <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={StyleSheet.absoluteFill}>
                 <Video
                     key={key}
                     ref={videoRef}

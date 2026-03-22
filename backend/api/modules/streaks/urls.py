@@ -12,6 +12,6 @@ urlpatterns = [
     path('<int:upload_id>/comment/', add_comment),
     path('<int:upload_id>/comments/', list_comments),
     path('<int:upload_id>/like/', toggle_like),
-    path('fire/<int:upload_id>/', toggle_fire),
+    path('<int:upload_id>/fire/', toggle_fire),
     path('leaderboard/', streak_leaderboard_view),
 ]
