@@ -173,34 +173,5 @@ def contact_list_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def streak_leaderboard_view(request):
-    try:
-        from ...models import Streak
-        
-        # Get top 50 streaks overall where the streak count > 0 with efficient joins
-        streaks = Streak.objects.filter(streak_count__gte=1) \
-            .select_related('user1__profile', 'user2__profile') \
-            .order_by('-streak_count')[:50]
-        
-        data = []
-        for streak in streaks:
-            user1 = streak.user1
-            user2 = streak.user2
-            data.append({
-                'streak_count': streak.streak_count,
-                'last_interaction_date': streak.last_interaction_date,
-                'user1': {
-                    'id': user1.id,
-                    'username': user1.username,
-                    'display_name': getattr(user1.profile, 'display_name', user1.username),
-                    'photo': user1.profile.photo.url if user1.profile.photo else None,
-                },
-                'user2': {
-                    'id': user2.id,
-                    'username': user2.username,
-                    'display_name': getattr(user2.profile, 'display_name', user2.username),
-                    'photo': user2.profile.photo.url if user2.profile.photo else None,
-                }
-            })
-        return Response(data)
-    except Exception as e:
-        return Response({'error': str(e)}, status=400)
+    # This was moved to streaks module
+    return Response({'error': 'Moved to /api/streaks/leaderboard/'}, status=308)

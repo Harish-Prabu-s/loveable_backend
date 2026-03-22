@@ -322,6 +322,26 @@ class StreakComment(models.Model):
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+class StreakLike(models.Model):
+    streak_upload = models.ForeignKey(StreakUpload, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('streak_upload', 'user')
+
+class StreakReaction(models.Model):
+    REACTION_TYPES = (
+        ('fire', 'Fire'),
+    )
+    streak_upload = models.ForeignKey(StreakUpload, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    reaction_type = models.CharField(max_length=10, choices=REACTION_TYPES, default='fire')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('streak_upload', 'user', 'reaction_type')
+
 
 class Report(models.Model):
     REASON_CHOICES = (

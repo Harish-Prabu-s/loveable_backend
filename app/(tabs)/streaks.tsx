@@ -58,27 +58,7 @@ interface Comment {
     time: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA
-// ─────────────────────────────────────────────────────────────────────────────
-
-const MOCK_USERS: StreakUser[] = [
-    { user_id: 1, display_name: 'Alex Rivera', username: 'alex_r', streak_count: 42, is_active: true, likes: 128, comments: 23, media: { id: 101, media_url: 'https://picsum.photos/seed/streak1/800/1200', media_type: 'image' } },
-    { user_id: 2, display_name: 'Priya Singh', username: 'priya_s', streak_count: 15, is_active: true, likes: 64, comments: 8, media: { id: 102, media_url: 'https://picsum.photos/seed/streak2/800/1200', media_type: 'image' } },
-    { user_id: 3, display_name: 'Jordan Lee', username: 'j_lee', streak_count: 7, is_active: false, likes: 30, comments: 5 },
-    { user_id: 4, display_name: 'Sofia Kim', username: 'sofia_k', streak_count: 93, is_active: true, likes: 310, comments: 47, media: { id: 103, media_url: 'https://picsum.photos/seed/streak3/800/1200', media_type: 'image' } },
-    { user_id: 5, display_name: 'Marcus T.', username: 'marcus_t', streak_count: 21, is_active: true, likes: 55, comments: 12, media: { id: 104, media_url: 'https://picsum.photos/seed/streak4/800/1200', media_type: 'image' } },
-    { user_id: 6, display_name: 'Zara Nadeem', username: 'zara_n', streak_count: 3, is_active: false, likes: 10, comments: 2 },
-    { user_id: 7, display_name: 'Ethan Cho', username: 'ethan_c', streak_count: 60, is_active: true, likes: 200, comments: 38, media: { id: 105, media_url: 'https://picsum.photos/seed/streak5/800/1200', media_type: 'image' } },
-    { user_id: 8, display_name: 'Nina Patel', username: 'nina_p', streak_count: 11, is_active: true, likes: 44, comments: 7, media: { id: 106, media_url: 'https://picsum.photos/seed/streak6/800/1200', media_type: 'image' } },
-];
-
-const MOCK_COMMENTS: Comment[] = [
-    { id: 1, user: 'Alex Rivera', avatar: 'https://i.pravatar.cc/80?u=1', text: '🔥 Killing it every day!', time: '2m ago' },
-    { id: 2, user: 'Priya Singh', avatar: 'https://i.pravatar.cc/80?u=2', text: 'Keep the streak going 💪', time: '5m ago' },
-    { id: 3, user: 'Sofia Kim', avatar: 'https://i.pravatar.cc/80?u=4', text: 'Amazing consistency ❤️', time: '12m ago' },
-    { id: 4, user: 'Marcus T.', avatar: 'https://i.pravatar.cc/80?u=5', text: 'Goals 🎯', time: '20m ago' },
-];
+// Removed mock data - now using real backend API.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -119,7 +99,7 @@ function StreakCircle({ item, isMe, onAddPress, onPress }: any) {
                     end={{ x: 1, y: 1 }}
                 >
                     <View style={[styles.circleInner, { backgroundColor: colors.background }]}>
-                        <Image source={{ uri: avatar(isMe ? undefined : item?.photo, isMe ? 'me' : item?.user_id, item?.gender) }} style={styles.circleImg} />
+                        <Image source={{ uri: avatar(item?.photo, isMe ? 'me' : item?.user_id, item?.gender) }} style={styles.circleImg} />
                         {isMe && (
                             <View style={styles.addOverlay}>
                                 <View style={styles.addBubble}>
@@ -174,72 +154,7 @@ function UserListItem({ item, onPress, onChatPress }: any) {
     );
 }
 
-function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
-    const insets = useSafeAreaInsets();
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(60)).current;
-    const [liked, setLiked] = useState(false);
-    const [fired, setFired] = useState(false);
-    const [likeCount, setLikeCount] = useState(0);
-    const [showComments, setShowComments] = useState(false);
-    const [commentText, setCommentText] = useState('');
-    const [localComments, setLocalComments] = useState<Comment[]>([...MOCK_COMMENTS]);
-
-    useEffect(() => {
-        if (user) { setLiked(false); setFired(false); setLikeCount(user.likes ?? 0); setShowComments(false); }
-    }, [user]);
-
-    useEffect(() => {
-        if (visible) {
-            Animated.parallel([
-                Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-                Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 11, useNativeDriver: true }),
-            ]).start();
-        } else {
-            Animated.parallel([
-                Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-                Animated.timing(slideAnim, { toValue: 60, duration: 200, useNativeDriver: true }),
-            ]).start();
-        }
-    }, [visible, fadeAnim, slideAnim]);
-
-    if (!visible || !user) return null;
-    const imgUrl = user.media?.media_url ?? `https://picsum.photos/seed/${user.user_id}/800/1200`;
-
-    return (
-        <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-            <View style={styles.viewerBg}>
-                <Image source={{ uri: imgUrl }} style={styles.viewerBgImg} blurRadius={18} />
-                <View style={styles.viewerDim} />
-            </View>
-            <View style={styles.viewerSheet}>
-                <Image source={{ uri: imgUrl }} style={styles.viewerImg} resizeMode="cover" />
-                <SafeAreaView style={styles.viewerTopBar} edges={['top']}>
-                    <View style={styles.viewerHeader}>
-                        <TouchableOpacity onPress={onPrev} style={styles.viewerNavBtn}><MaterialCommunityIcons name="chevron-left" size={26} color="#FFF" /></TouchableOpacity>
-                        <View style={styles.viewerUserRow}>
-                            <Image source={{ uri: avatar(user.photo, user.user_id) }} style={styles.viewerAvatar} />
-                            <View><Text style={styles.viewerName}>{user.display_name}</Text><Text style={styles.viewerStreakTxt}>🔥 {user.streak_count} day streak</Text></View>
-                        </View>
-                        <TouchableOpacity onPress={onNext} style={styles.viewerNavBtn}><MaterialCommunityIcons name="chevron-right" size={26} color="#FFF" /></TouchableOpacity>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}><MaterialCommunityIcons name="close" size={26} color="#FFF" /></TouchableOpacity>
-                    </View>
-                </SafeAreaView>
-                <View style={[styles.actionsBar, { paddingBottom: insets.bottom + 16 }]}>
-                    <TouchableOpacity style={styles.actionItem} onPress={() => { setLiked(!liked); setLikeCount(c => liked ? c - 1 : c + 1); }}>
-                        <MaterialCommunityIcons name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? '#EF4444' : '#FFF'} /><Text style={styles.actionCount}>{likeCount}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionItem} onPress={() => setShowComments(true)}>
-                        <MaterialCommunityIcons name="comment-processing-outline" size={28} color="#FFF" /><Text style={styles.actionCount}>{localComments.length}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionItem} onPress={() => setFired(!fired)}>
-                        <Text style={[styles.fireEmoji, fired && styles.fireEmojiActive]}>🔥</Text><Text style={styles.actionCount}>{fired ? 'Hot!' : 'Fire'}</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Modal>
-    );
-}
+// Header and Logic in StreaksScreen...
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN SCREEN: StreaksScreen
@@ -262,17 +177,20 @@ export default function StreaksScreen() {
         setLoading(true);
         try {
             const [fd, ad] = await Promise.all([
-                streaksApi.getSnapchatStreaks('friends').catch(() => [] as any[]),
-                streaksApi.getSnapchatStreaks('all').catch(() => [] as any[]),
+                streaksApi.getSnapchatStreaks('friends').catch(() => []),
+                streaksApi.getSnapchatStreaks('all').catch(() => []),
             ]);
-            setFriends(Array.isArray(fd) && fd.length > 0 ? fd : MOCK_USERS);
-            setAll(Array.isArray(ad) && ad.length > 0 ? ad : MOCK_USERS);
-        } catch {
-            setFriends(MOCK_USERS); setAll(MOCK_USERS);
+            setFriends(Array.isArray(fd) ? fd : []);
+            setAll(Array.isArray(ad) ? ad : []);
+        } catch (err) {
+            console.error('Error loading streaks:', err);
         } finally {
             setLoading(false);
         }
     };
+
+    const myStreak = friends.find(u => u.user_id === currentUser?.id);
+    const otherFriends = friends.filter(u => u.user_id !== currentUser?.id);
 
     const nextViewer = () => { if (viewerIndex + 1 < all.length) { setViewerIndex(v => v + 1); setViewerUser(all[viewerIndex + 1]); } };
     const prevViewer = () => { if (viewerIndex - 1 >= 0) { setViewerIndex(v => v - 1); setViewerUser(all[viewerIndex - 1]); } };
@@ -296,8 +214,19 @@ export default function StreaksScreen() {
                     ListHeaderComponent={
                         <>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.circlesScroll}>
-                                <StreakCircle isMe onAddPress={() => setShowCreate(true)} />
-                                {friends.map(u => <StreakCircle key={u.user_id} item={u} onPress={(u: any) => { setViewerUser(u); setViewerIndex(all.findIndex(x => x.user_id === u.user_id)); }} />)}
+                                <StreakCircle 
+                                    isMe 
+                                    item={myStreak}
+                                    onAddPress={() => setShowCreate(true)} 
+                                    onPress={(u: any) => { setViewerUser(u); setViewerIndex(all.findIndex(x => x.user_id === u.user_id)); }}
+                                />
+                                {otherFriends.map(u => (
+                                    <StreakCircle 
+                                        key={u.user_id} 
+                                        item={u} 
+                                        onPress={(u: any) => { setViewerUser(u); setViewerIndex(all.findIndex(x => x.user_id === u.user_id)); }} 
+                                    />
+                                ))}
                             </ScrollView>
 
                             <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -369,4 +298,197 @@ const styles = StyleSheet.create({
     actionCount: { color: '#FFF', fontSize: 12, marginTop: 4, fontWeight: '600' },
     fireEmoji: { fontSize: 24, opacity: 0.7 },
     fireEmojiActive: { opacity: 1 },
+
+    // Modal & Comments
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '70%', paddingBottom: 20 },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+    modalTitle: { fontSize: 18, fontWeight: '700' },
+    commentItem: { flexDirection: 'row', marginBottom: 16, gap: 12 },
+    commentAvatar: { width: 36, height: 36, borderRadius: 18 },
+    commentInfo: { flex: 1 },
+    commentUser: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+    commentText: { fontSize: 14, lineHeight: 20 },
+    emptyMsg: { textAlign: 'center', marginTop: 40, fontSize: 15 },
+    inputRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1, gap: 12 },
+    input: { flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, maxHeight: 100, fontSize: 15 },
 });
+
+function CommentsModal({ visible, uploadId, onClose, onCommentAdded }: any) {
+    const { colors } = useTheme();
+    const [comments, setComments] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [text, setText] = useState('');
+    const [sending, setSending] = useState(false);
+
+    useEffect(() => {
+        if (visible && uploadId) loadComments();
+    }, [visible, uploadId]);
+
+    const loadComments = async () => {
+        setLoading(true);
+        try {
+            const data = await streaksApi.listComments(uploadId);
+            setComments(data);
+        } catch (err) {
+            console.error('Error loading comments:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSend = async () => {
+        if (!text.trim() || sending) return;
+        setSending(true);
+        try {
+            await streaksApi.addComment(uploadId, text);
+            setText('');
+            loadComments();
+            onCommentAdded?.();
+        } catch (err) {
+            console.error('Error adding comment:', err);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                    <View style={styles.modalHeader}>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Comments ({comments.length})</Text>
+                        <TouchableOpacity onPress={onClose}><MaterialCommunityIcons name="close" size={24} color={colors.text} /></TouchableOpacity>
+                    </View>
+                    
+                    {loading ? (
+                        <ActivityIndicator style={{ padding: 40 }} color={colors.primary} />
+                    ) : (
+                        <FlatList
+                            data={comments}
+                            keyExtractor={i => i.id.toString()}
+                            renderItem={({ item }) => (
+                                <View style={styles.commentItem}>
+                                    <Image source={{ uri: avatar(item.user.photo, item.user.id) }} style={styles.commentAvatar} />
+                                    <View style={styles.commentInfo}>
+                                        <Text style={[styles.commentUser, { color: colors.text }]}>{item.user.display_name || item.user.username}</Text>
+                                        <Text style={[styles.commentText, { color: colors.textSecondary }]}>{item.text}</Text>
+                                    </View>
+                                </View>
+                            )}
+                            ListEmptyComponent={<Text style={[styles.emptyMsg, { color: colors.textMuted }]}>No comments yet. Be the first!</Text>}
+                            contentContainerStyle={{ padding: 16 }}
+                        />
+                    )}
+
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                        <View style={[styles.inputRow, { borderTopColor: colors.border }]}>
+                            <TextInput
+                                style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
+                                placeholder="Add a comment..."
+                                placeholderTextColor={colors.textMuted}
+                                value={text}
+                                onChangeText={setText}
+                                multiline
+                            />
+                            <TouchableOpacity onPress={handleSend} disabled={!text.trim() || sending}>
+                                <MaterialCommunityIcons name="send" size={24} color={text.trim() ? colors.primary : colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: any) {
+    const insets = useSafeAreaInsets();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(60)).current;
+    const [liked, setLiked] = useState(false);
+    const [fired, setFired] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+    const [commentCount, setCommentCount] = useState(0);
+    const [showComments, setShowComments] = useState(false);
+
+    useEffect(() => {
+        if (user) { 
+            setLiked(user.media?.has_liked ?? false); 
+            setFired(user.media?.has_fired ?? false); 
+            setLikeCount(user.media?.likes_count ?? 0); 
+            setCommentCount(user.media?.comments_count ?? 0);
+            setShowComments(false); 
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (visible) {
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+                Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 11, useNativeDriver: true }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+                Animated.timing(slideAnim, { toValue: 60, duration: 200, useNativeDriver: true }),
+            ]).start();
+        }
+    }, [visible, fadeAnim, slideAnim]);
+
+    if (!visible || !user) return null;
+    const imgUrl = user.media?.media_url ?? `https://picsum.photos/seed/${user.user_id}/800/1200`;
+
+    return (
+        <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+            <View style={styles.viewerBg}>
+                <Image source={{ uri: imgUrl }} style={styles.viewerBgImg} blurRadius={18} />
+                <View style={styles.viewerDim} />
+            </View>
+            <View style={styles.viewerSheet}>
+                <Image source={{ uri: imgUrl }} style={styles.viewerImg} resizeMode="cover" />
+                <SafeAreaView style={styles.viewerTopBar} edges={['top']}>
+                    <View style={styles.viewerHeader}>
+                        <TouchableOpacity onPress={onPrev} style={styles.viewerNavBtn}><MaterialCommunityIcons name="chevron-left" size={26} color="#FFF" /></TouchableOpacity>
+                        <View style={styles.viewerUserRow}>
+                            <Image source={{ uri: avatar(user.photo, user.user_id) }} style={styles.viewerAvatar} />
+                            <View><Text style={styles.viewerName}>{user.display_name}</Text><Text style={styles.viewerStreakTxt}>🔥 {user.streak_count} day streak</Text></View>
+                        </View>
+                        <TouchableOpacity onPress={onNext} style={styles.viewerNavBtn}><MaterialCommunityIcons name="chevron-right" size={26} color="#FFF" /></TouchableOpacity>
+                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}><MaterialCommunityIcons name="close" size={26} color="#FFF" /></TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+                <View style={[styles.actionsBar, { paddingBottom: insets.bottom + 16 }]}>
+                    <TouchableOpacity style={styles.actionItem} onPress={async () => {
+                        if (user.media?.id) {
+                            const res = await streaksApi.toggleLike(user.media.id);
+                            setLiked(res.liked);
+                            setLikeCount(c => res.liked ? c + 1 : c - 1);
+                        }
+                    }}>
+                        <MaterialCommunityIcons name={liked ? 'heart' : 'heart-outline'} size={28} color={liked ? '#EF4444' : '#FFF'} /><Text style={styles.actionCount}>{likeCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionItem} onPress={() => setShowComments(true)}>
+                        <MaterialCommunityIcons name="comment-processing-outline" size={28} color="#FFF" /><Text style={styles.actionCount}>{commentCount}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionItem} onPress={async () => {
+                        if (user.media?.id) {
+                            const res = await streaksApi.toggleFire(user.media.id);
+                            setFired(res.fired);
+                        }
+                    }}>
+                        <Text style={[styles.fireEmoji, fired && styles.fireEmojiActive]}>🔥</Text><Text style={styles.actionCount}>{fired ? 'Hot!' : 'Fire'}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+            {user.media?.id && (
+                <CommentsModal 
+                    visible={showComments} 
+                    uploadId={user.media.id} 
+                    onClose={() => setShowComments(false)}
+                    onCommentAdded={() => setCommentCount(c => c + 1)}
+                />
+            )}
+        </Modal>
+    );
+}

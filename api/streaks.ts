@@ -38,7 +38,7 @@ export const streaksApi = {
   },
 
   getLeaderboard: async (): Promise<any[]> => {
-    const response = await apiClient.get('chat/streaks/leaderboard/');
+    const response = await apiClient.get('streaks/leaderboard/');
     return response.data;
   },
 
@@ -59,6 +59,16 @@ export const streaksApi = {
 
   getSnapchatStreaks: async (type: 'friends' | 'all' = 'friends'): Promise<any[]> => {
     const response = await apiClient.get(`streaks/view/`, { params: { type } });
+    return response.data;
+  },
+  
+  toggleLike: async (uploadId: number): Promise<{ liked: boolean }> => {
+    const response = await apiClient.post(`streaks/${uploadId}/like/`);
+    return response.data;
+  },
+
+  toggleFire: async (uploadId: number): Promise<{ fired: boolean }> => {
+    const response = await apiClient.post(`streaks/${uploadId}/fire/`);
     return response.data;
   },
 };

@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
 import { generateAvatarUrl } from '@/utils/avatar';
+import { streaksApi } from '@/api/streaks';
 
 interface LeaderboardUser {
     id: number;
@@ -45,11 +46,46 @@ export default function LeaderboardScreen() {
     const router = useRouter();
     const { colors } = useTheme();
     const [loading, setLoading] = useState(true);
+    const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
 
     useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 800);
-        return () => clearTimeout(timer);
+        load();
     }, []);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const data = await streaksApi.getLeaderboard();
+            // Data is [{ streak_count, user1: { id, display_name, photo }, user2: { ... } }, ...]
+            // Flatten to unique users with their max streak
+            const userMap = new Map<number, LeaderboardUser>();
+            
+            data.forEach((item: any) => {
+                [item.user1, item.user2].forEach(u => {
+                    const existing = userMap.get(u.id);
+                    if (!existing || existing.streak < item.streak_count) {
+                        userMap.set(u.id, {
+                            id: u.id,
+                            name: u.display_name || u.username,
+                            streak: item.streak_count,
+                            rank: 0, // Will settle later
+                            photo: u.photo,
+                        });
+                    }
+                });
+            });
+
+            const sorted = Array.from(userMap.values())
+                .sort((a, b) => b.streak - a.streak)
+                .map((u, idx) => ({ ...u, rank: idx + 1 }));
+
+            setLeaderboard(sorted);
+        } catch (err) {
+            console.error('Error fetching leaderboard:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderItem = ({ item }: { item: LeaderboardUser }) => {
         const isTop3 = item.rank <= 3;
@@ -65,7 +101,7 @@ export default function LeaderboardScreen() {
                 </View>
 
                 <Image
-                    source={{ uri: generateAvatarUrl(item.id, item.gender as any) }}
+                    source={{ uri: item.photo || generateAvatarUrl(item.id) }}
                     style={styles.avatar}
                 />
 
@@ -90,11 +126,13 @@ export default function LeaderboardScreen() {
                     <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.title, { color: colors.text }]}>Leaderboard</Text>
-                <View style={{ width: 40 }} />
+                <TouchableOpacity onPress={load} style={styles.backBtn}>
+                    <MaterialCommunityIcons name="refresh" size={22} color={colors.text} />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.topThreeContainer}>
-                {MOCK_LEADERBOARD.slice(0, 3).map((user, idx) => (
+                {leaderboard.slice(0, 3).map((user, idx) => (
                     <View key={user.id} style={[styles.topUser, idx === 0 && styles.firstPlace]}>
                         <View style={styles.topAvatarWrap}>
                             <LinearGradient
@@ -102,7 +140,7 @@ export default function LeaderboardScreen() {
                                 style={styles.topGrad}
                             >
                                 <Image
-                                    source={{ uri: generateAvatarUrl(user.id, user.gender as any) }}
+                                    source={{ uri: user.photo || generateAvatarUrl(user.id) }}
                                     style={styles.topAvatar}
                                 />
                             </LinearGradient>
@@ -125,7 +163,7 @@ export default function LeaderboardScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={MOCK_LEADERBOARD.slice(3)}
+                    data={leaderboard.slice(3)}
                     keyExtractor={item => item.id.toString()}
                     renderItem={renderItem}
                     contentContainerStyle={styles.list}

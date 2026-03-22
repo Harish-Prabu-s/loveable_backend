@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
-from ...models import Streak, StreakUpload, Follow, Notification, StreakComment
+from ...models import Streak, StreakUpload, Follow, Notification, StreakComment, StreakLike, StreakReaction
 from ...serializers import ProfileSerializer
 from ..notifications.push_service import send_push_notification, _get_user_tokens
 
@@ -117,7 +117,7 @@ def add_streak_comment(streak_upload_id: int, user: User, text: str):
 def get_streak_comments(streak_upload_id: int):
     try:
         upload = StreakUpload.objects.get(pk=streak_upload_id)
-        return upload.comments.select_related('user__profile').order_by('-created_at')
+        return StreakComment.objects.filter(streak_upload=upload).select_related('user__profile').order_by('-created_at')
     except StreakUpload.DoesNotExist:
         return None
 
@@ -126,6 +126,32 @@ def get_streak_upload_service(upload_id: int):
         return StreakUpload.objects.select_related('user__profile').get(pk=upload_id)
     except StreakUpload.DoesNotExist:
         return None
+
+def toggle_streak_like(upload_id: int, user: User):
+    try:
+        upload = StreakUpload.objects.get(pk=upload_id)
+        like = StreakLike.objects.filter(streak_upload=upload, user=user).first()
+        if like:
+            like.delete()
+            return False, "Unliked"
+        else:
+            StreakLike.objects.create(streak_upload=upload, user=user)
+            return True, "Liked"
+    except StreakUpload.DoesNotExist:
+        return None, "Not found"
+
+def toggle_streak_reaction(upload_id: int, user: User, r_type: str = 'fire'):
+    try:
+        upload = StreakUpload.objects.get(pk=upload_id)
+        react = StreakReaction.objects.filter(streak_upload=upload, user=user, reaction_type=r_type).first()
+        if react:
+            react.delete()
+            return False, "Reaction removed"
+        else:
+            StreakReaction.objects.create(streak_upload=upload, user=user, reaction_type=r_type)
+            return True, "Reaction added"
+    except StreakUpload.DoesNotExist:
+        return None, "Not found"
 
 from datetime import timedelta
 from django.db.models import Max
@@ -153,48 +179,83 @@ def get_streaks_list_service(user: User, view_type: str = 'friends', request=Non
                 other_user_ids.append(other_user.id)
                 streak_map[other_user.id] = s
             
-            # 3. Batch fetch latest uploads from 24h ago
-            latest_uploads = StreakUpload.objects.filter(
+            # 3. Batch fetch latest uploads from 24h ago (portable)
+            all_uploads = StreakUpload.objects.filter(
                 user_id__in=other_user_ids,
                 created_at__gte=day_ago
-            ).order_by('user_id', '-created_at').distinct('user_id')
+            ).order_by('created_at') # Order by oldest first
             
-            upload_map = {up.user_id: up for up in latest_uploads}
+            # Map user -> latest upload
+            upload_map = {up.user_id: up for up in all_uploads} 
+            
+            # 4. Include current user's own latest upload if it exists
+            my_latest = StreakUpload.objects.filter(user=user, created_at__gte=day_ago).order_by('-created_at').first()
+            if my_latest:
+                upload_map[user.id] = my_latest
+                if user.id not in other_user_ids:
+                    other_user_ids.insert(0, user.id)
+                    # We need a dummy streak object or handle it
+                    class MockStreak:
+                        def __init__(self, u):
+                            self.user1 = u
+                            self.user2 = u
+                            self.streak_count = 0
+                            self.last_interaction_date = timezone.now()
+                            self.last_uploader_id = u.id
+                    streak_map[user.id] = MockStreak(user)
             
             result = []
             for uid in other_user_ids:
-                s = streak_map[uid]
+                s: Streak = streak_map[uid]
                 other_user = s.user2 if s.user1 == user else s.user1
                 up = upload_map.get(uid)
                 
+                # Check if current user liked/reacted
+                has_liked = False
+                has_fired = False
+                likes_count = 0
+                comments_count = 0
+                if up:
+                    has_liked = StreakLike.objects.filter(streak_upload=up, user=user).exists()
+                    has_fired = StreakReaction.objects.filter(streak_upload=up, user=user, reaction_type='fire').exists()
+                    likes_count = up.likes.count()
+                    comments_count = up.comments.count()
+
                 result.append({
                     'user_id': other_user.id,
                     'username': other_user.username,
                     'display_name': getattr(other_user.profile, 'display_name', other_user.username),
-                    'profile_pic': ProfileSerializer(other_user.profile, context={'request': request}).data.get('photo'),
+                    'photo': ProfileSerializer(other_user.profile, context={'request': request}).data.get('photo'),
                     'streak_count': s.streak_count,
                     'last_updated': s.last_interaction_date,
                     'last_uploader_id': s.last_uploader_id,
                     'media': {
                         'id': up.id,
                         'url': up.media_url.url if up.media_url else None,
-                        'type': up.media_type
+                        'type': up.media_type,
+                        'likes_count': likes_count,
+                        'comments_count': comments_count,
+                        'has_liked': has_liked,
+                        'has_fired': has_fired
                     } if up else None
                 })
             return result
 
         else: # type == 'all'
-            # 1. Fetch latest public uploads with annotated max streak count
-            # This is complex in Django with a symmetrical self-join. 
-            # We'll use a simpler optimization: fetch uploads first, then bulk fetch streaks.
-            uploads = StreakUpload.objects.filter(
-                created_at__gte=day_ago,
-                visibility='all'
-            ).select_related('user__profile').order_by('user_id', '-created_at').distinct('user_id')
+            # 1. Fetch latest public uploads OR the user's own uploads (portable)
+            all_uploads = StreakUpload.objects.filter(
+                models.Q(created_at__gte=day_ago) & (
+                    models.Q(visibility='all') | models.Q(user=user)
+                )
+            ).select_related('user__profile').order_by('created_at') # Order by oldest first
             
-            if not uploads.exists():
+            if not all_uploads.exists():
                 return []
                 
+            # Filter and take only the latest per user in memory
+            uploads_dict = {up.user_id: up for up in all_uploads}
+            uploads = list(uploads_dict.values())
+            
             uploader_ids = [up.user_id for up in uploads]
             
             # 2. Bulk fetch the highest streak for each uploader
@@ -213,17 +274,27 @@ def get_streaks_list_service(user: User, view_type: str = 'friends', request=Non
             
             result = []
             for up in uploads:
+                best_streak = streak_data_map.get(up.user_id, 0)
+                
+                # Check if current user liked/reacted
+                has_liked = StreakLike.objects.filter(streak_upload=up, user=user).exists()
+                has_fired = StreakReaction.objects.filter(streak_upload=up, user=user, reaction_type='fire').exists()
+                
                 result.append({
                     'user_id': up.user.id,
                     'username': up.user.username,
                     'display_name': getattr(up.user.profile, 'display_name', up.user.username),
                     'profile_pic': ProfileSerializer(up.user.profile, context={'request': request}).data.get('photo'),
-                    'streak_count': streak_data_map.get(up.user_id, 0),
+                    'streak_count': best_streak,
                     'last_updated': up.created_at,
                     'media': {
                         'id': up.id,
                         'url': up.media_url.url if up.media_url else None,
-                        'type': up.media_type
+                        'type': up.media_type,
+                        'likes_count': up.likes.count(),
+                        'comments_count': up.comments.count(),
+                        'has_liked': has_liked,
+                        'has_fired': has_fired
                     }
                 })
             return result
