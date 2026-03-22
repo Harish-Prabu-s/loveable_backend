@@ -49,11 +49,11 @@ const withMainApplication = (config) => {
       }
 
       // Fix 3: Replace the bad ReleaseLevel block + loadReactNative call with SoLoader.init
-      // Passing 'this' to load() as first argument for RN 0.81 compatibility
+      // Using positional Boolean args: load(turboModulesEnabled, fabricEnabled, bridgelessEnabled)
       if (contents.includes('loadReactNative(this)')) {
         contents = contents.replace(
           /\s*DefaultNewArchitectureEntryPoint\.releaseLevel = try \{[\s\S]*?\} catch \(e: IllegalArgumentException\) \{[\s\S]*?\}\s*\n\s*loadReactNative\(this\)/,
-          '\n    SoLoader.init(this, false)\n    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {\n      // Disabling Bridgeless mode for stability in 0.81.5\n      load(this, true, false)\n    }'
+          '\n    SoLoader.init(this, false)\n    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {\n      // Opt-in for New Architecture (Fabric) but disabling Bridgeless for stability\n      load(true, true, false)\n    }'
         );
         console.log('[withMainApplication] Replaced loadReactNative with SoLoader.init (Bridgeless disabled)');
       }
@@ -78,6 +78,13 @@ const withMainApplication = (config) => {
           '// add(MyReactNativePackage())\n              add(WebRTCModulePackage())'
         );
         console.log('[withMainApplication] Manually registered WebRTCModulePackage');
+      }
+
+      // Fix 7: Catch-all safety net — replace any remaining load(this,...) with load(true,...)
+      // This covers cases where the Expo template already has a load() call with wrong args
+      if (contents.includes('load(this,')) {
+        contents = contents.replace(/load\(this,/g, 'load(true,');
+        console.log('[withMainApplication] Replaced load(this,...) with load(true,...)');
       }
 
       fs.writeFileSync(mainApplicationPath, contents, 'utf8');
