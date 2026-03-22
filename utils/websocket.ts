@@ -21,10 +21,10 @@ export class WebSocketClient {
 
     constructor(path: string, userId: number) {
         const configSignalingUrl = Constants.expoConfig?.extra?.signalingUrl || 'ws://localhost:8000';
-        // Handle secure websocket if needed (ngrok etc)
-        const protocol = configSignalingUrl.startsWith('https') ? 'wss' : 
-                         configSignalingUrl.startsWith('http') ? 'ws' : 'ws';
-        const cleanUrl = configSignalingUrl.replace(/^https?:\/\//, '');
+        // Determine correct ws/wss protocol based on the config URL
+        const protocol = configSignalingUrl.startsWith('wss') || configSignalingUrl.startsWith('https') ? 'wss' : 'ws';
+        // Strip ALL protocol prefixes (wss://, ws://, https://, http://) before rebuilding
+        const cleanUrl = configSignalingUrl.replace(/^(wss?|https?):\/\//, '');
         this.url = `${protocol}://${cleanUrl}${path}${userId}/`;
     }
 
