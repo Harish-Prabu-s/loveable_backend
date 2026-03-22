@@ -5,7 +5,7 @@ import { ensureHttps } from '@/utils/url';
 
 const getBaseUrl = () => {
   // Forced Ngrok URL as requested by the user for all environments
-  const ngrokUrl = 'https://frogeyed-maggie-estuarial.ngrok-free.dev/api/';
+  const ngrokUrl = 'https://berneice-untransmigrated-exotically.ngrok-free.dev/api/';
   console.log(`[API] Using Base URL: ${ngrokUrl}`);
   return ngrokUrl;
 };

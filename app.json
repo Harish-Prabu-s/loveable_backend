@@ -43,7 +43,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "signalingUrl": "wss://preflagellate-agnus-timidly.ngrok-free.dev",
+      "signalingUrl": "wss://berneice-untransmigrated-exotically.ngrok-free.dev",
       "apiUrl": "http://localhost:8000/api",
       "eas": {
         "projectId": "4f304a85-6864-4d5e-9b51-8d5ff868e27a"
