@@ -17,7 +17,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
 
     // Prevent screen recording and detect screenshots
     useEffect(() => {
-        let subscription;
+        let subscription: any;
         if (visible) {
             ScreenCapture.preventScreenCaptureAsync();
             subscription = ScreenCapture.addScreenshotListener(() => {
@@ -50,7 +50,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
     };
 
     useEffect(() => {
-        let timer;
+        let timer: any;
         if (visible && story) {
             setProgress(0);
             // Record view
@@ -132,7 +132,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                         <TouchableOpacity 
                             activeOpacity={1} 
                             style={styles.leftControl} 
-                            onPress={(e) => {
+                            onPress={() => {
                                 const now = Date.now();
                                 if (now - lastTap.current < 300) {
                                     handleLike();
@@ -146,7 +146,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                         <TouchableOpacity 
                             activeOpacity={1} 
                             style={styles.rightControl} 
-                            onPress={(e) => {
+                            onPress={() => {
                                 const now = Date.now();
                                 if (now - lastTap.current < 300) {
                                     handleLike();
@@ -170,6 +170,9 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                     <View style={styles.footer}>
                         <MaterialCommunityIcons name="eye" size={20} color="#FFF" />
                         <Text style={styles.viewCount}>{story.view_count || 0}</Text>
+                        <View style={{ width: 12 }} />
+                        <MaterialCommunityIcons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? '#EF4444' : '#FFF'} />
+                        <Text style={styles.viewCount}>{likesCount}</Text>
                     </View>
 
                 </SafeAreaView>

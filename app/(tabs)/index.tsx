@@ -719,6 +719,9 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/streaks-view' as any)}>
             <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.actionIcon}>
               <MaterialCommunityIcons name="fire" size={24} color="#FFFFFF" />
+              <View style={styles.actionAddBadge}>
+                <MaterialCommunityIcons name="plus" size={12} color="#FFFFFF" />
+              </View>
             </LinearGradient>
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Streaks</Text>
           </TouchableOpacity>
@@ -966,6 +969,19 @@ const styles = StyleSheet.create({
   },
   actionLabel: { fontSize: 12, fontWeight: '700' },
   // Mood
+  actionAddBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#3B82F6',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000',
+  },
   moodSection: {
     padding: 24, marginTop: 24,
     marginHorizontal: 16, borderRadius: 32,

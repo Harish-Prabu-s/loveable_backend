@@ -8,6 +8,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { useAuthStore } from '@/store/authStore';
 
+import { StreakCircle, InlineStreakViewer, avatar } from '@/components/InlineStreakViewer';
+
 export default function StreaksViewScreen() {
     const router = useRouter();
     const { colors } = useTheme();
@@ -15,6 +17,9 @@ export default function StreaksViewScreen() {
     const [activeTab, setActiveTab] = useState<'friends' | 'all'>('friends');
     const [streaks, setStreaks] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<any>(null);
 
     useEffect(() => {
         loadStreaks();
@@ -32,12 +37,24 @@ export default function StreaksViewScreen() {
         }
     };
 
-    const getAvatar = (photo?: string, id?: number, gender?: string) => {
-        if (photo && photo.startsWith('http')) return photo;
-        return generateAvatarUrl(id || 'default', gender as any);
+    const nextViewer = () => {
+        const idx = streaks.findIndex(u => u.user_id === selectedUser?.user_id);
+        if (idx !== -1 && idx < streaks.length - 1) {
+            setSelectedUser(streaks[idx + 1]);
+        } else {
+            setViewerVisible(false);
+        }
+    };
+
+    const prevViewer = () => {
+        const idx = streaks.findIndex(u => u.user_id === selectedUser?.user_id);
+        if (idx > 0) {
+            setSelectedUser(streaks[idx - 1]);
+        }
     };
 
     const formatTime = (dateStr: string) => {
+        if (!dateStr) return 'Recently';
         const date = new Date(dateStr);
         const now = new Date();
         const diff = now.getTime() - date.getTime();
@@ -55,16 +72,13 @@ export default function StreaksViewScreen() {
             <TouchableOpacity 
                 style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onPress={() => {
-                    if (item.media) {
-                        router.push(`/streak/${item.media.id}` as any);
-                    } else {
-                        router.push(`/user/${item.user_id}` as any);
-                    }
+                    setSelectedUser(item);
+                    setViewerVisible(true);
                 }}
             >
                 <View style={styles.avatarContainer}>
                     <Image 
-                        source={{ uri: item.media?.media_url || getAvatar(item.photo, item.user_id) }} 
+                        source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} 
                         style={styles.avatar} 
                     />
                     {item.media && <View style={styles.storyRing} />}
@@ -135,6 +149,14 @@ export default function StreaksViewScreen() {
                     }
                 />
             )}
+
+            <InlineStreakViewer 
+                visible={viewerVisible} 
+                user={selectedUser} 
+                onClose={() => setViewerVisible(false)} 
+                onNext={nextViewer} 
+                onPrev={prevViewer} 
+            />
         </SafeAreaView>
     );
 }

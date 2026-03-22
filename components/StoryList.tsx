@@ -14,7 +14,7 @@ export default function StoryList({ stories, onStoryPress, onCreatePress }) {
                 <TouchableOpacity style={styles.storyContainer} onPress={onCreatePress}>
                     <View style={styles.createStoryRing}>
                         <Image
-                            source={{ uri: (user as any)?.profile?.photo || 'https://via.placeholder.com/150' }}
+                            source={{ uri: (user as any)?.photo || (user as any)?.profile?.photo || `https://ui-avatars.com/api/?name=${user?.username || 'me'}&background=random` }}
                             style={styles.avatar}
                         />
                         <View style={styles.addIconContainer}>
