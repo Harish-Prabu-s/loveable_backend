@@ -91,41 +91,55 @@ def toggle_like(request, upload_id):
 @permission_classes([IsAuthenticated])
 def toggle_fire(request, upload_id):
     from .services import toggle_streak_reaction
-    fired, msg = toggle_streak_reaction(upload_id, request.user, 'fire')
+    fired, msg, count, fire_count = toggle_streak_reaction(upload_id, request.user, 'fire')
     if fired is None:
         return Response({'error': msg}, status=404)
-    return Response({'status': msg, 'fired': fired})
+    return Response({'status': msg, 'fired': fired, 'streak_count': count, 'fire_count': fire_count})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_user_fire(request, user_id):
+    from .services import toggle_user_fire_service
+    fired, msg, count, fire_count = toggle_user_fire_service(user_id, request.user)
+    if fired is None:
+        return Response({'error': msg}, status=404)
+    return Response({'status': msg, 'fired': fired, 'streak_count': count, 'fire_count': fire_count})
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def streak_leaderboard_view(request):
     try:
-        from ...models import Streak
-        # Get top 50 streaks overall where the streak count > 0 with efficient joins
-        streaks = Streak.objects.filter(streak_count__gte=1) \
-            .select_related('user1__profile', 'user2__profile') \
-            .order_by('-streak_count')[:50]
+        from django.contrib.auth.models import User
+        from django.db.models import Count, Q, Max, F
+        from django.db.models.functions import Greatest
+        from ...utils import get_absolute_media_url
+        
+        # Rank users by total received fire reactions
+        # Also get their highest streak count safely
+        users = User.objects.annotate(
+            fire_count=Count('received_reactions', filter=Q(received_reactions__reaction_type='fire')),
+            max_s1=Max('streaks_user1__streak_count'),
+            max_s2=Max('streaks_user2__streak_count'),
+            upload_count=Count('streak_uploads')
+        ).annotate(
+            best_streak=Greatest(F('max_s1'), F('max_s2'), default=0)
+        ).filter(Q(fire_count__gt=0) | Q(best_streak__gt=0) | Q(upload_count__gt=0)).order_by('-fire_count', '-best_streak')[:50]
         
         data = []
-        for streak in streaks:
-            user1 = streak.user1
-            user2 = streak.user2
+        for u in users:
+            profile = getattr(u, 'profile', None)
+            photo_url = get_absolute_media_url(profile.photo.url, request) if profile and profile.photo else None
+            
             data.append({
-                'streak_count': streak.streak_count,
-                'last_interaction_date': streak.last_interaction_date,
-                'user1': {
-                    'id': user1.id,
-                    'username': user1.username,
-                    'display_name': getattr(user1.profile, 'display_name', user1.username),
-                    'photo': user1.profile.photo.url if user1.profile.photo else None,
-                },
-                'user2': {
-                    'id': user2.id,
-                    'username': user2.username,
-                    'display_name': getattr(user2.profile, 'display_name', user2.username),
-                    'photo': user2.profile.photo.url if user2.profile.photo else None,
-                }
+                'user_id': u.id,
+                'username': u.username,
+                'display_name': profile.display_name if profile else u.username,
+                'photo': photo_url,
+                'fire_count': u.fire_count,
+                'streak_count': u.best_streak,
             })
         return Response(data)
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error in streak_leaderboard_view: {e}")
         return Response({'error': str(e)}, status=400)

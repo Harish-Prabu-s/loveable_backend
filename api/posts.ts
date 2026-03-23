@@ -100,4 +100,15 @@ export const postsApi = {
         const response = await apiClient.post(`posts/${postId}/share/`, { target_user_id: targetUserId });
         return response.data;
     },
+
+    /** Get a single post by ID */
+    getPost: async (postId: number): Promise<Post> => {
+        const response = await apiClient.get(`posts/${postId}/`);
+        const p: Post = response.data;
+        return {
+            ...p,
+            image: ensureHttps(p.image) ?? null,
+            photo: ensureHttps(p.photo) ?? null,
+        };
+    },
 };

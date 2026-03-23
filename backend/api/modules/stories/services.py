@@ -16,15 +16,38 @@ def get_active_stories(user):
         (models.Q(visibility='close_friends') & models.Q(user__close_friends__close_friend=user))
     ).select_related('user__profile').prefetch_related('views').order_by('-created_at').distinct()
 
-def create_story(user, media_url: str, media_type: str = 'image', visibility='all'):
+def create_story(user, media_url: str, media_type: str = 'image', visibility='all', caption: str = ''):
     expires_at = timezone.now() + timedelta(hours=24)
-    story = Story.objects.create(user=user, media_url=media_url, media_type=media_type, expires_at=expires_at, visibility=visibility)
+    story = Story.objects.create(
+        user=user, 
+        media_url=media_url, 
+        media_type=media_type, 
+        expires_at=expires_at, 
+        visibility=visibility,
+        caption=caption
+    )
     
     # Notify Close Friends
     from ..notifications.services import notify_close_friends_of_content
+    from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'story', story.id)
+    handle_mentions(caption, user, 'story', story.id)
     
     return story
+
+def add_story_comment(story_id: int, user, text: str):
+    from ...models import StoryComment
+    try:
+        story = Story.objects.get(id=story_id)
+        comment = StoryComment.objects.create(story=story, user=user, text=text)
+        
+        # Process Mentions
+        from ..notifications.utils import handle_mentions
+        handle_mentions(text, user, 'story_comment', story.id)
+        
+        return comment
+    except Story.DoesNotExist:
+        return None
 
 def record_view(story_id: int, user):
     story = Story.objects.get(id=story_id)

@@ -20,9 +20,12 @@ def create_story_view(request):
     media_url = request.data.get('media_url')
     media_type = request.data.get('media_type', 'image')
     visibility = request.data.get('visibility', 'all')
+    caption = request.data.get('caption', '').strip()
+    
     if not media_url:
         return Response({'error': 'media_url required'}, status=400)
-    story = create_story(request.user, media_url, media_type, visibility)
+    
+    story = create_story(request.user, media_url, media_type, visibility, caption)
     return Response(StorySerializer(story, context={'request': request}).data, status=201)
 
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -87,10 +90,9 @@ def like_story_view(request, story_id):
         
         # Send notification to content owner
         if story.user != request.user:
-            from ..notifications.push_service import send_push_notification
+            from ..notifications.push_service import send_push_notification, _get_user_tokens
             from ..notifications.services import create_notification
-            from ...models import PushToken
-            tokens = list(PushToken.objects.filter(user=story.user).values_list('expo_token', flat=True))
+            
             sender_name = getattr(request.user.profile, 'display_name', '') if hasattr(request.user, 'profile') else request.user.username
             
             # Persist to DB
@@ -102,6 +104,7 @@ def like_story_view(request, story_id):
                 object_id=story.id
             )
 
+            tokens = _get_user_tokens(story.user_id)
             if tokens:
                 send_push_notification(
                     tokens, 
@@ -117,38 +120,15 @@ def like_story_view(request, story_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def comment_story_view(request, story_id):
-    from ...models import Story, StoryComment
-    text = request.data.get('text')
+    from .services import add_story_comment
+    text = request.data.get('text', '').strip()
     if not text:
         return Response({'error': 'text required'}, status=400)
+    
     try:
-        story = Story.objects.get(id=story_id)
-        comment = StoryComment.objects.create(story=story, user=request.user, text=text)
-
-        # Send notification to content owner
-        if story.user != request.user:
-            from ..notifications.push_service import send_push_notification, _get_user_tokens
-            from ..notifications.services import create_notification
-            tokens = _get_user_tokens(story.user.id)
-            profile = getattr(request.user, 'profile', None)
-            sender_name = profile.display_name if profile else request.user.username
-            
-            # Persist to DB
-            create_notification(
-                recipient=story.user,
-                actor=request.user,
-                notification_type='story_comment',
-                message=f"{sender_name} commented on your story: {text[:30]}...",
-                object_id=story.id
-            )
-
-            if tokens:
-                send_push_notification(
-                    tokens, 
-                    title="New Story Comment!", 
-                    body=f"{sender_name} commented on your story: {text[:30]}...",
-                    data={'type': 'story_comment', 'story_id': story.id}
-                )
+        comment = add_story_comment(story_id, request.user, text)
+        if not comment:
+            return Response({'error': 'Story not found'}, status=404)
 
         from ...utils import get_absolute_media_url
         p = getattr(request.user, 'profile', None)
@@ -160,8 +140,8 @@ def comment_story_view(request, story_id):
             'text': comment.text,
             'created_at': comment.created_at.isoformat(),
         })
-    except Story.DoesNotExist:
-        return Response({'error': 'Story not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])

@@ -11,6 +11,8 @@ import {
   MediaStream,
 } from '@/utils/webrtc';
 
+import { BASE_URL } from '@/api/client';
+
 export type WebRTCCallKind = "audio" | "video" | "voice";
 
 type SignalingMessage =
@@ -28,20 +30,21 @@ type SignalingMessage =
     type: "ice-candidate";
     roomId: number;
     candidate: any;
+    fromCaller: boolean;
   }
   | {
     type: "call-end";
     roomId: number;
+  }
+  | {
+    type: "callee-joined";
+    roomId: number;
   };
 
 function getSignalingUrl(): string {
-  const extra = Constants.expoConfig?.extra;
-  if (extra?.signalingUrl) return String(extra.signalingUrl).replace(/\/$/, "");
-  
-  const env = typeof process !== "undefined" ? process.env : (global as any).__ENV__;
-  if (env?.EXPO_PUBLIC_SIGNALING_WS_URL) return String(env.EXPO_PUBLIC_SIGNALING_WS_URL).replace(/\/$/, "");
-  if (env?.VITE_SIGNALING_WS_URL) return String(env.VITE_SIGNALING_WS_URL).replace(/\/$/, "");
-  return "ws://localhost:9000";
+  const protocol = BASE_URL.startsWith('https') ? 'wss' : 'ws';
+  const cleanUrl = BASE_URL.replace(/^(wss?|https?):\/\//, '').replace(/\/api\/?$/, '');
+  return `${protocol}://${cleanUrl}`;
 }
 
 interface UseWebRTCOptions {
@@ -107,7 +110,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
             const data: SignalingMessage = envelope.message || envelope; // Handle nested or flat
             if (data.roomId !== roomId) return;
 
-            if (data.type === "call-offer") {
+            if (data.type === "callee-joined") {
+              if (!pcRef.current || !isCaller) return;
+              // Callee has joined the room, time to send the offer
+              const offer = await pcRef.current.createOffer({});
+              await pcRef.current.setLocalDescription(offer);
+              wsRef.current?.send(JSON.stringify({ type: "call-offer", roomId, sdp: offer }));
+            } else if (data.type === "call-offer") {
               if (!pcRef.current || isCaller) return;
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
               const answer = await pcRef.current.createAnswer();
@@ -118,6 +127,8 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
             } else if (data.type === "ice-candidate") {
               if (!pcRef.current || !data.candidate) return;
+              // Ignore our own ICE candidates echoed back by the broadcast channel
+              if (data.fromCaller === isCaller) return;
               await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
             } else if (data.type === "call-end") {
               if (!isCancelled) setRemoteStream(null);
@@ -126,6 +137,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
             }
           } catch (e) {
             console.warn("Signaling error", e);
+          }
+        };
+
+        ws.onopen = () => {
+          if (!isCaller) {
+            // Tell the caller we're ready to receive an offer
+            wsRef.current?.send(JSON.stringify({ type: "callee-joined", roomId }));
           }
         };
 
@@ -155,19 +173,12 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
           wsRef.current.send(JSON.stringify({
             type: "ice-candidate",
             roomId,
+            fromCaller: isCaller,
             candidate: event.candidate?.toJSON ? event.candidate.toJSON() : event.candidate,
           }));
         };
 
         connectSignaling();
-
-        if (signalingBase && isCaller && wsRef.current) {
-          wsRef.current.onopen = async () => {
-            const offer = await pc.createOffer({});
-            await pc.setLocalDescription(offer);
-            wsRef.current?.send(JSON.stringify({ type: "call-offer", roomId, sdp: offer }));
-          };
-        }
       } catch (err: any) {
         console.warn(err);
         toast.error("Error accessing camera or microphone.");

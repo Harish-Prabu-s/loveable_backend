@@ -49,4 +49,8 @@ export const reelsApi = {
     deleteReel: async (id: number): Promise<void> => {
         await client.delete(`/reels/${id}/delete/`);
     },
+    getReel: async (id: number): Promise<Reel> => {
+        const res = await client.get(`/reels/${id}/`);
+        return res.data;
+    },
 };

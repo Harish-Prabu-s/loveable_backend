@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, Text, View, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Text, View, Dimensions, Platform, TouchableOpacity } from 'react-native';
 import { MotiView, AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,7 @@ export interface ToastOptions {
     message: string;
     type?: ToastType;
     duration?: number;
+    onPress?: () => void;
 }
 
 export interface ToastRef {
@@ -23,19 +24,28 @@ const Toast = forwardRef<ToastRef>((_, ref) => {
     const [isVisible, setIsVisible] = useState(false);
     const [message, setMessage] = useState('');
     const [type, setType] = useState<ToastType>('info');
+    const [onPress, setOnPress] = useState<(() => void) | undefined>();
 
     const hide = useCallback(() => {
         setIsVisible(false);
     }, []);
 
     useImperativeHandle(ref, () => ({
-        show: ({ message, type = 'info', duration = 3000 }) => {
+        show: ({ message, type = 'info', duration = 3000, onPress }) => {
             setMessage(message);
             setType(type);
+            setOnPress(() => onPress);
             setIsVisible(true);
             setTimeout(hide, duration);
         },
     }));
+
+    const handlePress = () => {
+        if (onPress) {
+            onPress();
+            hide();
+        }
+    };
 
     const getColors = () => {
         switch (type) {
@@ -62,7 +72,7 @@ const Toast = forwardRef<ToastRef>((_, ref) => {
     };
 
     return (
-        <View style={styles.outerContainer} pointerEvents="none">
+        <View style={styles.outerContainer} pointerEvents="box-none">
             <AnimatePresence>
                 {isVisible && (
                     <MotiView
@@ -72,19 +82,25 @@ const Toast = forwardRef<ToastRef>((_, ref) => {
                         transition={{ type: 'spring', damping: 15 }}
                         style={styles.container}
                     >
-                        <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
-                            <LinearGradient
-                                colors={getColors() as [string, string, ...string[]]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.gradient}
-                            >
-                                <View style={styles.content}>
-                                    <MaterialCommunityIcons name={getIcon()} size={24} color="#FFFFFF" />
-                                    <Text style={styles.message}>{message}</Text>
-                                </View>
-                            </LinearGradient>
-                        </BlurView>
+                        <TouchableOpacity 
+                            activeOpacity={onPress ? 0.7 : 1} 
+                            onPress={handlePress}
+                            disabled={!onPress}
+                        >
+                            <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
+                                <LinearGradient
+                                    colors={getColors() as [string, string, ...string[]]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.gradient}
+                                >
+                                    <View style={styles.content}>
+                                        <MaterialCommunityIcons name={getIcon()} size={24} color="#FFFFFF" />
+                                        <Text style={styles.message}>{message}</Text>
+                                    </View>
+                                </LinearGradient>
+                            </BlurView>
+                        </TouchableOpacity>
                     </MotiView>
                 )}
             </AnimatePresence>

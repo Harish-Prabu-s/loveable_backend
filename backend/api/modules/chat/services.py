@@ -9,17 +9,17 @@ from ...models import Room, Message, Streak
 def get_or_create_room(caller: User, receiver_id: int, call_type: str) -> Room:
     receiver = User.objects.get(id=receiver_id)
     
+    # Try finding an active/pending room in EITHER direction
     room = Room.objects.filter(
-        caller=caller, 
-        receiver=receiver, 
-        call_type=call_type, 
+        (models.Q(caller=caller, receiver=receiver) | models.Q(caller=receiver, receiver=caller)),
+        call_type=call_type,
         status__in=['pending', 'active']
     ).first()
     
     if not room:
+        # Fallback to the latest room created between them
         room = Room.objects.filter(
-            caller=caller, 
-            receiver=receiver, 
+            (models.Q(caller=caller, receiver=receiver) | models.Q(caller=receiver, receiver=caller)),
             call_type=call_type
         ).order_by('-created_at').first()
 
@@ -88,6 +88,39 @@ def send_message(
 
     # Update Streak logic
     update_streak(sender, other_user)
+
+    # Coin Deduction Logic
+    from ..monetization.services import get_chat_cost, get_media_cost
+    from ...models import Wallet, CoinTransaction
+    from django.db import transaction
+
+    cost = 0
+    if msg_type == 'text':
+        cost = get_chat_cost()
+    elif msg_type == 'image':
+        cost = get_media_cost('photo')
+    elif msg_type == 'video':
+        cost = get_media_cost('video_msg')
+    elif msg_type == 'voice':
+        cost = get_media_cost('voice_msg')
+
+    if cost > 0:
+        wallet, _ = Wallet.objects.get_or_create(user=sender)
+        if wallet.coin_balance < cost:
+            raise Exception("Insufficient coins")
+        
+        with transaction.atomic():
+            wallet.coin_balance = models.F('coin_balance') - cost
+            wallet.total_spent = models.F('total_spent') + cost
+            wallet.save(update_fields=['coin_balance', 'total_spent'])
+            
+            CoinTransaction.objects.create(
+                wallet=wallet,
+                type='debit',
+                transaction_type='chat_spent',
+                amount=cost,
+                description=f'Sent {msg_type} message'
+            )
 
     msg = Message.objects.create(
         room_id=room_id,

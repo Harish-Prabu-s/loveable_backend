@@ -65,43 +65,64 @@ export default function StreaksViewScreen() {
         return `${Math.floor(hrs / 24)}d ago`;
     };
 
+    const handleFireUser = async (u: any) => {
+        try {
+            const res = u.media?.id 
+                ? await streaksApi.toggleFire(u.media.id)
+                : await streaksApi.toggleUserFire(u.user_id);
+                
+            if (res.fired !== undefined) {
+                setStreaks(prev => prev.map(s => 
+                    s.user_id === u.user_id ? { ...s, streak_count: res.streak_count ?? (res.fired ? s.streak_count + 1 : Math.max(0, s.streak_count - 1)) } : s
+                ));
+            }
+        } catch (e) {
+            console.error('Failed to fire user', e);
+        }
+    };
+
     const renderUserCard = ({ item }: { item: any }) => {
         const isSentByMe = item.last_uploader_id === currentUser?.id;
         
         return (
-            <TouchableOpacity 
-                style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => {
-                    setSelectedUser(item);
-                    setViewerVisible(true);
-                }}
-            >
-                <View style={styles.avatarContainer}>
-                    <Image 
-                        source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} 
-                        style={styles.avatar} 
-                    />
-                    {item.media && <View style={styles.storyRing} />}
-                </View>
-
-                <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: colors.text }]}>{item.display_name || item.username}</Text>
-                    <View style={styles.statusRow}>
-                        <MaterialCommunityIcons 
-                            name={isSentByMe ? "arrow-top-right" : "arrow-bottom-left"} 
-                            size={14} 
-                            color={isSentByMe ? colors.primary : "#10B981"} 
+            <View style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TouchableOpacity 
+                    style={styles.cardMainView}
+                    onPress={() => {
+                        setSelectedUser(item);
+                        setViewerVisible(true);
+                    }}
+                >
+                    <View style={styles.avatarContainer}>
+                        <Image 
+                            source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} 
+                            style={styles.avatar} 
                         />
-                        <Text style={[styles.statusText, { color: colors.textMuted }]}>
-                            {isSentByMe ? 'Sent' : 'Received'} • {formatTime(item.last_updated)}
-                        </Text>
+                        {item.media && <View style={styles.storyRing} />}
                     </View>
-                </View>
 
-                <View style={styles.streakInfo}>
-                    <Text style={styles.streakCount}>{item.streak_count} 🔥</Text>
+                    <View style={styles.userInfo}>
+                        <Text style={[styles.userName, { color: colors.text }]}>{item.display_name || item.username}</Text>
+                        <View style={styles.statusRow}>
+                            <MaterialCommunityIcons 
+                                name={isSentByMe ? "arrow-top-right" : "arrow-bottom-left"} 
+                                size={14} 
+                                color={isSentByMe ? colors.primary : "#10B981"} 
+                            />
+                            <Text style={[styles.statusText, { color: colors.textMuted }]}>
+                                {isSentByMe ? 'Sent' : 'Received'} • {formatTime(item.last_updated)}
+                            </Text>
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
+                <View style={styles.cardActions}>
+                    <TouchableOpacity style={styles.fireIconButton} onPress={() => handleFireUser(item)}>
+                        <MaterialCommunityIcons name="fire" size={24} color="#EF4444" />
+                        <Text style={styles.streakCountMini}>{item.streak_count}</Text>
+                    </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 
@@ -194,8 +215,14 @@ const styles = StyleSheet.create({
     userName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     statusText: { fontSize: 13 },
-    streakInfo: { alignItems: 'flex-end' },
-    streakCount: { fontSize: 16, fontWeight: '800', color: '#EF4444' },
+    cardMainView: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    cardActions: { marginLeft: 10 },
+    fireIconButton: { 
+        flexDirection: 'row', alignItems: 'center', gap: 4, 
+        backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 
+    },
+    streakCountMini: { fontSize: 14, fontWeight: '800', color: '#EF4444' },
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 100 },
     emptyText: { fontSize: 20, fontWeight: '700', marginTop: 16 },

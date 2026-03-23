@@ -64,3 +64,20 @@ export const getProfileAvatarFull = (
     }
     return generateAvatarUrl(seed, gender);
 };
+import { getMediaUrl } from './media';
+
+export const getAvatarUri = (photo: string | null | undefined, seed: string | number, gender?: string): string => {
+    const resolved = getMediaUrl(photo);
+    if (resolved) return resolved;
+    return generateAvatarUrl(seed, gender as any);
+}
+
+export const timeAgo = (dateStr: string): string => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+}

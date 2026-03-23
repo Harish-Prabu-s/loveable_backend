@@ -36,18 +36,13 @@ function fallbackToMocks() {
 }
 
 if (!isExpoGo) {
-    try {
-        const WebRTC = require('react-native-webrtc');
-        RTCView = WebRTC.RTCView;
-        RTCPeerConnection = WebRTC.RTCPeerConnection;
-        RTCIceCandidate = WebRTC.RTCIceCandidate;
-        RTCSessionDescription = WebRTC.RTCSessionDescription;
-        mediaDevices = WebRTC.mediaDevices;
-        MediaStream = WebRTC.MediaStream;
-    } catch (e) {
-        console.warn("webrtc not found via native module, falling back to mocks", e);
-        fallbackToMocks();
-    }
+    const WebRTC = require('react-native-webrtc');
+    RTCView = WebRTC.RTCView;
+    RTCPeerConnection = WebRTC.RTCPeerConnection;
+    RTCIceCandidate = WebRTC.RTCIceCandidate;
+    RTCSessionDescription = WebRTC.RTCSessionDescription;
+    mediaDevices = WebRTC.mediaDevices;
+    MediaStream = WebRTC.MediaStream;
 } else {
     fallbackToMocks();
 }

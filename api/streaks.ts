@@ -67,8 +67,12 @@ export const streaksApi = {
     return response.data;
   },
 
-  toggleFire: async (uploadId: number): Promise<{ fired: boolean }> => {
+  toggleFire: async (uploadId: number) => {
     const response = await apiClient.post(`streaks/${uploadId}/fire/`);
+    return response.data;
+  },
+  toggleUserFire: async (userId: number) => {
+    const response = await apiClient.post(`streaks/user/${userId}/fire/`);
     return response.data;
   },
 };

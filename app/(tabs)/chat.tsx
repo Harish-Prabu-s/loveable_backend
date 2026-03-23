@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { chatApi } from '@/api/chat';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { getMediaUrl } from '@/utils/media';
 import { archiveApi } from '@/api/archive';
@@ -41,6 +42,12 @@ export default function ChatScreen() {
   useEffect(() => {
     loadContacts();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadContacts();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -166,12 +173,27 @@ export default function ChatScreen() {
                   </View>
                   <Text style={styles.time}>{contact.last_timestamp ? new Date(contact.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</Text>
                 </View>
-                <View style={styles.chatFooter}>
-                  <Text style={styles.lastMessage} numberOfLines={1}>
-                    {contact.last_message_type === 'post_share' ? 'Shared a post' : 
-                     contact.last_message_type === 'reel_share' ? 'Shared a reel' : 
-                     contact.last_message || 'Start chatting...'}
+                <View style={[styles.chatFooter, contact.unread_count > 0 && styles.unreadFooter]}>
+                  <Text 
+                    style={[
+                      styles.lastMessage, 
+                      contact.unread_count > 0 && styles.unreadMessageText
+                    ]} 
+                    numberOfLines={1}
+                  >
+                    {contact.unread_count > 0 ? (
+                      `${contact.unread_count} new message${contact.unread_count > 1 ? 's' : ''}`
+                    ) : (
+                      contact.last_message_type === 'post_share' ? 'Shared a post' : 
+                      contact.last_message_type === 'reel_share' ? 'Shared a reel' : 
+                      contact.last_message || 'Start chatting...'
+                    )}
                   </Text>
+                  {contact.unread_count > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadText}>{contact.unread_count}</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </TouchableOpacity>
@@ -305,6 +327,13 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     flex: 1,
     marginRight: 8,
+  },
+  unreadMessageText: {
+    color: '#8B5CF6',
+    fontWeight: '800',
+  },
+  unreadFooter: {
+    marginTop: 2,
   },
   unreadBadge: {
     backgroundColor: '#8B5CF6',

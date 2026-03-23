@@ -14,6 +14,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
     const [isLiked, setIsLiked] = useState(story?.is_liked || false);
     const [likesCount, setLikesCount] = useState(story?.likes_count || 0);
     const lastTap = useRef(0);
+    const tapTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Prevent screen recording and detect screenshots
     useEffect(() => {
@@ -135,11 +136,15 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                             onPress={() => {
                                 const now = Date.now();
                                 if (now - lastTap.current < 300) {
-                                    handleLike();
+                                    if (tapTimer.current) clearTimeout(tapTimer.current);
+                                    if (!isLiked) handleLike();
                                     lastTap.current = 0;
                                 } else {
                                     lastTap.current = now;
-                                    onPrev();
+                                    tapTimer.current = setTimeout(() => {
+                                        onPrev();
+                                        tapTimer.current = null;
+                                    }, 300);
                                 }
                             }} 
                         />
@@ -149,11 +154,15 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                             onPress={() => {
                                 const now = Date.now();
                                 if (now - lastTap.current < 300) {
-                                    handleLike();
+                                    if (tapTimer.current) clearTimeout(tapTimer.current);
+                                    if (!isLiked) handleLike();
                                     lastTap.current = 0;
                                 } else {
                                     lastTap.current = now;
-                                    onNext();
+                                    tapTimer.current = setTimeout(() => {
+                                        onNext();
+                                        tapTimer.current = null;
+                                    }, 300);
                                 }
                             }} 
                         />

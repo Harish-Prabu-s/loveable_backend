@@ -4,17 +4,17 @@ import { DeviceEventEmitter } from 'react-native';
 import { ensureHttps } from '@/utils/url';
 
 const getBaseUrl = () => {
-  // Forced Ngrok URL as requested by the user for all environments
-  const ngrokUrl = 'https://berneice-untransmigrated-exotically.ngrok-free.dev/api/';
-  console.log(`[API] Using Base URL: ${ngrokUrl}`);
-  return ngrokUrl;
+  // Local network IP address
+  const localUrl = 'http://10.67.114.184:8000/api/';
+  console.log(`[API] Using Base URL: ${localUrl}`);
+  return localUrl;
 };
 
-const BASE_URL = getBaseUrl().trim();
+export const BASE_URL = getBaseUrl().trim();
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
+  timeout: 120000, // Increased to 120s for video uploads
 });
 
 // Bare client for refresh to avoid interceptor recursion
@@ -62,9 +62,38 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const replaceNgrokUrls = (obj: any): any => {
+  if (typeof obj === 'string') {
+    if (obj.includes('ngrok-free.dev')) {
+      try {
+        const urlObj = new URL(obj);
+        const baseOrigin = new URL(BASE_URL).origin;
+        return `${baseOrigin}${urlObj.pathname}${urlObj.search}`;
+      } catch {
+        return obj;
+      }
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(replaceNgrokUrls);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const newObj: any = {};
+    for (const key in obj) {
+      newObj[key] = replaceNgrokUrls(obj[key]);
+    }
+    return newObj;
+  }
+  return obj;
+};
+
 // Response Interceptor: 401 Refresh & Logging
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    response.data = replaceNgrokUrls(response.data);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 

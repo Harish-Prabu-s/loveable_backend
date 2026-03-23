@@ -334,13 +334,14 @@ class StreakReaction(models.Model):
     REACTION_TYPES = (
         ('fire', 'Fire'),
     )
-    streak_upload = models.ForeignKey(StreakUpload, on_delete=models.CASCADE, related_name='reactions')
+    streak_upload = models.ForeignKey(StreakUpload, on_delete=models.CASCADE, related_name='reactions', null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_reactions', null=True)
     reaction_type = models.CharField(max_length=10, choices=REACTION_TYPES, default='fire')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('streak_upload', 'user', 'reaction_type')
+        unique_together = ('streak_upload', 'user', 'recipient', 'reaction_type')
 
 
 class Report(models.Model):
@@ -395,6 +396,7 @@ class Story(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stories')
     media_url = models.FileField(upload_to='stories/', null=True, blank=True)
     media_type = models.CharField(max_length=10, default='image') # 'image' or 'video'
+    caption = models.TextField(blank=True)
     visibility = models.CharField(max_length=20, default='all')
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField(null=True, blank=True)

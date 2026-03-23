@@ -16,9 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/context/ThemeContext';
 import { streaksApi } from '@/api/streaks';
+import { profilesApi } from '@/api/profiles';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/context/ThemeContext';
 import CreateStreakModal from '@/components/CreateStreak';
 import { StreakCircle, InlineStreakViewer, avatar } from '@/components/InlineStreakViewer';
 
@@ -37,15 +38,18 @@ export default function StreaksScreen() {
     
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
 
     const loadData = useCallback(async () => {
         try {
-            const [frData, alData] = await Promise.all([
+            const [frData, alData, profData] = await Promise.all([
                 streaksApi.getSnapchatStreaks('friends').catch(() => []),
                 streaksApi.getSnapchatStreaks('all').catch(() => []),
+                profilesApi.getProfile().catch(() => null),
             ]);
             setFriendStreaks(Array.isArray(frData) ? frData : []);
             setAllStreaks(Array.isArray(alData) ? alData : []);
+            if (profData) setProfile(profData);
         } catch (e) {
             console.error(e);
         } finally {
@@ -95,7 +99,7 @@ export default function StreaksScreen() {
                 <StreakCircle 
                     isMe={true} 
                     item={myStreak}
-                    profile={user}
+                    profile={profile || user}
                     onAddPress={() => setShowCreate(true)} 
                     onPress={handleOpenViewer} 
                 />
@@ -111,25 +115,50 @@ export default function StreaksScreen() {
         </View>
     );
 
+    const handleFireUser = async (u: any) => {
+        try {
+            const res = u.media?.id 
+                ? await streaksApi.toggleFire(u.media.id)
+                : await streaksApi.toggleUserFire(u.user_id);
+                
+            if (res.fired !== undefined) {
+                // Optimistic update for fire count
+                setAllStreaks(prev => prev.map(s => 
+                    s.user_id === u.user_id ? { ...s, streak_count: res.streak_count ?? (res.fired ? s.streak_count + 1 : Math.max(0, s.streak_count - 1)) } : s
+                ));
+            }
+        } catch (e) {
+            console.error('Failed to fire user', e);
+        }
+    };
+
     const UserListItem = ({ item, onPress }: any) => {
         return (
-            <TouchableOpacity style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => onPress(item)}>
-                <View style={styles.listAvatarWrap}>
-                    <View style={[styles.listInner, { backgroundColor: colors.background }]}>
-                        <Image source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} style={styles.listAvatar} />
+            <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TouchableOpacity style={styles.listMainAction} onPress={() => onPress(item)}>
+                    <View style={styles.listAvatarWrap}>
+                        <View style={[styles.listInner, { backgroundColor: colors.background }]}>
+                            <Image source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} style={styles.listAvatar} />
+                        </View>
                     </View>
-                </View>
-                <View style={styles.listInfo}>
-                    <Text style={[styles.listName, { color: colors.text }]}>{item.display_name || item.username}</Text>
-                    <View style={styles.listStatusRow}>
-                        <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
-                        <Text style={[styles.listSub, { color: colors.textMuted }]}>{item.streak_count} day streak</Text>
+                    <View style={styles.listInfo}>
+                        <Text style={[styles.listName, { color: colors.text }]}>{item.display_name || item.username}</Text>
+                        <View style={styles.listStatusRow}>
+                            <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
+                            <Text style={[styles.listSub, { color: colors.textMuted }]}>{item.streak_count} day streak</Text>
+                        </View>
                     </View>
-                </View>
-                <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/chat/${item.user_id}` as any)}>
-                    <MaterialCommunityIcons name="chat-processing-outline" size={22} color={colors.primary} />
                 </TouchableOpacity>
-            </TouchableOpacity>
+
+                <View style={styles.listActions}>
+                    <TouchableOpacity style={styles.fireBtn} onPress={() => handleFireUser(item)}>
+                        <MaterialCommunityIcons name="fire" size={24} color="#EF4444" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/chat/${item.user_id}` as any)}>
+                        <MaterialCommunityIcons name="chat-processing-outline" size={22} color={colors.primary} />
+                    </TouchableOpacity>
+                </View>
+            </View>
         );
     };
 
@@ -189,6 +218,7 @@ const styles = StyleSheet.create({
     searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
     listScroll: { paddingBottom: 100 },
     listCard: { flexDirection: 'row', alignItems: 'center', padding: 12, marginHorizontal: 20, marginBottom: 12, borderRadius: 18, borderWidth: 0.5 },
+    listMainAction: { flex: 1, flexDirection: 'row', alignItems: 'center' },
     listAvatarWrap: { marginRight: 15 },
     listInner: { width: 56, height: 56, borderRadius: 28, padding: 2, overflow: 'hidden' },
     listAvatar: { width: '100%', height: '100%', borderRadius: 26 },
@@ -196,6 +226,8 @@ const styles = StyleSheet.create({
     listName: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
     listStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     listSub: { fontSize: 13, fontWeight: '500' },
+    listActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    fireBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
     chatBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     fab: { position: 'absolute', bottom: 30, right: 25, borderRadius: 32, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65 },
     fabGrad: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },

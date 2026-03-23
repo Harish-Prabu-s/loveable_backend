@@ -26,7 +26,9 @@ def create_reel(user, video_url: str, caption: str = '', visibility='all'):
     
     # Notify Close Friends
     from ..notifications.services import notify_close_friends_of_content
+    from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'reel', reel.id)
+    handle_mentions(caption, user, 'reel', reel.id)
     
     return reel
 
@@ -38,8 +40,31 @@ def toggle_reel_like(reel_id: int, user: User):
             like.delete()
             return {'liked': False, 'likes_count': reel.likes.count()}
         
-        # Success notification logic can remain in controller or be triggered here
-        # For simplicity and to match other modules, we'll return the state
+        # Notify owner
+        if reel.user != user:
+            from ..notifications.services import create_notification
+            from ..notifications.push_service import send_push_notification, _get_user_tokens
+            
+            profile = getattr(user, 'profile', None)
+            sender_name = profile.display_name if profile else user.username
+            
+            create_notification(
+                recipient=reel.user,
+                actor=user,
+                notification_type='reel_like',
+                message=f"{sender_name} liked your reel!",
+                object_id=reel.id
+            )
+            
+            tokens = _get_user_tokens(reel.user_id)
+            if tokens:
+                send_push_notification(
+                    tokens,
+                    title="New Reel Like!",
+                    body=f"{sender_name} liked your reel!",
+                    data={'type': 'reel_like', 'reel_id': reel.id}
+                )
+
         return {'liked': True, 'likes_count': reel.likes.count(), 'reel': reel}
     except Reel.DoesNotExist:
         return None
@@ -48,6 +73,11 @@ def add_reel_comment(reel_id: int, user: User, text: str):
     try:
         reel = Reel.objects.get(pk=reel_id)
         comment = ReelComment.objects.create(reel=reel, user=user, text=text)
+        
+        # Process Mentions
+        from ..notifications.utils import handle_mentions
+        handle_mentions(text, user, 'reel_comment', reel.id)
+        
         return comment
     except Reel.DoesNotExist:
         return None

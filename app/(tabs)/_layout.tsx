@@ -30,27 +30,13 @@ function BadgeIcon({ name, color, count }: { name: any; color: string; count: nu
 export default function TabLayout() {
   const { isAuthenticated } = useAuthStore();
   const { colors } = useTheme();
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { newNotification } = useNotifications();
+  const { globalUnreadCount, refreshUnreadCount } = useNotifications();
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const poll = async () => {
-      try {
-        const count = await notificationsApi.getUnreadCount();
-        setUnreadCount(count);
-      } catch { /* silent */ }
-    };
-    poll();
-    const interval = setInterval(poll, 30_000); // poll every 30s
-    return () => clearInterval(interval);
+    refreshUnreadCount();
+    // The main badge updates are now handled globally via the WS hook in NotificationContext
   }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (newNotification) {
-      setUnreadCount(prev => prev + 1);
-    }
-  }, [newNotification]);
 
   return (
     <Tabs
@@ -105,7 +91,7 @@ export default function TabLayout() {
         options={{
           title: 'Activity',
           tabBarIcon: ({ color }) => (
-            <BadgeIcon name="heart" color={color} count={unreadCount} />
+            <BadgeIcon name="heart" color={color} count={globalUnreadCount} />
           ),
         }}
       />

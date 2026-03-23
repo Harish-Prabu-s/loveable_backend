@@ -14,8 +14,12 @@ import { useNotifications } from '@/context/NotificationContext';
 import type { Message as ApiMessage, Room } from '@/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MotiView, AnimatePresence } from 'moti';
-import { Switch } from 'react-native';
+import { Switch, Modal, FlatList } from 'react-native';
 import { MotiTransitions } from '@/utils/animations';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import { walletApi } from '@/api/wallet';
+import { giftsApi } from '@/api/gifts';
 
 
 type UiMessage = {
@@ -54,6 +58,18 @@ export default function ChatScreen() {
     const [disappearingEnabled, setDisappearingEnabled] = useState(false);
     const [disappearingTimer, setDisappearingTimer] = useState(0);
 
+    // New states for attachments and charging
+    const [recording, setRecording] = useState<Audio.Recording | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
+    const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+    const [showGiftModal, setShowGiftModal] = useState(false);
+    const [gifts, setGifts] = useState<any[]>([]);
+    const [walletBalance, setWalletBalance] = useState(0);
+
+    const [playingSound, setPlayingSound] = useState<Audio.Sound | null>(null);
+    const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+
     const scrollViewRef = useRef<ScrollView>(null);
 
     const toUi = (m: ApiMessage): UiMessage => {
@@ -66,7 +82,9 @@ export default function ChatScreen() {
             gameId = parts[1];
             gameTitle = parts[2]?.replace(']', '');
         } else if (m.type === 'voice') {
-            type = 'audio' as any;
+            type = 'voice';
+        } else if (m.type === 'video') {
+            type = 'video';
         } else if (m.type === 'post_share' && m.content.startsWith('[POST_SHARE:')) {
             type = 'post_share';
             const postId = m.content.match(/\[POST_SHARE:(\d+)\]/)?.[1];
@@ -93,6 +111,9 @@ export default function ChatScreen() {
             type = m.type as any;
         }
 
+        const senderId = typeof m.sender === 'object' && m.sender !== null ? (m.sender as any).id : m.sender;
+        console.log(`[Chat Debug] Msg ID: ${m.id} | raw sender: ${JSON.stringify(m.sender)} | extracted senderId: ${senderId} | current userId: ${user?.id} | isMe: ${Number(senderId) === Number(user?.id)}`);
+
         return {
             id: String(m.id),
             text: m.content,
@@ -100,7 +121,7 @@ export default function ChatScreen() {
             audio: m.type === 'audio' || m.type === 'voice',
             gameId,
             gameTitle,
-            sender: Number(m.sender) === Number(user?.id) ? 'me' : 'other',
+            sender: Number(senderId) === Number(user?.id) ? 'me' : 'other',
             timestamp: new Date(m.created_at).getTime(),
             type,
             is_seen: m.is_seen,
@@ -194,7 +215,14 @@ export default function ChatScreen() {
     const handleSendMessage = async () => {
         if (!inputValue.trim() || !room) return;
 
+        // Check text message cost (1 coin)
+        if (walletBalance < 1 && !isFemale) {
+            Alert.alert("Insufficient Coins", "You need 1 coin to send a message.");
+            return;
+        }
+
         const textToSend = inputValue;
+        // ... rest of the send logic
 
         // Add optimistic message
         const newMessage: UiMessage = {
@@ -217,6 +245,9 @@ export default function ChatScreen() {
         try {
             const m = await chatApi.sendMessage(room.id, textToSend);
             
+            // Re-fetch balance after successful send
+            fetchWalletBalance();
+
             // Re-map the new message to UI format securely
             const uiMsg = toUi(m);
             setMessages(prev => {
@@ -228,9 +259,215 @@ export default function ChatScreen() {
                 return newArr;
             });
             
-        } catch (e) {
+        } catch (e: any) {
             console.error('send message error', e);
-            Alert.alert('Error', 'Failed to send message');
+            if (e.response?.status === 402) {
+                Alert.alert('Insufficient Balance', 'Please recharge your wallet.');
+            } else {
+                Alert.alert('Error', 'Failed to send message');
+            }
+        }
+    };
+
+    const fetchWalletBalance = async () => {
+        try {
+            const res = await walletApi.getWallet();
+            setWalletBalance(res.coin_balance || 0);
+        } catch (e) {}
+    };
+
+    useEffect(() => {
+        fetchWalletBalance();
+        // Load gifts
+        giftsApi.getGifts().then(setGifts).catch(() => {});
+
+        return () => {
+            if (playingSound) {
+                playingSound.unloadAsync();
+            }
+        };
+    }, []);
+
+    // --- Media & Voice Functions ---
+
+    const startRecording = async () => {
+        try {
+            const permission = await Audio.requestPermissionsAsync();
+            if (permission.status !== 'granted') return;
+
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+            });
+
+            const { recording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
+            );
+            setRecording(recording);
+            setIsRecording(true);
+            setRecordingDuration(0);
+
+            // Timer
+            const interval = setInterval(() => {
+                setRecordingDuration(d => d + 1);
+            }, 1000);
+            (recording as any)._timer = interval;
+
+        } catch (err) {
+            console.error('Failed to start recording', err);
+        }
+    };
+
+    const stopRecording = async () => {
+        if (!recording) return;
+
+        setIsRecording(false);
+        clearInterval((recording as any)._timer);
+        
+        try {
+            await recording.stopAndUnloadAsync();
+            const uri = recording.getURI();
+            if (uri) {
+                // Confirm 5 coins cost
+                Alert.alert(
+                    "Send Voice Message?",
+                    "This will cost 5 coins.",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Send", onPress: () => sendMediaMessage(uri, 'voice', recordingDuration) }
+                    ]
+                );
+            }
+        } catch (err) {
+            console.error('Failed to stop recording', err);
+        }
+        setRecording(null);
+    };
+
+    const pickMedia = async (type: 'image' | 'video', useCamera: boolean) => {
+        const result = useCamera 
+            ? await ImagePicker.launchCameraAsync({
+                mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+                allowsEditing: true,
+                quality: 0.8,
+                videoMaxDuration: 15, // 15s limit
+            })
+            : await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+                allowsEditing: true,
+                quality: 0.8,
+                videoMaxDuration: 15,
+            });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+            const asset = result.assets[0];
+            
+            // Check video duration specifically for library picks that might bypass editing
+            if (type === 'video' && asset.duration && asset.duration > 15000) {
+                Alert.alert("Too Long", "Videos are limited to 15 seconds.");
+                return;
+            }
+
+            const cost = type === 'image' ? 5 : 10;
+            Alert.alert(
+                `Send ${type}?`,
+                `This will cost ${cost} coins.`,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Send", onPress: () => sendMediaMessage(asset.uri, type) }
+                ]
+            );
+        }
+        setShowAttachmentMenu(false);
+    };
+
+    const sendMediaMessage = async (uri: string, type: 'image' | 'video' | 'voice', duration?: number) => {
+        if (!room) return;
+        try {
+            setLoading(true);
+            
+            // 1. Upload
+            const file: any = {
+                uri,
+                name: `upload_${Date.now()}.${type === 'voice' ? 'm4a' : type === 'image' ? 'jpg' : 'mp4'}`,
+                type: type === 'voice' ? 'audio/m4a' : type === 'image' ? 'image/jpeg' : 'video/mp4'
+            };
+            
+            const uploadRes = await chatApi.uploadMedia(file, type === 'voice' ? 'voice' : type);
+            
+            // 2. Send Message
+            const m = await chatApi.sendMessage(
+                room.id, 
+                `[${type.toUpperCase()}_MESSAGE]`, 
+                type === 'voice' ? 'voice' : type, 
+                uploadRes.url, 
+                duration || 0
+            );
+            
+            setMessages(prev => [...prev, toUi(m)]);
+            fetchWalletBalance();
+        } catch (e: any) {
+            console.error('send media message error', e);
+            if (e.response?.status === 402) {
+                Alert.alert('Insufficient Balance', 'Please recharge your wallet.');
+            } else {
+                Alert.alert('Error', 'Failed to send file');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const sendGift = async (gift: any) => {
+        if (!room) return;
+        try {
+            setShowGiftModal(false);
+            setLoading(true);
+            
+            await giftsApi.sendGift(gift.id, userId);
+
+            // Add a virtual message for the gift in UI
+            const m = await chatApi.sendMessage(room.id, `Sent a ${gift.icon} ${gift.name}`, 'text');
+            setMessages(prev => [...prev, toUi(m)]);
+            
+            fetchWalletBalance();
+            Alert.alert("Success", `Sent ${gift.name}!`);
+        } catch (e: any) {
+            console.error('send gift error', e);
+            Alert.alert("Error", "Failed to send gift.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const playVoiceMessage = async (uri: string, messageId: string) => {
+        try {
+            if (playingSound) {
+                await playingSound.unloadAsync();
+                setPlayingSound(null);
+                if (playingMessageId === messageId) {
+                    setPlayingMessageId(null);
+                    return;
+                }
+            }
+
+            const { sound } = await Audio.Sound.createAsync(
+                { uri },
+                { shouldPlay: true }
+            );
+            
+            setPlayingSound(sound);
+            setPlayingMessageId(messageId);
+
+            sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    setPlayingMessageId(null);
+                    setPlayingSound(null);
+                }
+            });
+
+        } catch (e) {
+            console.error('play voice error', e);
         }
     };
     
@@ -311,6 +548,9 @@ export default function ChatScreen() {
                         }>
                             <MaterialCommunityIcons name="video" size={24} color="#8B5CF6" />
                         </TouchableOpacity>
+                        <TouchableOpacity style={styles.iconButton} onPress={() => setShowGiftModal(true)}>
+                            <MaterialCommunityIcons name="gift-outline" size={24} color="#EC4899" />
+                        </TouchableOpacity>
                         <TouchableOpacity style={styles.iconButton}>
                             <MaterialCommunityIcons name="dots-vertical" size={24} color="#64748B" />
                         </TouchableOpacity>
@@ -355,6 +595,36 @@ export default function ChatScreen() {
                                         )}
                                         {msg.type === 'image' && msg.image && (
                                             <Image source={{ uri: msg.image }} style={styles.messageImage} />
+                                        )}
+                                        {msg.type === 'video' && msg.image && (
+                                            <TouchableOpacity style={styles.mediaContainer} onPress={() => {}}>
+                                                <Image source={{ uri: msg.image }} style={styles.messageImage} />
+                                                <View style={styles.playOverlay}>
+                                                    <MaterialCommunityIcons name="play-circle" size={48} color="#FFFFFF" />
+                                                </View>
+                                            </TouchableOpacity>
+                                        )}
+                                        {msg.type === 'voice' && (
+                                            <TouchableOpacity 
+                                                style={styles.voiceContainer} 
+                                                onPress={() => msg.image && playVoiceMessage(msg.image, msg.id)}
+                                            >
+                                                <MaterialCommunityIcons 
+                                                    name={playingMessageId === msg.id ? "pause" : "play"} 
+                                                    size={24} 
+                                                    color={isMe ? "#FFFFFF" : "#8B5CF6"} 
+                                                />
+                                                <View style={styles.voiceWaveform}>
+                                                    <View style={[styles.waveformBar, { height: 12, backgroundColor: isMe ? 'rgba(255,255,255,0.4)' : '#E2E8F0' }]} />
+                                                    <View style={[styles.waveformBar, { height: 20, backgroundColor: isMe ? 'rgba(255,255,255,0.6)' : '#CBD5E1' }]} />
+                                                    <View style={[styles.waveformBar, { height: 16, backgroundColor: isMe ? '#FFFFFF' : '#8B5CF6' }]} />
+                                                    <View style={[styles.waveformBar, { height: 24, backgroundColor: isMe ? 'rgba(255,255,255,0.6)' : '#CBD5E1' }]} />
+                                                    <View style={[styles.waveformBar, { height: 14, backgroundColor: isMe ? 'rgba(255,255,255,0.4)' : '#E2E8F0' }]} />
+                                                </View>
+                                                <Text style={[styles.voiceDurationText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
+                                                    {msg.text?.includes('Recording') ? msg.text.split(' ')[1] : 'Voice'}
+                                                </Text>
+                                            </TouchableOpacity>
                                         )}
                                         {(msg.type === 'post_share' || msg.type === 'reel_share') && (
                                             <TouchableOpacity 
@@ -406,36 +676,145 @@ export default function ChatScreen() {
 
                 {/* Input Area */}
                 <View style={styles.inputContainer}>
-                    <TouchableOpacity style={styles.attachButton}>
-                        <MaterialCommunityIcons name="plus" size={24} color="#64748B" />
-                    </TouchableOpacity>
-
-                    <TextInput
-                        style={styles.textInput}
-                        value={inputValue}
-                        onChangeText={setInputValue}
-                        placeholder="Type a message..."
-                        placeholderTextColor="#94A3B8"
-                        multiline
-                        maxLength={500}
-                    />
-
-                    {inputValue.trim() ? (
-                        <MotiView
-                            from={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={MotiTransitions.bounce}
-                        >
-                            <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} activeOpacity={0.8}>
-                                <MaterialCommunityIcons name="send" size={20} color="#FFFFFF" />
+                    {isRecording ? (
+                        <View style={styles.recordingContainer}>
+                            <MotiView
+                                from={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                style={styles.recordingDot}
+                            />
+                            <Text style={styles.recordingText}>Recording {recordingDuration}s...</Text>
+                            <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
+                                <Text style={styles.stopButtonText}>Stop</Text>
                             </TouchableOpacity>
-                        </MotiView>
+                        </View>
                     ) : (
-                        <TouchableOpacity style={styles.micButton}>
-                            <MaterialCommunityIcons name="microphone" size={24} color="#64748B" />
-                        </TouchableOpacity>
+                        <>
+                            <TouchableOpacity 
+                                style={styles.attachButton} 
+                                onPress={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                            >
+                                <MaterialCommunityIcons 
+                                    name={showAttachmentMenu ? "close" : "plus"} 
+                                    size={24} 
+                                    color={showAttachmentMenu ? "#EF4444" : "#64748B"} 
+                                />
+                            </TouchableOpacity>
+
+                            <TextInput
+                                style={styles.textInput}
+                                value={inputValue}
+                                onChangeText={setInputValue}
+                                placeholder="Type a message..."
+                                placeholderTextColor="#94A3B8"
+                                multiline
+                                maxLength={500}
+                            />
+
+                            {inputValue.trim() ? (
+                                <MotiView
+                                    from={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={MotiTransitions.bounce}
+                                >
+                                    <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} activeOpacity={0.8}>
+                                        <MaterialCommunityIcons name="send" size={20} color="#FFFFFF" />
+                                    </TouchableOpacity>
+                                </MotiView>
+                            ) : (
+                                <TouchableOpacity 
+                                    style={styles.micButton} 
+                                    onLongPress={startRecording}
+                                    onPress={() => Alert.alert("Hold to record", "Long press the microphone to record a voice message.")}
+                                >
+                                    <MaterialCommunityIcons name="microphone" size={24} color="#8B5CF6" />
+                                </TouchableOpacity>
+                            )}
+                        </>
                     )}
                 </View>
+
+                {/* Attachment Menu */}
+                <AnimatePresence>
+                    {showAttachmentMenu && (
+                        <MotiView
+                            from={{ opacity: 0, translateY: 100 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            exit={{ opacity: 0, translateY: 100 }}
+                            style={styles.attachmentMenu}
+                        >
+                            <View style={styles.attachmentRow}>
+                                <TouchableOpacity style={styles.attachmentItem} onPress={() => pickMedia('image', true)}>
+                                    <View style={[styles.attachmentIcon, { backgroundColor: '#F0F9FF' }]}>
+                                        <MaterialCommunityIcons name="camera" size={24} color="#0EA5E9" />
+                                    </View>
+                                    <Text style={styles.attachmentLabel}>Camera</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.attachmentItem} onPress={() => pickMedia('image', false)}>
+                                    <View style={[styles.attachmentIcon, { backgroundColor: '#F5F3FF' }]}>
+                                        <MaterialCommunityIcons name="image" size={24} color="#8B5CF6" />
+                                    </View>
+                                    <Text style={styles.attachmentLabel}>Gallery</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.attachmentItem} onPress={() => pickMedia('video', true)}>
+                                    <View style={[styles.attachmentIcon, { backgroundColor: '#FFF7ED' }]}>
+                                        <MaterialCommunityIcons name="video" size={24} color="#F97316" />
+                                    </View>
+                                    <Text style={styles.attachmentLabel}>Video</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.attachmentItem} onPress={() => pickMedia('video', false)}>
+                                    <View style={[styles.attachmentIcon, { backgroundColor: '#F0FDF4' }]}>
+                                        <MaterialCommunityIcons name="movie" size={24} color="#22C55E" />
+                                    </View>
+                                    <Text style={styles.attachmentLabel}>Video Gal</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </MotiView>
+                    )}
+                </AnimatePresence>
+
+                {/* Gift Modal */}
+                <Modal
+                    visible={showGiftModal}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowGiftModal(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.giftModal}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Send a Gift</Text>
+                                <TouchableOpacity onPress={() => setShowGiftModal(false)}>
+                                    <MaterialCommunityIcons name="close" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+                            
+                            <FlatList
+                                data={gifts}
+                                keyExtractor={(item) => String(item.id)}
+                                numColumns={3}
+                                contentContainerStyle={styles.giftList}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity style={styles.giftItem} onPress={() => sendGift(item)}>
+                                        <Text style={styles.giftIcon}>{item.icon}</Text>
+                                        <Text style={styles.giftName}>{item.name}</Text>
+                                        <View style={styles.giftCostRow}>
+                                            <MaterialCommunityIcons name="database" size={14} color="#F59E0B" />
+                                            <Text style={styles.giftCost}>{item.cost}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                            
+                            <View style={styles.walletBar}>
+                                <Text style={styles.walletText}>Balance: {walletBalance} coins</Text>
+                                <TouchableOpacity style={styles.rechargeButton}>
+                                    <Text style={styles.rechargeText}>Recharge</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -649,5 +1028,194 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginTop: 4,
         textAlign: 'center',
+    },
+    // New Styles
+    recordingContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginHorizontal: 8,
+    },
+    recordingDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#EF4444',
+        marginRight: 8,
+    },
+    recordingText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#0F172A',
+        fontWeight: '600',
+    },
+    stopButton: {
+        backgroundColor: '#EF4444',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    stopButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    attachmentMenu: {
+        position: 'absolute',
+        bottom: 80,
+        left: 16,
+        right: 16,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    attachmentRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+    },
+    attachmentItem: {
+        alignItems: 'center',
+    },
+    attachmentIcon: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    attachmentLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    giftModal: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        minHeight: '50%',
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    giftList: {
+        padding: 16,
+    },
+    giftItem: {
+        flex: 1,
+        alignItems: 'center',
+        padding: 16,
+        margin: 8,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    giftIcon: {
+        fontSize: 32,
+        marginBottom: 8,
+    },
+    giftName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    giftCostRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    giftCost: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#F59E0B',
+        marginLeft: 4,
+    },
+    walletBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 20,
+        backgroundColor: '#F8FAFC',
+        marginHorizontal: 20,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    walletText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    rechargeButton: {
+        backgroundColor: '#8B5CF6',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+    },
+    rechargeText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    mediaContainer: {
+        position: 'relative',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    playOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    voiceContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 4,
+        minWidth: 120,
+    },
+    voiceWaveform: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 12,
+        height: 30,
+    },
+    waveformBar: {
+        width: 3,
+        borderRadius: 1.5,
+        marginHorizontal: 1,
+    },
+    voiceDurationText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
 });

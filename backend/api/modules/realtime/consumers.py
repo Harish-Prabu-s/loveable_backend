@@ -43,6 +43,7 @@ class BaseRealtimeConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             # Standard heartbeat
             if data.get('type') == 'ping':
+                logger.info(f"[WS] Ping from user {self.user_id}")
                 await self.send(text_data=json.dumps({'type': 'pong'}))
             else:
                 await self.handle_custom_event(data)

@@ -56,8 +56,7 @@ export default function StoryViewScreen() {
     useEffect(() => {
         const load = async () => {
             try {
-                const stories = await storiesApi.list();
-                const found = stories.find((s: any) => s.id === storyId);
+                const found = await storiesApi.getStory(storyId);
                 if (found) {
                     setStory(found);
                     setLiked(found.is_liked || false);
@@ -67,7 +66,7 @@ export default function StoryViewScreen() {
                 const commentsData = await storiesApi.getComments(storyId);
                 setComments(commentsData);
             } catch (e) {
-                console.error(e);
+                console.error('Failed to load story detail:', e);
             }
         };
         load();
@@ -167,6 +166,13 @@ export default function StoryViewScreen() {
                     <MaterialCommunityIcons name="close" size={24} color="#FFF" />
                 </TouchableOpacity>
             </SafeAreaView>
+            
+            {/* Caption Overlay */}
+            {story.caption ? (
+                <View style={styles.captionContainer}>
+                    <Text style={styles.captionText}>{story.caption}</Text>
+                </View>
+            ) : null}
 
             {/* Right action buttons */}
             <View style={styles.rightActions}>
@@ -291,4 +297,9 @@ const styles = StyleSheet.create({
     },
     commentInputField: { flex: 1, color: '#F1F5F9', fontSize: 14, marginRight: 10 },
     viewerTitle: { color: '#F1F5F9', fontWeight: '700', fontSize: 16, marginBottom: 12 },
+    captionContainer: {
+        position: 'absolute', bottom: 100, left: 16, right: 80,
+        backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 12,
+    },
+    captionText: { color: '#FFF', fontSize: 16, fontWeight: '500' },
 });

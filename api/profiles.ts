@@ -20,10 +20,16 @@ export const profilesApi = {
       type: 'image/jpeg',
       name: 'photo.jpg',
     });
-    // Use the specialized endpoint with filename sanitization
-    await apiClient.post('auth/upload-avatar/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    // Use the specialized endpoint with fetch for reliability
+    const { fetchWithAuth } = await import('./client');
+    const uploadRes = await fetchWithAuth('auth/upload-avatar/', {
+      method: 'POST',
+      body: formData,
     });
+
+    if (!uploadRes.ok) {
+      throw new Error(`Avatar upload failed: ${uploadRes.status}`);
+    }
     // Return the updated profile
     const response = await apiClient.get('profiles/me/');
     return response.data;

@@ -14,9 +14,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Video, ResizeMode } from 'expo-av';
 import { useTheme } from '@/context/ThemeContext';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { streaksApi } from '@/api/streaks';
+import { CommentSheet } from './CommentSheet';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -82,8 +84,8 @@ export function StreakCircle({ item, isMe, onAddPress, onPress, profile }: any) 
                         )}
                     </View>
                 </LinearGradient>
-                {!isMe && item && item.streak_count > 0 && (
-                    <View style={styles.flameBadge}>
+                {item && item.streak_count > 0 && (
+                    <View style={styles.flameTopBadge}>
                         <Text style={styles.flameBadgeTxt}>🔥{item.streak_count}</Text>
                     </View>
                 )}
@@ -102,13 +104,20 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
     const [liked, setLiked] = useState(false);
     const [fired, setFired] = useState(false);
     const [likeCount, setLikeCount] = useState(0);
+    const [fireCount, setFireCount] = useState(0);
     const [commentCount, setCommentCount] = useState(0);
     const [showComments, setShowComments] = useState(false);
+    const [comments, setComments] = useState<any[]>([]);
+    const [loadingComments, setLoadingComments] = useState(false);
 
     const [currentIndex, setCurrentIndex] = useState(0);
-    const lastTap = useRef(0);
+    const lastTapTime = useRef(0);
+    const tapTimer = useRef<NodeJS.Timeout | null>(null);
+    const videoRef = useRef<Video>(null);
+    const [isPaused, setIsPaused] = useState(false);
+
     const mediaList = user?.media_list || (user?.media ? [user.media] : []);
-    const currentMedia = mediaList[currentIndex];
+    const currentMedia = mediaList.length > 0 ? mediaList[currentIndex] : null;
 
     useEffect(() => {
         if (user) { 
@@ -117,6 +126,7 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
             setLiked(initialMedia?.has_liked ?? false); 
             setFired(initialMedia?.has_fired ?? false); 
             setLikeCount(initialMedia?.likes_count ?? 0); 
+            setFireCount(user.streak_count ?? 0);
             setCommentCount(initialMedia?.comments_count ?? 0);
             setShowComments(false); 
         }
@@ -130,6 +140,30 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
             setCommentCount(currentMedia.comments_count ?? 0);
         }
     }, [currentMedia]);
+
+    const loadComments = async () => {
+        if (!currentMedia?.id) return;
+        setLoadingComments(true);
+        try {
+            const data = await streaksApi.listComments(currentMedia.id);
+            setComments(data);
+        } catch (error) {
+            console.error('Failed to load streak comments:', error);
+        } finally {
+            setLoadingComments(false);
+        }
+    };
+
+    const handleAddComment = async (text: string) => {
+        if (!currentMedia?.id) return;
+        try {
+            await streaksApi.addComment(currentMedia.id, text);
+            await loadComments();
+            setCommentCount(c => c + 1);
+        } catch (error) {
+            console.error('Failed to add comment:', error);
+        }
+    };
 
     useEffect(() => {
         if (visible) {
@@ -150,20 +184,31 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
         const now = Date.now();
         const DOUBLE_TAP_DELAY = 300;
 
-        if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+        if (now - lastTapTime.current < DOUBLE_TAP_DELAY) {
+            // Double tap - Like
+            if (tapTimer.current) {
+                clearTimeout(tapTimer.current);
+                tapTimer.current = null;
+            }
             handleLikeToggle();
-            lastTap.current = 0;
+            lastTapTime.current = 0;
             return;
         }
-        lastTap.current = now;
+        
+        lastTapTime.current = now;
 
-        if (x < SCREEN_W * 0.3) {
-            if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-            else onPrev?.();
-        } else {
-            if (currentIndex < mediaList.length - 1) setCurrentIndex(currentIndex + 1);
-            else onNext?.();
-        }
+        // Start a timer for single tap action
+        tapTimer.current = setTimeout(() => {
+            // NAVIGATION
+            if (x < SCREEN_W * 0.3) {
+                if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+                else onPrev?.();
+            } else {
+                if (currentIndex < mediaList.length - 1) setCurrentIndex(currentIndex + 1);
+                else onNext?.();
+            }
+            tapTimer.current = null;
+        }, DOUBLE_TAP_DELAY);
     };
 
     const handleLikeToggle = async () => {
@@ -174,18 +219,51 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
         }
     };
 
+    const handleFireToggle = async () => {
+        if (currentMedia?.id) {
+            const res = await streaksApi.toggleFire(currentMedia.id);
+            setFired(res.fired);
+            if (res.streak_count !== undefined) {
+                setFireCount(res.streak_count);
+            } else {
+                setFireCount(c => res.fired ? c + 1 : c - 1);
+            }
+        } else if (user?.user_id) {
+            const res = await streaksApi.toggleUserFire(user.user_id);
+            setFired(res.fired);
+            if (res.streak_count !== undefined) {
+                setFireCount(res.streak_count);
+            } else {
+                setFireCount(c => res.fired ? c + 1 : c - 1);
+            }
+        }
+    };
+
     if (!visible || !user) return null;
-    const imgUrl = currentMedia?.media_url ?? user.media?.media_url ?? `https://picsum.photos/seed/${user.user_id}/800/1200`;
+    const mediaUrl = currentMedia?.media_url ?? user.media?.media_url;
+    const isVideo = currentMedia?.media_type === 'video';
 
     return (
         <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
             <View style={styles.viewerBg}>
-                <Image source={{ uri: imgUrl }} style={styles.viewerBgImg} blurRadius={18} />
+                {mediaUrl && <Image source={{ uri: mediaUrl }} style={styles.viewerBgImg} blurRadius={18} />}
                 <View style={styles.viewerDim} />
             </View>
             <Animated.View style={[styles.viewerSheet, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                 <TouchableOpacity activeOpacity={1} onPress={handleViewerPress} style={StyleSheet.absoluteFill}>
-                    <Image source={{ uri: imgUrl }} style={styles.viewerImg} resizeMode="cover" />
+                    {isVideo ? (
+                        <Video
+                            ref={videoRef}
+                            source={{ uri: mediaUrl }}
+                            style={styles.viewerImg}
+                            resizeMode={ResizeMode.COVER}
+                            shouldPlay={!isPaused}
+                            isLooping
+                            useNativeControls={false}
+                        />
+                    ) : (
+                        <Image source={{ uri: mediaUrl }} style={styles.viewerImg} resizeMode="cover" />
+                    )}
                 </TouchableOpacity>
                 
                 <SafeAreaView style={styles.viewerTopBar} edges={['top']}>
@@ -225,13 +303,33 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
                             <MaterialCommunityIcons name={liked ? "heart" : "heart-outline"} size={28} color={liked ? "#EF4444" : "#FFF"} />
                             <Text style={styles.actionCount}>{likeCount}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => setShowComments(true)}>
+                        <TouchableOpacity style={styles.actionBtn} onPress={handleFireToggle}>
+                            <MaterialCommunityIcons name="fire" size={28} color={fired ? "#FF6B35" : "rgba(255,255,255,0.7)"} />
+                            <Text style={styles.actionCount}>{fireCount}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => { setShowComments(true); loadComments(); }}>
                             <MaterialCommunityIcons name="comment-outline" size={26} color="#FFF" />
                             <Text style={styles.actionCount}>{commentCount}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Fire Animation Overlay (Optional, but user said "if double tap to like ... image slide ... fix that") */}
+                {/* I already fixed that with tapTimer */}
             </Animated.View>
+            <CommentSheet
+                visible={showComments}
+                onClose={() => setShowComments(false)}
+                comments={comments.map(c => ({
+                    id: c.id,
+                    user_display_name: c.user?.display_name || c.user_display_name || 'User',
+                    user_avatar: c.user?.photo || c.user_avatar,
+                    text: c.text,
+                    created_at: c.created_at
+                }))}
+                loading={loadingComments}
+                onAddComment={handleAddComment}
+            />
         </Modal>
     );
 }
@@ -242,8 +340,8 @@ const styles = StyleSheet.create({
     circleInner: { width: 67, height: 67, borderRadius: 33.5, borderWidth: 1.5, borderColor: 'transparent', overflow: 'visible', position: 'relative' },
     circleImg: { width: '100%', height: '100%', borderRadius: 32 },
     circleLabel: { fontSize: 11, fontWeight: '600', marginTop: 6, textAlign: 'center' },
-    flameBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#FFF', borderRadius: 10, paddingHorizontal: 4, paddingVertical: 1, elevation: 3 },
-    flameBadgeTxt: { fontSize: 10, fontWeight: '800', color: '#000' },
+    flameTopBadge: { position: 'absolute', top: -14, alignSelf: 'center', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.41 },
+    flameBadgeTxt: { fontSize: 11, fontWeight: '900', color: '#EF4444' },
     addOverlay: { position: 'absolute', bottom: -2, right: -2 },
     addBubble: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
 

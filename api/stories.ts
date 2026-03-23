@@ -101,4 +101,9 @@ export const storiesApi = {
     const res = await client.post(`/stories/${story_id}/like/`);
     return res.data;
   },
+
+  getStory: async (id: number): Promise<Story> => {
+    const res = await client.get(`/stories/${id}/`);
+    return res.data;
+  },
 };

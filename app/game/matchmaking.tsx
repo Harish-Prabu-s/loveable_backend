@@ -29,7 +29,7 @@ export default function MatchmakingScreen() {
         setStatus('searching');
         try {
             // Call REST API to spin up game directly instead of redis queues
-            const response = await apiClient.post('/api/games/create/', {
+            const response = await apiClient.post('games/create/', {
                 room_type: 'couple',
                 target_user_id: targetId
             });

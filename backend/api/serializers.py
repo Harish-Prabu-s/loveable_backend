@@ -172,7 +172,7 @@ class StorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Story
-        fields = ['id', 'user', 'media_url', 'media_type', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
+        fields = ['id', 'user', 'media_url', 'media_type', 'caption', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
 
     def get_is_owner(self, obj):
         request = self.context.get('request')
@@ -265,6 +265,9 @@ class ContactSerializer(serializers.Serializer):
     last_message = serializers.CharField()
     last_message_type = serializers.CharField()
     last_timestamp = serializers.DateTimeField()
+    unread_count = serializers.IntegerField(default=0)
+    streak_count = serializers.IntegerField(default=0)
+    streak_last_interaction = serializers.DateTimeField(required=False)
 
     def get_display_name(self, obj):
         profile = getattr(obj, 'profile', None)

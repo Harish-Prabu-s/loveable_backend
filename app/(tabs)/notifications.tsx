@@ -10,6 +10,7 @@ import { notificationsApi, type Notification } from '@/api/notifications';
 import { getMediaUrl } from '@/utils/media';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { useNotifications } from '@/context/NotificationContext';
+import { toast } from '@/utils/toast';
 
 const NOTIFICATION_ICONS: Record<string, { name: any; color: string }> = {
     follow_request: { name: 'account-plus', color: '#8B5CF6' },
@@ -24,12 +25,21 @@ const NOTIFICATION_ICONS: Record<string, { name: any; color: string }> = {
     gift: { name: 'gift', color: '#F59E0B' },
     streak_upload: { name: 'fire', color: '#EF4444' },
     streak_comment: { name: 'comment-text-outline', color: '#EF4444' },
+    streak_fire: { name: 'fire', color: '#EF4444' },
+    user_fire: { name: 'fire', color: '#EF4444' },
+    mention_post: { name: 'at', color: '#8B5CF6' },
+    mention_reel: { name: 'at', color: '#8B5CF6' },
+    mention_story: { name: 'at', color: '#8B5CF6' },
+    mention_comment: { name: 'at', color: '#8B5CF6' },
+    mention_reel_comment: { name: 'at', color: '#8B5CF6' },
+    mention_story_comment: { name: 'at', color: '#8B5CF6' },
     screenshot: { name: 'camera-off', color: '#EF4444' },
 };
 
-function NotificationItem({ item, onRespond }: {
+function NotificationItem({ item, onRespond, onFollowBack }: {
     item: Notification;
-    onRespond?: (id: number, action: 'accept' | 'reject') => void;
+    onRespond?: (id: number, objectId: number, action: 'accept' | 'reject') => void;
+    onFollowBack?: (userId: number) => void;
 }) {
     const icon = NOTIFICATION_ICONS[item.type] || { name: 'bell', color: '#8B5CF6' };
     const avatarUrl = item.actor?.photo
@@ -40,9 +50,14 @@ function NotificationItem({ item, onRespond }: {
         <TouchableOpacity
             style={[styles.notifItem, !item.is_read && styles.unreadItem]}
             onPress={() => {
-                if (item.type === 'story_like' || item.type === 'story_comment' || item.type === 'story_post') {
+                const type = item.type;
+                if (type === 'story_like' || type === 'story_comment' || type === 'story_post' || type === 'mention_story' || type === 'mention_story_comment') {
                     if (item.object_id) router.push(`/story/${item.object_id}` as any);
-                } else if (item.type === 'streak_upload' || item.type === 'streak_comment') {
+                } else if (type === 'mention_post' || type === 'mention_comment') {
+                    if (item.object_id) router.push(`/post/${item.object_id}` as any);
+                } else if (type === 'mention_reel' || type === 'mention_reel_comment') {
+                    if (item.object_id) router.push(`/reel/${item.object_id}` as any);
+                } else if (type === 'streak_upload' || type === 'streak_comment' || type === 'streak_fire') {
                     if (item.object_id) router.push(`/streak/${item.object_id}` as any);
                 } else if (item.actor) {
                     router.push(`/user/${item.actor.id}` as any);
@@ -60,11 +75,18 @@ function NotificationItem({ item, onRespond }: {
                 <Text style={styles.notifTime}>{new Date(item.created_at).toLocaleDateString()}</Text>
                 {(item.type === 'follow_request' || item.type === 'friend_request') && onRespond && (
                     <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.acceptBtn} onPress={() => onRespond(item.object_id!, 'accept')}>
+                        <TouchableOpacity style={styles.acceptBtn} onPress={() => onRespond(item.id, item.object_id!, 'accept')}>
                             <Text style={styles.acceptBtnText}>Accept</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.rejectBtn} onPress={() => onRespond(item.object_id!, 'reject')}>
+                        <TouchableOpacity style={styles.rejectBtn} onPress={() => onRespond(item.id, item.object_id!, 'reject')}>
                             <Text style={styles.rejectBtnText}>Decline</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+                {item.type === 'follow_accepted' && onFollowBack && (
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={styles.acceptBtn} onPress={() => onFollowBack(item.actor.id!)}>
+                            <Text style={styles.acceptBtnText}>Follow Back</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -75,48 +97,56 @@ function NotificationItem({ item, onRespond }: {
 }
 
 export default function NotificationsScreen() {
-    const router = useRouter(); // Use the imported useRouter
+    const router = useRouter(); 
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const { newNotification } = useNotifications();
+    const { newNotification, globalUnreadCount, refreshUnreadCount, clearUnreadCount } = useNotifications();
 
     const loadNotifications = useCallback(async () => {
         try {
             const data = await notificationsApi.getAll();
             setNotifications(Array.isArray(data?.results) ? data.results : []);
-            setUnreadCount(data?.unread_count || 0);
+            await refreshUnreadCount();
         } catch (e) {
             console.error('Failed to load notifications', e);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [refreshUnreadCount]);
 
     useEffect(() => {
         loadNotifications();
-    }, []);
+    }, [loadNotifications]);
 
     useEffect(() => {
         if (newNotification) {
             setNotifications(prev => {
-                // Prevent duplicate notifications
                 if (prev.find(n => n.id === newNotification.id)) return prev;
                 return [newNotification, ...prev];
             });
-            setUnreadCount(prev => prev + 1);
         }
     }, [newNotification]);
 
     const markAllRead = async () => {
         await notificationsApi.markRead();
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
+        clearUnreadCount();
     };
 
-    const handleResponse = async (requestId: number, action: 'accept' | 'reject', type: string) => {
+    const handleFollowBack = async (userId: number) => {
+        try {
+            const { profilesApi } = await import('@/api/profiles');
+            await profilesApi.follow(userId);
+            toast.success("Followed successfully!");
+            setNotifications(prev => prev.map(n => n.actor?.id === userId && n.type === 'follow_accepted' ? { ...n, type: 'follow_back_done' } : n));
+        } catch (e) {
+            toast.error("Could not follow user.");
+        }
+    };
+
+    const handleResponse = async (notificationId: number, requestId: number, action: 'accept' | 'reject', type: string) => {
         try {
             if (type === 'follow_request') {
                 await notificationsApi.respondFollowRequest(requestId, action);
@@ -125,7 +155,13 @@ export default function NotificationsScreen() {
                 await profilesApi.respondFriendRequest(requestId, action);
             }
             Alert.alert(action === 'accept' ? '✓ Accepted' : 'Declined');
-            await loadNotifications();
+            
+            if (action === 'accept' && type === 'follow_request') {
+                setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, type: 'follow_accepted', message: n.message?.replace('wants to follow you', 'started following you') } : n));
+            } else {
+                setNotifications(prev => prev.filter(n => n.id !== notificationId));
+            }
+            await refreshUnreadCount();
         } catch (e) {
             Alert.alert('Error', 'Could not process the request.');
         }
@@ -142,7 +178,7 @@ export default function NotificationsScreen() {
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#F1F5F9" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Notifications</Text>
-                {unreadCount > 0 && (
+                {globalUnreadCount > 0 && (
                     <TouchableOpacity onPress={markAllRead}>
                         <Text style={styles.markAllText}>Mark all read</Text>
                     </TouchableOpacity>
@@ -168,7 +204,7 @@ export default function NotificationsScreen() {
                         <>
                             <Text style={styles.sectionLabel}>Requests</Text>
                             {requestNotifications.map(n => (
-                                <NotificationItem key={n.id} item={n} onRespond={(id, act) => handleResponse(id, act, n.type)} />
+                                <NotificationItem key={n.id} item={n} onRespond={(id, objId, act) => handleResponse(id, objId, act, n.type)} />
                             ))}
                         </>
                     )}
@@ -178,7 +214,7 @@ export default function NotificationsScreen() {
                         <>
                             <Text style={styles.sectionLabel}>Activity</Text>
                             {otherNotifications.map(n => (
-                                <NotificationItem key={n.id} item={n} />
+                                <NotificationItem key={n.id} item={n} onFollowBack={handleFollowBack} />
                             ))}
                         </>
                     )}

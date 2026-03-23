@@ -1,4 +1,5 @@
-import Constants from 'expo-constants';
+import { AppState, AppStateStatus } from 'react-native';
+import { BASE_URL } from '@/api/client';
 
 type WsEvent = 'open' | 'close' | 'message' | 'error' | 'reconnect';
 
@@ -6,10 +7,13 @@ export class WebSocketClient {
     private url: string;
     private ws: WebSocket | null = null;
     private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private reconnectDelay = 3000; // Start with 3s
+    private maxReconnectAttempts = 999; // Allow long-term reconnection
+    private reconnectDelay = 3000;
     private pingInterval: any = null;
     private pingTimeout = 30000; // 30s
+    private pongTimeout: any = null;
+    private pongTimeoutDuration = 10000; // 10s grace for pong
+    
     private listeners: Record<WsEvent, ((data?: any) => void)[]> = {
         open: [],
         close: [],
@@ -18,15 +22,27 @@ export class WebSocketClient {
         reconnect: []
     };
     private isIntentionallyClosed = false;
+    private appStateSubscription: any = null;
 
     constructor(path: string, userId: number) {
-        const configSignalingUrl = Constants.expoConfig?.extra?.signalingUrl || 'ws://localhost:8000';
-        // Determine correct ws/wss protocol based on the config URL
-        const protocol = configSignalingUrl.startsWith('wss') || configSignalingUrl.startsWith('https') ? 'wss' : 'ws';
-        // Strip ALL protocol prefixes (wss://, ws://, https://, http://) before rebuilding
-        const cleanUrl = configSignalingUrl.replace(/^(wss?|https?):\/\//, '');
+        const configSignalingUrl = BASE_URL;
+        const protocol = configSignalingUrl.startsWith('https') ? 'wss' : 'ws';
+        const cleanUrl = configSignalingUrl.replace(/^(wss?|https?):\/\//, '').replace(/\/api\/?$/, '');
         this.url = `${protocol}://${cleanUrl}${path}${userId}/`;
+
+        // Watch for App State changes to reconnect when moving to foreground
+        this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
     }
+
+    private handleAppStateChange = (nextAppState: AppStateStatus) => {
+        if (nextAppState === 'active' && !this.isIntentionallyClosed) {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                console.log(`[WS] App returned to foreground. Reconnecting ${this.url}...`);
+                this.reconnectAttempts = 0; // Reset attempts to try immediately
+                this.connect();
+            }
+        }
+    };
 
     connect() {
         if (this.ws) {
@@ -48,7 +64,10 @@ export class WebSocketClient {
         this.ws.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
-                if (data.type === 'pong') return;
+                if (data.type === 'pong') {
+                    this.handlePong();
+                    return;
+                }
                 this.emit('message', data);
             } catch (err) {
                 console.warn(`[WS] Failed to parse message:`, e.data);
@@ -58,6 +77,7 @@ export class WebSocketClient {
         this.ws.onclose = (e) => {
             this.stopPing();
             this.ws = null;
+            console.log(`[WS] Closed ${this.url} | Code: ${e.code} | Reason: ${e.reason || 'None'}`);
             this.emit('close', e);
 
             if (!this.isIntentionallyClosed) {
@@ -71,6 +91,13 @@ export class WebSocketClient {
         };
     }
 
+    private handlePong() {
+        if (this.pongTimeout) {
+            clearTimeout(this.pongTimeout);
+            this.pongTimeout = null;
+        }
+    }
+
     private attemptReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.error(`[WS] Max reconnect attempts reached for ${this.url}`);
@@ -82,11 +109,14 @@ export class WebSocketClient {
         this.emit('reconnect', { attempt: this.reconnectAttempts, delay: this.reconnectDelay });
 
         setTimeout(() => {
-            this.connect();
+            // Check again if we're not closed before connecting
+            if (!this.isIntentionallyClosed) {
+                this.connect();
+            }
         }, this.reconnectDelay);
 
-        // Exponential backoff: 3s, 6s, 10s (max)
-        this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 10000);
+        // Exponential backoff: capped at 20s
+        this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 20000);
     }
 
     private startPing() {
@@ -94,14 +124,24 @@ export class WebSocketClient {
         this.pingInterval = setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                 this.ws.send(JSON.stringify({ type: 'ping' }));
+                
+                // Increase pong timeout to 20s for better resilience on slow networks
+                this.pongTimeout = setTimeout(() => {
+                    console.warn(`[WS] Pong timeout on ${this.url}. This might indicate a dead connection.`);
+                    // Only force-close if we've missed twice? No, let's just make it 25s
+                }, 25000);
             }
-        }, this.pingTimeout);
+        }, 20000); // Ping every 20s
     }
 
     private stopPing() {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
             this.pingInterval = null;
+        }
+        if (this.pongTimeout) {
+            clearTimeout(this.pongTimeout);
+            this.pongTimeout = null;
         }
     }
 
@@ -113,8 +153,16 @@ export class WebSocketClient {
         }
     }
 
+    reconnect() {
+        this.reconnectAttempts = 0;
+        this.connect();
+    }
+
     close() {
         this.isIntentionallyClosed = true;
+        if (this.appStateSubscription) {
+            this.appStateSubscription.remove();
+        }
         if (this.ws) {
             this.ws.close();
             this.ws = null;

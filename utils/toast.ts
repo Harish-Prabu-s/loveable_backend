@@ -6,6 +6,7 @@ export interface ToastOptions {
     message: string;
     type?: ToastType;
     duration?: number;
+    onPress?: () => void;
 }
 
 const TOAST_EVENT = 'SHOW_PREMIUM_TOAST';
@@ -18,14 +19,14 @@ export const toast = {
             DeviceEventEmitter.emit(TOAST_EVENT, options);
         }
     },
-    success: (message: string, duration?: number) => {
-        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'success', duration });
+    success: (message: string, duration?: number, onPress?: () => void) => {
+        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'success', duration, onPress });
     },
-    error: (message: string, duration?: number) => {
-        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'error', duration });
+    error: (message: string, duration?: number, onPress?: () => void) => {
+        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'error', duration, onPress });
     },
-    info: (message: string, duration?: number) => {
-        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'info', duration });
+    info: (message: string, duration?: number, onPress?: () => void) => {
+        DeviceEventEmitter.emit(TOAST_EVENT, { message, type: 'info', duration, onPress });
     },
 };
 

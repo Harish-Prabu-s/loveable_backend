@@ -74,6 +74,8 @@ def send_message_view(request, room_id: int):
         msg = send_message(room_id, request.user, content or '', msg_type, media_url, duration_seconds)
         return Response(MessageSerializer(msg).data, status=201)
     except Exception as e:
+        if str(e) == "Insufficient coins":
+            return Response({'error': 'Insufficient coins'}, status=402)
         import logging
         logging.getLogger(__name__).error(f"Error sending message: {e}")
         return Response({'error': 'Failed to send message'}, status=400)
@@ -112,17 +114,18 @@ def contact_list_view(request):
     try:
         user = request.user
         # Efficiently fetch all rooms and their latest message in one go
-        from django.db.models import Prefetch
+        from django.db.models import Prefetch, Count, Case, When, IntegerField
         from ...models import Room, Message, Streak
         
-        # Custom prefetch for the latest message per room
-        latest_message_qs = Message.objects.order_by('-created_at')
-        
+        # Room qs with unread count annotated
         rooms = Room.objects.filter(Q(caller=user) | Q(receiver=user)) \
             .select_related('caller__profile', 'receiver__profile') \
-            .prefetch_related(Prefetch('messages', queryset=latest_message_qs, to_attr='latest_msgs')) \
-            .annotate(last_msg_time=Max('messages__created_at')) \
+            .annotate(
+                unread_count=Count('messages', filter=Q(messages__is_seen=False) & ~Q(messages__sender=user)),
+                last_msg_time=Max('messages__created_at')
+            ) \
             .filter(last_msg_time__isnull=False) \
+            .prefetch_related(Prefetch('messages', queryset=Message.objects.order_by('-created_at'), to_attr='latest_msgs')) \
             .order_by('-last_msg_time')
 
         # Prefetch all relevant streaks for these users to avoid N+1 in the loop
@@ -154,6 +157,7 @@ def contact_list_view(request):
             other_user.last_message = last_msg.content
             other_user.last_message_type = last_msg.type
             other_user.last_timestamp = last_msg.created_at
+            other_user.unread_count = room.unread_count
 
             # Attach Streak Info from our pre-fetched dictionary
             u1_id, u2_id = (user.id, other_user.id) if user.id < other_user.id else (other_user.id, user.id)

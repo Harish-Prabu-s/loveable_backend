@@ -21,6 +21,9 @@ interface NotificationContextType {
     incomingCall: IncomingCallData | null;
     newNotification: any | null;
     activeChatEvent: any | null;
+    globalUnreadCount: number;
+    refreshUnreadCount: () => Promise<void>;
+    clearUnreadCount: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -31,6 +34,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
     const [newNotification, setNewNotification] = useState<any | null>(null);
     const [activeChatEvent, setActiveChatEvent] = useState<any | null>(null);
+    const [globalUnreadCount, setGlobalUnreadCount] = useState(0);
+
+    const refreshUnreadCount = async () => {
+        try {
+            const { notificationsApi } = await import('@/api/notifications');
+            const count = await notificationsApi.getUnreadCount();
+            setGlobalUnreadCount(count);
+        } catch { }
+    };
+
+    const clearUnreadCount = () => {
+        setGlobalUnreadCount(0);
+    };
+
+    useEffect(() => {
+        if (newNotification) {
+            setGlobalUnreadCount(prev => prev + 1);
+        }
+    }, [newNotification]);
     
     const notifWsRef = useRef<WebSocketClient | null>(null);
     const chatWsRef = useRef<WebSocketClient | null>(null);
@@ -65,6 +87,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             responseListener.current = Notifications.addNotificationResponseReceivedListener(r => {
                 const data = r.notification.request.content.data;
                 if (data.type === 'chat_message') router.push(`/chat/${data.sender_id}`);
+                if (data.type === 'mention') {
+                    if (data.post_id) router.push(`/post/${data.post_id}` as any);
+                    else if (data.reel_id) router.push(`/reel/${data.reel_id}` as any);
+                    else if (data.story_id) router.push(`/story/${data.story_id}` as any);
+                }
             });
         } catch (err) {
             console.warn('Push setup error:', err);
@@ -76,43 +103,57 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             notifWsRef.current?.close();
             chatWsRef.current?.close();
             callWsRef.current?.close();
+            notifWsRef.current = null;
+            chatWsRef.current = null;
+            callWsRef.current = null;
             return;
         }
 
         // 1. Notification Channel
-        const notifWs = new WebSocketClient('/ws/notifications/', user.id);
-        notifWs.on('message', (data) => {
-            if (data.type === 'new_notification') {
-                setNewNotification(data.data);
-            }
-        });
-        notifWs.connect();
-        notifWsRef.current = notifWs;
+        if (!notifWsRef.current) {
+            const notifWs = new WebSocketClient('/ws/notifications/', user.id);
+            notifWs.on('message', (data) => {
+                if (data.type === 'new_notification') {
+                    setNewNotification(data.data);
+                }
+            });
+            notifWs.connect();
+            notifWsRef.current = notifWs;
+        }
 
         // 2. Chat Channel
-        const chatWs = new WebSocketClient('/ws/chat/', user.id);
-        chatWs.on('message', (data) => {
-            if (data.type === 'new_message' || data.type === 'messages_seen' || data.type === 'typing') {
-                setActiveChatEvent(data);
-            }
-        });
-        chatWs.connect();
-        chatWsRef.current = chatWs;
+        if (!chatWsRef.current) {
+            const chatWs = new WebSocketClient('/ws/chat/', user.id);
+            chatWs.on('message', (data) => {
+                if (data.type === 'new_message' || data.type === 'messages_seen' || data.type === 'typing') {
+                    setActiveChatEvent(data);
+                }
+            });
+            chatWs.connect();
+            chatWsRef.current = chatWs;
+        }
 
         // 3. Call Channel
-        const callWs = new WebSocketClient('/ws/call/', user.id);
-        callWs.on('message', (data) => {
-            if (data.type === 'incoming-call') {
-                setIncomingCall(data);
-            }
-        });
-        callWs.connect();
-        callWsRef.current = callWs;
+        if (!callWsRef.current) {
+            const callWs = new WebSocketClient('/ws/call/', user.id);
+            callWs.on('message', (data) => {
+                if (data.type === 'incoming-call') {
+                    setIncomingCall(data);
+                }
+            });
+            callWs.connect();
+            callWsRef.current = callWs;
+        }
 
         return () => {
-            notifWs.close();
-            chatWs.close();
-            callWs.close();
+            // We don't necessarily want to close them on Every render, 
+            // but the dependency array [token, user.id] ensures this only runs when auth changes.
+            notifWsRef.current?.close();
+            chatWsRef.current?.close();
+            callWsRef.current?.close();
+            notifWsRef.current = null;
+            chatWsRef.current = null;
+            callWsRef.current = null;
         };
     }, [token, user?.id]);
 
@@ -145,7 +186,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
 
     return (
-        <NotificationContext.Provider value={{ incomingCall, newNotification, activeChatEvent }}>
+        <NotificationContext.Provider value={{ incomingCall, newNotification, activeChatEvent, globalUnreadCount, refreshUnreadCount, clearUnreadCount }}>
             {children}
             {incomingCall && (
                 <Modal transparent visible={!!incomingCall}>

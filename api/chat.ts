@@ -32,12 +32,26 @@ export const chatApi = {
     const res = await apiClient.get(`chat/presence/${user_id}/`);
     return res.data;
   },
-  uploadMedia: async (file: File, type: 'image' | 'video' | 'voice'): Promise<{ url: string, filename: string }> => {
+  uploadMedia: async (file: any, type: 'image' | 'video' | 'voice'): Promise<{ url: string, filename: string }> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
-    const res = await apiClient.post('uploads/', formData);
-    return res.data;
+    
+    // Using fetch for uploads is more reliable in React Native than axios
+    const { fetchWithAuth } = await import('./client');
+    const response = await fetchWithAuth('uploads/', {
+      method: 'POST',
+      body: formData,
+      // Do NOT set Content-Type header; fetch will set it with the correct boundary
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Upload Error]', response.status, errorText);
+      throw new Error(`Upload failed: ${response.status}`);
+    }
+
+    return response.json();
   },
   getContactList: async (): Promise<Contact[]> => {
     const res = await apiClient.get('chat/contact-list/');

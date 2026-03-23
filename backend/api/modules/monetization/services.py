@@ -8,9 +8,10 @@ DEFAULTS = {
     'audio_call':  {'cost_per_minute': 10, 'night': 30},
     'video_call':  {'cost_per_minute': 30, 'night': 60},
     'live':        {'cost_per_minute': 100, 'night': 120},
-    'chat':        {'cost_per_message': 1, 'night': 2},
-    'photo':       {'cost_per_media': 10, 'night': 20},
-    'video_msg':   {'cost_per_media': 30, 'night': 40},
+    'chat':        {'cost_per_message': 1, 'night': 1},
+    'photo':       {'cost_per_media': 5, 'night': 5},
+    'video_msg':   {'cost_per_media': 10, 'night': 10},
+    'voice_msg':   {'cost_per_media': 5, 'night': 5},
     'bet_match':   {'cost_per_minute': 0, 'night': 0},
     'gift':        {'cost_per_media': 0, 'night': 0},
 }

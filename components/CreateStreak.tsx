@@ -1,129 +1,231 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 import { streaksApi } from '@/api/streaks';
+import { useTheme } from '@/context/ThemeContext';
 
 interface CreateStreakProps {
     visible: boolean;
     onClose: () => void;
-    onCreated: () => void;
+    onCreated?: () => void;
 }
 
 export default function CreateStreak({ visible, onClose, onCreated }: CreateStreakProps) {
-    const [media, setMedia] = useState<string | null>(null);
-    const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+    const { colors } = useTheme();
+    const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
     const [visibility, setVisibility] = useState<'all' | 'close_friends'>('all');
     const [loading, setLoading] = useState(false);
 
-    const pickMedia = async () => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
+    const pickMedia = async (type: 'Images' | 'Videos' | 'All') => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Please allow access to your gallery.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: type === 'Videos' ? ImagePicker.MediaTypeOptions.Videos : type === 'Images' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.All,
             allowsEditing: true,
             aspect: [9, 16],
             quality: 0.8,
+            videoMaxDuration: 15,
         });
 
-        if (!result.canceled) {
-            setMedia(result.assets[0].uri);
-            setMediaType(result.assets[0].type === 'video' ? 'video' : 'image');
+        if (!result.canceled && result.assets[0]) {
+            const asset = result.assets[0];
+            if (asset.type === 'video' && asset.duration && asset.duration > 15000) {
+                Alert.alert('Video too long', 'Please select a video shorter than 15 seconds.');
+                return;
+            }
+            setMedia({
+                uri: asset.uri,
+                type: asset.type === 'video' ? 'video' : 'image'
+            });
         }
     };
 
-    const uploadStreak = async () => {
-        if (!media) {
-            alert("Please select a photo or video");
-            return;
-        }
+    const handleUpload = async () => {
+        if (!media) return;
         setLoading(true);
         try {
             await streaksApi.uploadStreak({
-                media: { uri: media },
-                media_type: mediaType,
-                visibility: visibility
+                media: { uri: media.uri },
+                media_type: media.type,
+                visibility,
             });
+
             setMedia(null);
-            onCreated();
-        } catch (e) {
+            setVisibility('all');
+            if (onCreated) onCreated();
+            onClose();
+        } catch (e: any) {
             console.error(e);
-            alert('Failed to upload streak');
+            Alert.alert('Upload Failed', e?.response?.data?.error || 'Could not upload streak');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Modal visible={visible} animationType="slide">
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={onClose}>
-                        <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                        <MaterialCommunityIcons name="close" size={28} color={colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Send Streak 🔥</Text>
-                    <TouchableOpacity onPress={uploadStreak} disabled={loading || !media}>
-                        {loading ? <ActivityIndicator color="#EF4444" /> : <Text style={[styles.postBtn, !media && { color: '#64748B' }]}>Send</Text>}
-                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: colors.text }]}>New Streak 🔥</Text>
+                    {media ? (
+                        <TouchableOpacity onPress={handleUpload} disabled={loading} style={styles.shareBtn}>
+                            {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={[styles.shareText, { color: colors.primary }]}>Share</Text>}
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={{ width: 44 }} />
+                    )}
                 </View>
 
-                <ScrollView contentContainerStyle={styles.content}>
-                    <View style={styles.visibilityArea}>
-                        <Text style={styles.visibilityLabel}>Visibility:</Text>
-                        <TouchableOpacity onPress={() => setVisibility('all')} style={[styles.visibilityBtn, visibility === 'all' && styles.visibilityBtnActive]}>
-                            <Text style={[styles.visibilityBtnText, visibility === 'all' && styles.visibilityBtnTextActive]}>🌍 All</Text>
+                {media && (
+                    <View style={[styles.visibilityRow, { backgroundColor: colors.surfaceAlt }]}>
+                        <TouchableOpacity 
+                            style={[styles.visibilityBtn, visibility === 'all' && { backgroundColor: colors.primary }]} 
+                            onPress={() => setVisibility('all')}
+                        >
+                            <MaterialCommunityIcons name="earth" size={18} color={visibility === 'all' ? '#FFF' : colors.textMuted} />
+                            <Text style={[styles.visibilityText, { color: visibility === 'all' ? '#FFF' : colors.textMuted }]}>Everyone</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setVisibility('close_friends')} style={[styles.visibilityBtn, visibility === 'close_friends' && styles.visibilityBtnActive]}>
-                            <Text style={[styles.visibilityBtnText, visibility === 'close_friends' && styles.visibilityBtnTextActive]}>💚 Close Friends Only</Text>
+                        <TouchableOpacity 
+                            style={[styles.visibilityBtn, visibility === 'close_friends' && { backgroundColor: '#10B981' }]} 
+                            onPress={() => setVisibility('close_friends')}
+                        >
+                            <MaterialCommunityIcons name="heart-multiple" size={18} color={visibility === 'close_friends' ? '#FFF' : colors.textMuted} />
+                            <Text style={[styles.visibilityText, { color: visibility === 'close_friends' ? '#FFF' : colors.textMuted }]}>Close Friends</Text>
                         </TouchableOpacity>
                     </View>
+                )}
 
-                    <TouchableOpacity style={styles.mediaSelector} onPress={pickMedia}>
-                        {media ? (
-                            <View style={styles.previewContainer}>
-                                <Image source={{ uri: media }} style={styles.preview} />
-                                {mediaType === 'video' && (
-                                    <View style={styles.videoBadge}>
-                                        <MaterialCommunityIcons name="play" size={24} color="#FFF" />
-                                    </View>
-                                )}
-                            </View>
-                        ) : (
-                            <View style={styles.placeholderBox}>
-                                <MaterialCommunityIcons name="camera-plus" size={48} color="#94A3B8" />
-                                <Text style={styles.placeholderText}>Select Media</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-
-                    <Text style={styles.infoText}>
-                        Streaks are sent to all your active friends. Build your connection every day!
-                    </Text>
-                </ScrollView>
+                <View style={styles.content}>
+                    {media ? (
+                        <View style={styles.previewContainer}>
+                            {media.type === 'video' ? (
+                                <Video
+                                    source={{ uri: media.uri }}
+                                    style={styles.preview}
+                                    resizeMode={ResizeMode.COVER}
+                                    isLooping
+                                    shouldPlay
+                                />
+                            ) : (
+                                <Image source={{ uri: media.uri }} style={styles.preview} />
+                            )}
+                            <TouchableOpacity style={styles.removeBtn} onPress={() => setMedia(null)}>
+                                <MaterialCommunityIcons name="close-circle" size={32} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={styles.optionGrid}>
+                            <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => pickMedia('Images')}>
+                                <MaterialCommunityIcons name="image-plus" size={48} color={colors.primary} />
+                                <Text style={[styles.uploadText, { color: colors.text }]}>Pick Photo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => pickMedia('Videos')}>
+                                <MaterialCommunityIcons name="video-plus" size={48} color="#A855F7" />
+                                <Text style={[styles.uploadText, { color: colors.text }]}>Pick Video (15s)</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
             </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#020617' },
-    header: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 16, paddingTop: 60, paddingBottom: 16,
-        backgroundColor: '#0F172A', borderBottomWidth: 1, borderBottomColor: '#1E293B',
+    container: {
+        flex: 1,
+        marginTop: 50,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        overflow: 'hidden',
     },
-    title: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-    postBtn: { color: '#EF4444', fontSize: 16, fontWeight: 'bold' },
-    content: { padding: 16, alignItems: 'center' },
-    visibilityArea: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 8, alignSelf: 'stretch' },
-    visibilityLabel: { color: '#94A3B8', marginRight: 4 },
-    visibilityBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1E293B', borderWidth: 1, borderColor: '#334155' },
-    visibilityBtnActive: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: '#3B82F6' },
-    visibilityBtnText: { color: '#94A3B8', fontSize: 13 },
-    visibilityBtnTextActive: { color: '#3B82F6', fontWeight: 'bold' },
-    mediaSelector: { width: '100%', aspectRatio: 9 / 16, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1E293B', borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed' },
-    previewContainer: { width: '100%', height: '100%' },
-    preview: { width: '100%', height: '100%', resizeMode: 'cover' },
-    videoBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 4 },
-    placeholderBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    placeholderText: { color: '#94A3B8', marginTop: 12, fontSize: 16, fontWeight: '600' },
-    infoText: { color: '#64748B', fontSize: 14, textAlign: 'center', marginTop: 24, paddingHorizontal: 20 },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+    },
+    closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    shareBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    title: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    shareText: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    content: {
+        flex: 1,
+        padding: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewContainer: {
+        width: '100%',
+        aspectRatio: 9 / 16,
+        borderRadius: 24,
+        overflow: 'hidden',
+        position: 'relative',
+        backgroundColor: '#000',
+    },
+    preview: {
+        width: '100%',
+        height: '100%',
+    },
+    removeBtn: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 16,
+    },
+    optionGrid: {
+        flexDirection: 'row',
+        gap: 20,
+        width: '100%',
+        justifyContent: 'center',
+    },
+    uploadBtn: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 140,
+        height: 180,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+    },
+    uploadText: {
+        marginTop: 12,
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    visibilityRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        padding: 16,
+        gap: 12,
+    },
+    visibilityBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 24,
+    },
+    visibilityText: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
 });

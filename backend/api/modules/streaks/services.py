@@ -137,22 +137,137 @@ def toggle_streak_like(upload_id: int, user: User):
             return False, "Unliked"
         else:
             StreakLike.objects.create(streak_upload=upload, user=user)
+            
+            # Notify owner
+            if upload.user != user:
+                from ..notifications.services import create_notification
+                from ..notifications.push_service import send_push_notification, _get_user_tokens
+                
+                profile = getattr(user, 'profile', None)
+                sender_name = profile.display_name if profile else user.username
+                
+                create_notification(
+                    recipient=upload.user,
+                    actor=user,
+                    notification_type='streak_like',
+                    message=f"{sender_name} liked your streak!",
+                    object_id=upload.id
+                )
+                
+                tokens = _get_user_tokens(upload.user_id)
+                if tokens:
+                    send_push_notification(
+                        tokens,
+                        title="New Streak Like!",
+                        body=f"{sender_name} liked your streak!",
+                        data={'type': 'streak_like', 'upload_id': upload.id}
+                    )
+                    
             return True, "Liked"
     except StreakUpload.DoesNotExist:
         return None, "Not found"
 
+def update_streak_count(u1, u2):
+    from ...models import Streak
+    s = Streak.objects.filter(
+        (models.Q(user1=u1, user2=u2) | models.Q(user1=u2, user2=u1))
+    ).first()
+    if not s:
+        s = Streak.objects.create(user1=u1, user2=u2, streak_count=0)
+    
+    # Count total fire reactions between these two users
+    count = StreakReaction.objects.filter(
+        (models.Q(user=u1, recipient=u2) | models.Q(user=u2, recipient=u1)),
+        reaction_type='fire'
+    ).count()
+    s.streak_count = count
+    s.last_interaction_date = timezone.now()
+    if count > 0:
+        s.last_uploader = u1 # or track who last fired
+    s.save()
+    return count
+
 def toggle_streak_reaction(upload_id: int, user: User, r_type: str = 'fire'):
     try:
         upload = StreakUpload.objects.get(pk=upload_id)
+        recipient = upload.user
         react = StreakReaction.objects.filter(streak_upload=upload, user=user, reaction_type=r_type).first()
         if react:
             react.delete()
-            return False, "Reaction removed"
+            streak_count = update_streak_count(user, recipient)
+            fire_count = StreakReaction.objects.filter(recipient=recipient, reaction_type='fire').count()
+            return False, "Reaction removed", streak_count, fire_count
         else:
-            StreakReaction.objects.create(streak_upload=upload, user=user, reaction_type=r_type)
-            return True, "Reaction added"
+            StreakReaction.objects.create(streak_upload=upload, user=user, recipient=recipient, reaction_type=r_type)
+            streak_count = update_streak_count(user, recipient)
+            fire_count = StreakReaction.objects.filter(recipient=recipient, reaction_type='fire').count()
+            
+            # Notify recipient
+            try:
+                from ..notifications.services import create_notification
+                sender_name = getattr(user.profile, 'display_name', user.username)
+                create_notification(
+                    recipient=recipient,
+                    actor=user,
+                    notification_type='streak_fire',
+                    message=f"🔥 {sender_name} fired your streak upload!",
+                    object_id=upload.id
+                )
+                tokens = _get_user_tokens(recipient.id)
+                if tokens:
+                    send_push_notification(
+                        tokens,
+                        title="🔥 New Fire!",
+                        body=f"{sender_name} fired your streak upload!",
+                        data={'type': 'streak_fire', 'upload_id': upload.id, 'user_id': user.id}
+                    )
+            except Exception:
+                pass
+
+            return True, "Reaction added", streak_count, fire_count
     except StreakUpload.DoesNotExist:
-        return None, "Not found"
+        return None, "Not found", 0, 0
+
+def toggle_user_fire_service(recipient_id: int, user: User, r_type: str = 'fire'):
+    try:
+        recipient = User.objects.get(pk=recipient_id)
+        # Toggle a reaction that isn't tied to a specific upload
+        react = StreakReaction.objects.filter(streak_upload=None, user=user, recipient=recipient, reaction_type=r_type).first()
+        if react:
+            react.delete()
+            streak_count = update_streak_count(user, recipient)
+            fire_count = StreakReaction.objects.filter(recipient=recipient, reaction_type='fire').count()
+            return False, "Reaction removed", streak_count, fire_count
+        else:
+            StreakReaction.objects.create(streak_upload=None, user=user, recipient=recipient, reaction_type=r_type)
+            streak_count = update_streak_count(user, recipient)
+            fire_count = StreakReaction.objects.filter(recipient=recipient, reaction_type='fire').count()
+            
+            # Notify recipient
+            try:
+                from ..notifications.services import create_notification
+                sender_name = getattr(user.profile, 'display_name', user.username)
+                create_notification(
+                    recipient=recipient,
+                    actor=user,
+                    notification_type='user_fire',
+                    message=f"🔥 {sender_name} sent you a fire!",
+                    object_id=None
+                )
+                tokens = _get_user_tokens(recipient.id)
+                if tokens:
+                    send_push_notification(
+                        tokens,
+                        title="🔥 You've got fire!",
+                        body=f"{sender_name} sent you a fire!",
+                        data={'type': 'user_fire', 'user_id': user.id}
+                    )
+            except Exception:
+                pass
+
+            return True, "Reaction added", streak_count, fire_count
+    except User.DoesNotExist:
+        return None, "User not found", 0, 0
 
 from datetime import timedelta
 from django.db.models import Max

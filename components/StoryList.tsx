@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 
-export default function StoryList({ stories, onStoryPress, onCreatePress }) {
+export default function StoryList({ stories, profile, onStoryPress, onCreatePress }: any) {
     const { user } = useAuthStore();
 
     return (
@@ -14,7 +14,7 @@ export default function StoryList({ stories, onStoryPress, onCreatePress }) {
                 <TouchableOpacity style={styles.storyContainer} onPress={onCreatePress}>
                     <View style={styles.createStoryRing}>
                         <Image
-                            source={{ uri: (user as any)?.photo || (user as any)?.profile?.photo || `https://ui-avatars.com/api/?name=${user?.username || 'me'}&background=random` }}
+                            source={{ uri: (profile as any)?.photo || (user as any)?.photo || (user as any)?.profile?.photo || `https://ui-avatars.com/api/?name=${user?.username || 'me'}&background=random` }}
                             style={styles.avatar}
                         />
                         <View style={styles.addIconContainer}>

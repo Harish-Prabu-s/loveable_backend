@@ -60,7 +60,9 @@ def create_post(user, caption: str, image=None, visibility='all'):
     
     # Notify Close Friends
     from ..notifications.services import notify_close_friends_of_content
+    from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'post', post.id)
+    handle_mentions(caption, user, 'post', post.id)
     
     return post
 
@@ -108,6 +110,10 @@ def add_comment(post_id: int, user, text: str):
     try:
         post = Post.objects.select_related('user').get(id=post_id)
         comment = PostComment.objects.create(post=post, user=user, text=text)
+        
+        # Process Mentions
+        from ..notifications.utils import handle_mentions
+        handle_mentions(text, user, 'post_comment', post.id)
         
         # Notify owner
         if post.user != user:

@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Listen for logouts from external triggers (like apiClient response interceptor passing 401s)
         const logoutListener = DeviceEventEmitter.addListener('auth:logout', () => {
-            logout();
+            dispatch({ type: 'LOGOUT' });
         });
 
         return () => {
