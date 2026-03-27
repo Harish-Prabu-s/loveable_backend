@@ -44,7 +44,7 @@ def mark_read(request):
     """POST /notifications/read/ — mark notifications as read. Body: {ids: [1,2,3]} or empty for all."""
     ids = request.data.get('ids', None)
     mark_notifications_read(request.user, ids)
-    return Response({'status': 'ok'})
+    return Response({'status': 'ok', 'unread_count': get_unread_count(request.user)})
 
 
 @api_view(['GET'])

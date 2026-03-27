@@ -28,7 +28,7 @@ def create_reel(user, video_url: str, caption: str = '', visibility='all'):
     from ..notifications.services import notify_close_friends_of_content
     from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'reel', reel.id)
-    handle_mentions(caption, user, 'reel', reel.id)
+    handle_mentions(caption, user, 'reel', reel.id, obj=reel)
     
     return reel
 

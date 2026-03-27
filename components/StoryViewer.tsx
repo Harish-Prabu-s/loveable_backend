@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { storiesApi } from '@/api/stories';
 import { notificationsApi } from '@/api/notifications';
@@ -9,6 +10,7 @@ import * as ScreenCapture from 'expo-screen-capture';
 const { width, height } = Dimensions.get('window');
 
 export default function StoryViewer({ visible, story, onClose, onNext, onPrev, onDelete }) {
+    const router = useRouter();
     const [progress, setProgress] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isLiked, setIsLiked] = useState(story?.is_liked || false);
@@ -184,6 +186,27 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                         <Text style={styles.viewCount}>{likesCount}</Text>
                     </View>
 
+                    {/* Caption & Mentions */}
+                    <View style={styles.storyContent}>
+                        {story.caption ? <Text style={styles.storyCaption}>{story.caption}</Text> : null}
+                        {story.mentioned_users && story.mentioned_users.length > 0 && (
+                            <View style={styles.mentionsContainer}>
+                                {story.mentioned_users.map(u => (
+                                    <TouchableOpacity 
+                                        key={u.id} 
+                                        style={styles.mentionChip}
+                                        onPress={() => {
+                                            onClose();
+                                            router.push(`/user/${u.id}` as any);
+                                        }}
+                                    >
+                                        <Text style={styles.mentionText}>@{u.username}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
                 </SafeAreaView>
             </View>
         </Modal>
@@ -288,6 +311,39 @@ const styles = StyleSheet.create({
     viewCount: {
         color: '#FFF',
         marginLeft: 6,
+        fontWeight: 'bold',
+    },
+    storyContent: {
+        position: 'absolute',
+        bottom: 100,
+        left: 20,
+        right: 20,
+        zIndex: 10,
+    },
+    storyCaption: {
+        color: '#FFF',
+        fontSize: 16,
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: -1, height: 1 },
+        textShadowRadius: 10,
+        marginBottom: 10,
+    },
+    mentionsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    mentionChip: {
+        backgroundColor: 'rgba(139, 92, 246, 0.4)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(139, 92, 246, 0.6)',
+    },
+    mentionText: {
+        color: '#FFF',
+        fontSize: 13,
         fontWeight: 'bold',
     }
 });

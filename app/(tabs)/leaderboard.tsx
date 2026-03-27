@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { useTheme } from '@/context/ThemeContext';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { streaksApi } from '@/api/streaks';
@@ -102,90 +103,13 @@ export default function LeaderboardScreen() {
     const renderTopThree = () => (
         <View style={styles.topThreeContainer}>
             {leaderboard.slice(0, 3).map((user, idx) => (
-                <TouchableOpacity 
-                    key={user.id} 
-                    style={[styles.topUser, idx === 0 && styles.firstPlace]}
-                    onPress={() => router.push(`/user/${user.id}` as any)}
+                <MotiView
+                    key={user.id}
+                    from={{ opacity: 0, scale: 0.5, translateY: 50 }}
+                    animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                    transition={{ type: 'spring', delay: idx * 200, damping: 12 }}
                 >
-                    <View style={styles.topAvatarWrap}>
-                        <LinearGradient
-                            colors={idx === 0 ? ['#FFD700', '#FFA500'] : idx === 1 ? ['#C0C0C0', '#808080'] : ['#CD7F32', '#8B4513']}
-                            style={styles.topGrad}
-                        >
-                            <Image
-                                source={{ uri: user.photo || generateAvatarUrl(user.id) }}
-                                style={styles.topAvatar}
-                            />
-                        </LinearGradient>
-                        <View style={[styles.topRankBadge, { backgroundColor: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32' }]}>
-                            <Text style={styles.topRankEmoji}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</Text>
-                        </View>
-                    </View>
-                    <Text style={[styles.topName, { color: colors.text }]} numberOfLines={1}>{user.name}</Text>
-                    <TouchableOpacity style={styles.topStreak} onPress={() => handleFireUser(user)}>
-                        <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
-                        <Text style={[styles.topStreakTxt, { color: colors.text }]}>{user.fire_count}</Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.topBestStreak, { color: colors.textSecondary }]}>🔥 {user.streak}</Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
-
-    const renderItem = ({ item }: { item: LeaderboardUser }) => {
-        const isTop3 = item.rank <= 3;
-        const badgeColor = item.rank === 1 ? '#FFD700' : item.rank === 2 ? '#C0C0C0' : item.rank === 3 ? '#CD7F32' : colors.surfaceAlt;
-
-        return (
-            <TouchableOpacity 
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => router.push(`/user/${item.id}` as any)}
-            >
-                <View style={styles.avatarContainer}>
-                    <Image
-                        source={{ uri: item.photo || generateAvatarUrl(item.id) }}
-                        style={styles.avatar}
-                    />
-                    <View style={[styles.listRankBadge, { backgroundColor: badgeColor }]}>
-                        <Text style={[styles.listRankText, { color: item.rank <= 3 ? '#000' : colors.text }]}>
-                            {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.infoCol}>
-                    <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-                        {item.name}
-                    </Text>
-                </View>
-
-                <TouchableOpacity style={styles.streakCol} onPress={() => handleFireUser(item)}>
-                    <MaterialCommunityIcons name="fire" size={20} color="#EF4444" />
-                    <Text style={[styles.streakText, { color: colors.text }]}>{item.fire_count}</Text>
-                </TouchableOpacity>
-                <View style={styles.bestStreakBadge}>
-                    <Text style={[styles.bestStreakText, { color: colors.textSecondary }]}>🔥{item.streak}</Text>
-                </View>
-            </TouchableOpacity>
-        );
-    };
-
-    return (
-        <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.title, { color: colors.text }]}>Leaderboard</Text>
-                <TouchableOpacity onPress={load} style={styles.backBtn}>
-                    <MaterialCommunityIcons name="refresh" size={22} color={colors.text} />
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.topThreeContainer}>
-                {leaderboard.slice(0, 3).map((user, idx) => (
                     <TouchableOpacity 
-                        key={user.id} 
                         style={[styles.topUser, idx === 0 && styles.firstPlace]}
                         onPress={() => router.push(`/user/${user.id}` as any)}
                     >
@@ -210,8 +134,67 @@ export default function LeaderboardScreen() {
                         </TouchableOpacity>
                         <Text style={[styles.topBestStreak, { color: colors.textSecondary }]}>🔥 {user.streak}</Text>
                     </TouchableOpacity>
-                ))}
+                </MotiView>
+            ))}
+        </View>
+    );
+
+    const renderItem = ({ item, index }: { item: LeaderboardUser; index: number }) => {
+        const badgeColor = item.rank === 1 ? '#FFD700' : item.rank === 2 ? '#C0C0C0' : item.rank === 3 ? '#CD7F32' : colors.surfaceAlt;
+
+        return (
+            <MotiView
+                from={{ opacity: 0, translateX: -20 }}
+                animate={{ opacity: 1, translateX: 0 }}
+                transition={{ type: 'timing', delay: 600 + (index * 50) }}
+            >
+                <TouchableOpacity 
+                    style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    onPress={() => router.push(`/user/${item.id}` as any)}
+                >
+                    <View style={styles.avatarContainer}>
+                        <Image
+                            source={{ uri: item.photo || generateAvatarUrl(item.id) }}
+                            style={styles.avatar}
+                        />
+                        <View style={[styles.listRankBadge, { backgroundColor: badgeColor }]}>
+                            <Text style={[styles.listRankText, { color: item.rank <= 3 ? '#000' : colors.text }]}>
+                                {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.infoCol}>
+                        <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                            {item.name}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity style={styles.streakCol} onPress={() => handleFireUser(item)}>
+                        <MaterialCommunityIcons name="fire" size={20} color="#EF4444" />
+                        <Text style={[styles.streakText, { color: colors.text }]}>{item.fire_count}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.bestStreakBadge}>
+                        <Text style={[styles.bestStreakText, { color: colors.textSecondary }]}>🔥{item.streak}</Text>
+                    </View>
+                </TouchableOpacity>
+            </MotiView>
+        );
+    };
+
+    return (
+        <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                    <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.title, { color: colors.text }]}>Leaderboard</Text>
+                <TouchableOpacity onPress={load} style={styles.backBtn}>
+                    <MaterialCommunityIcons name="refresh" size={22} color={colors.text} />
+                </TouchableOpacity>
             </View>
+
+            {renderTopThree()}
 
             {loading ? (
                 <View style={styles.loading}>
@@ -221,7 +204,7 @@ export default function LeaderboardScreen() {
                 <FlatList
                     data={leaderboard.slice(3)}
                     keyExtractor={item => item.id.toString()}
-                    renderItem={renderItem}
+                    renderItem={({ item, index }) => renderItem({ item, index })}
                     contentContainerStyle={styles.list}
                     showsVerticalScrollIndicator={false}
                 />

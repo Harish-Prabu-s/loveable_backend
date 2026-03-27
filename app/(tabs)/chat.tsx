@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import { chatApi } from '@/api/chat';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -106,15 +107,25 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <MotiView
+        from={{ opacity: 0, translateY: -20 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'timing', duration: 500 }}
+        style={styles.header}
+      >
         <Text style={styles.title}>Messages</Text>
         <TouchableOpacity style={styles.newChatButton} onPress={() => router.push('/(tabs)/discover' as any)}>
           <MaterialCommunityIcons name="message-plus" size={24} color="#8B5CF6" />
         </TouchableOpacity>
-      </View>
+      </MotiView>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <MotiView
+        from={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'timing', duration: 400, delay: 200 }}
+        style={styles.searchContainer}
+      >
         <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
           <TextInput
@@ -125,7 +136,7 @@ export default function ChatScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
-      </View>
+      </MotiView>
 
       {/* Chat List */}
       <ScrollView
@@ -141,62 +152,68 @@ export default function ChatScreen() {
             <Text style={styles.emptySubText}>Start a conversation with someone!</Text>
           </View>
         ) : (
-          filteredContacts.map((contact) => (
-            <TouchableOpacity
+          filteredContacts.map((contact, index) => (
+            <MotiView
               key={contact.id}
-              style={styles.chatItem}
-              onPress={() => {
-                // We navigate to /[id] where [id] is the other user's ID
-                // The receiver logic in [id].tsx should handle this
-                router.push({ pathname: '/chat/[id]' as any, params: { id: contact.id, isUser: 'true' } });
-              }}
-              onLongPress={() => handleLongPress(contact)}
+              from={{ opacity: 0, translateX: 50 }}
+              animate={{ opacity: 1, translateX: 0 }}
+              transition={{ type: 'spring', delay: 300 + (index * 100) }}
             >
-              <Image
-                source={{
-                  uri: contact.photo || generateAvatarUrl(contact.id, 'O')
+              <TouchableOpacity
+                style={styles.chatItem}
+                onPress={() => {
+                  // We navigate to /[id] where [id] is the other user's ID
+                  // The receiver logic in [id].tsx should handle this
+                  router.push({ pathname: '/chat/[id]' as any, params: { id: contact.id, isUser: 'true' } });
                 }}
-                style={styles.avatar}
-              />
-              <View style={styles.chatInfo}>
-                <View style={styles.chatHeader}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.roomName} numberOfLines={1}>{contact.display_name || contact.username}</Text>
-                    {contact.streak_count && contact.streak_count > 0 ? (
-                      <View style={styles.streakBadge}>
-                        <Text style={styles.streakEmoji}>
-                          {contact.streak_count >= 100 ? '💯' : '🔥'}
-                        </Text>
-                        <Text style={styles.streakText}>{contact.streak_count}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.time}>{contact.last_timestamp ? new Date(contact.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</Text>
-                </View>
-                <View style={[styles.chatFooter, contact.unread_count > 0 && styles.unreadFooter]}>
-                  <Text 
-                    style={[
-                      styles.lastMessage, 
-                      contact.unread_count > 0 && styles.unreadMessageText
-                    ]} 
-                    numberOfLines={1}
-                  >
-                    {contact.unread_count > 0 ? (
-                      `${contact.unread_count} new message${contact.unread_count > 1 ? 's' : ''}`
-                    ) : (
-                      contact.last_message_type === 'post_share' ? 'Shared a post' : 
-                      contact.last_message_type === 'reel_share' ? 'Shared a reel' : 
-                      contact.last_message || 'Start chatting...'
-                    )}
-                  </Text>
-                  {contact.unread_count > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{contact.unread_count}</Text>
+                onLongPress={() => handleLongPress(contact)}
+              >
+                <Image
+                  source={{
+                    uri: contact.photo || generateAvatarUrl(contact.id, 'O')
+                  }}
+                  style={styles.avatar}
+                />
+                <View style={styles.chatInfo}>
+                  <View style={styles.chatHeader}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.roomName} numberOfLines={1}>{contact.display_name || contact.username}</Text>
+                      {contact.streak_count && contact.streak_count > 0 ? (
+                        <View style={styles.streakBadge}>
+                          <Text style={styles.streakEmoji}>
+                            {contact.streak_count >= 100 ? '💯' : '🔥'}
+                          </Text>
+                          <Text style={styles.streakText}>{contact.streak_count}</Text>
+                        </View>
+                      ) : null}
                     </View>
-                  )}
+                    <Text style={styles.time}>{contact.last_timestamp ? new Date(contact.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</Text>
+                  </View>
+                  <View style={[styles.chatFooter, contact.unread_count > 0 && styles.unreadFooter]}>
+                    <Text 
+                      style={[
+                        styles.lastMessage, 
+                        contact.unread_count > 0 && styles.unreadMessageText
+                      ]} 
+                      numberOfLines={1}
+                    >
+                      {contact.unread_count > 0 ? (
+                        `${contact.unread_count} new message${contact.unread_count > 1 ? 's' : ''}`
+                      ) : (
+                        contact.last_message_type === 'post_share' ? 'Shared a post' : 
+                        contact.last_message_type === 'reel_share' ? 'Shared a reel' : 
+                        contact.last_message || 'Start chatting...'
+                      )}
+                    </Text>
+                    {contact.unread_count > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadText}>{contact.unread_count}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </MotiView>
           ))
         )}
       </ScrollView>

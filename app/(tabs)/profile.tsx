@@ -247,89 +247,108 @@ export default function ProfileScreen() {
           <Text style={[styles.menuTitle, { color: colors.textSecondary }]}>Account Settings</Text>
 
           {/* Settings */}
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings' as any)}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primaryLight }]}>
-              <MaterialCommunityIcons name="cog" size={24} color={colors.primary} />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Settings</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 500 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings' as any)}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.primaryLight }]}>
+                <MaterialCommunityIcons name="cog" size={24} color={colors.primary} />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Settings</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/edit-profile' as any)}>
-            <View style={[styles.iconContainer, { backgroundColor: '#DBEAFE' }]}>
-              <MaterialCommunityIcons name="account-edit" size={24} color="#3B82F6" />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Edit Profile</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 600 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/edit-profile' as any)}>
+              <View style={[styles.iconContainer, { backgroundColor: '#DBEAFE' }]}>
+                <MaterialCommunityIcons name="account-edit" size={24} color="#3B82F6" />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Edit Profile</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => Alert.alert('Privacy & Safety', 'Your data is encrypted and safe. We never share your information with third parties.')}>
-            <View style={[styles.iconContainer, { backgroundColor: '#DCFCE7' }]}>
-              <MaterialCommunityIcons name="shield-check" size={24} color="#22C55E" />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Privacy & Safety</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 700 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => Alert.alert('Privacy & Safety', 'Your data is encrypted and safe. We never share your information with third parties.')}>
+              <View style={[styles.iconContainer, { backgroundColor: '#DCFCE7' }]}>
+                <MaterialCommunityIcons name="shield-check" size={24} color="#22C55E" />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Privacy & Safety</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/close-friends' as any)}>
-            <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
-              <MaterialCommunityIcons name="heart-multiple" size={24} color="#10B981" />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Close Friends</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/archive' as any)}>
-            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <MaterialCommunityIcons name="archive-outline" size={24} color="#0EA5E9" />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Archive</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 800 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/close-friends' as any)}>
+              <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
+                <MaterialCommunityIcons name="heart-multiple" size={24} color="#10B981" />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Close Friends</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
+
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 900 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/archive' as any)}>
+              <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
+                <MaterialCommunityIcons name="archive-outline" size={24} color="#0EA5E9" />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Archive</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
           {/* Notification Toggle */}
-          <View style={[styles.menuItem, { borderBottomColor: colors.border }]}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FEF9C3' }]}>
-              <MaterialCommunityIcons
-                name={notificationsEnabled ? 'bell' : 'bell-off'}
-                size={24}
-                color="#EAB308"
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 1000 }}>
+            <View style={[styles.menuItem, { borderBottomColor: colors.border }]}>
+              <View style={[styles.iconContainer, { backgroundColor: '#FEF9C3' }]}>
+                <MaterialCommunityIcons
+                  name={notificationsEnabled ? 'bell' : 'bell-off'}
+                  size={24}
+                  color="#EAB308"
+                />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Notifications</Text>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={toggleNotifications}
+                disabled={notifToggling}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
               />
             </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Notifications</Text>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={toggleNotifications}
-              disabled={notifToggling}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFF"
-            />
-          </View>
+          </MotiView>
 
           <Text style={[styles.menuTitle, { marginTop: 24, color: colors.textSecondary }]}>Support</Text>
 
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => Alert.alert('Help Center', 'For support, email us at support@loveableapp.com or visit our website.')}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.surfaceAlt }]}>
-              <MaterialCommunityIcons name="help-circle-outline" size={24} color={colors.textSecondary} />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.text }]}>Help Center</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 1100 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => Alert.alert('Help Center', 'For support, email us at support@loveableapp.com or visit our website.')}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.surfaceAlt }]}>
+                <MaterialCommunityIcons name="help-circle-outline" size={24} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Help Center</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
-          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/delete-account' as any)}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <MaterialCommunityIcons name="account-remove" size={24} color="#EF4444" />
-            </View>
-            <Text style={[styles.menuLabel, { color: colors.danger }]}>Delete Account</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 1200 }}>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: colors.border }]} onPress={() => router.push('/settings/delete-account' as any)}>
+              <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                <MaterialCommunityIcons name="account-remove" size={24} color="#EF4444" />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.danger }]}>Delete Account</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          </MotiView>
 
           {/* Logout */}
-          <TouchableOpacity style={[styles.menuItem, { marginTop: 16 }]} onPress={handleLogout}>
-            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <MaterialCommunityIcons name="logout" size={24} color="#EF4444" />
-            </View>
-            <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Logout</Text>
-          </TouchableOpacity>
+          <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1300 }}>
+            <TouchableOpacity style={[styles.menuItem, { marginTop: 16 }]} onPress={handleLogout}>
+              <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
+                <MaterialCommunityIcons name="logout" size={24} color="#EF4444" />
+              </View>
+              <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Logout</Text>
+            </TouchableOpacity>
+          </MotiView>
         </MotiView>
       </Animated.ScrollView>
     </SafeAreaView>

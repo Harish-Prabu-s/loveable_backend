@@ -8,6 +8,7 @@ class Post(models.Model):
     caption = models.TextField(blank=True)
     image = models.ImageField(upload_to='posts/', null=True, blank=True)
     visibility = models.CharField(max_length=20, default='all')
+    mentions = models.ManyToManyField(User, related_name='mentioned_in_posts', blank=True)
     is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -398,6 +399,7 @@ class Story(models.Model):
     media_type = models.CharField(max_length=10, default='image') # 'image' or 'video'
     caption = models.TextField(blank=True)
     visibility = models.CharField(max_length=20, default='all')
+    mentions = models.ManyToManyField(User, related_name='mentioned_in_stories', blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField(null=True, blank=True)
 
@@ -417,6 +419,7 @@ class Reel(models.Model):
     video_url = models.FileField(upload_to='reels/')
     caption = models.TextField(blank=True)
     visibility = models.CharField(max_length=20, default='all')
+    mentions = models.ManyToManyField(User, related_name='mentioned_in_reels', blank=True)
     is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

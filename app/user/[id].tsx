@@ -279,10 +279,7 @@ export default function PublicProfileScreen() {
                     <View style={styles.commGrid}>
                         <TouchableOpacity
                             style={styles.commCard}
-                            onPress={() => router.push({
-                                pathname: '/call/[id]' as any,
-                                params: { id: profile.user, mode: 'audio' },
-                            })}
+                                onPress={() => router.push(`/calling/${profile.user}?callType=audio`)}
                         >
                             <View style={[styles.commIconBg, { backgroundColor: '#FEE2E2' }]}>
                                 <MaterialCommunityIcons name="phone" size={28} color="#EF4444" />
@@ -292,10 +289,7 @@ export default function PublicProfileScreen() {
 
                         <TouchableOpacity
                             style={styles.commCard}
-                            onPress={() => router.push({
-                                pathname: '/call/[id]' as any,
-                                params: { id: profile.user, mode: 'video' },
-                            })}
+                                onPress={() => router.push(`/calling/${profile.user}?callType=video`)}
                         >
                             <View style={[styles.commIconBg, { backgroundColor: '#E0E7FF' }]}>
                                 <MaterialCommunityIcons name="video" size={28} color="#6366F1" />

@@ -26,6 +26,8 @@ interface ThemeColors {
     textMuted: string;
     primary: string;
     primaryLight: string;
+    accent: string;
+    accentLight: string;
     danger: string;
     success: string;
     card: string;
@@ -34,19 +36,21 @@ interface ThemeColors {
 }
 
 const DARK: ThemeColors = {
-    background: '#020617',
-    surface: '#0F172A',
-    surfaceAlt: '#1E293B',
-    border: '#1E293B',
-    text: '#F1F5F9',
+    background: '#0A091E',
+    surface: 'rgba(26, 22, 50, 0.7)',
+    surfaceAlt: 'rgba(37, 33, 64, 0.8)',
+    border: 'rgba(255, 255, 255, 0.1)',
+    text: '#FFFFFF',
     textSecondary: '#94A3B8',
-    textMuted: '#475569',
-    primary: '#8B5CF6',
-    primaryLight: 'rgba(139,92,246,0.15)',
-    danger: '#EF4444',
+    textMuted: '#64748B',
+    primary: '#D946EF', // Fuchsia
+    primaryLight: 'rgba(217, 70, 239, 0.2)',
+    accent: '#8B5CF6', // Violet
+    accentLight: 'rgba(139, 92, 246, 0.2)',
+    danger: '#F43F5E',
     success: '#10B981',
-    card: '#0F172A',
-    tabBar: '#090E1A',
+    card: '#16152B',
+    tabBar: '#0A091E',
     statusBar: 'light',
 };
 
@@ -56,11 +60,13 @@ const LIGHT: ThemeColors = {
     surfaceAlt: '#F1F5F9',
     border: '#E2E8F0',
     text: '#0F172A',
-    textSecondary: '#475569',
+    textSecondary: '#64748B',
     textMuted: '#94A3B8',
-    primary: '#7C3AED',
-    primaryLight: 'rgba(124,58,237,0.1)',
-    danger: '#DC2626',
+    primary: '#9333EA',
+    primaryLight: 'rgba(147,51,234,0.1)',
+    accent: '#DB2777',
+    accentLight: 'rgba(219,39,119,0.1)',
+    danger: '#E11D48',
     success: '#059669',
     card: '#FFFFFF',
     tabBar: '#FFFFFF',

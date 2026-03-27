@@ -62,7 +62,7 @@ def create_post(user, caption: str, image=None, visibility='all'):
     from ..notifications.services import notify_close_friends_of_content
     from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'post', post.id)
-    handle_mentions(caption, user, 'post', post.id)
+    handle_mentions(caption, user, 'post', post.id, obj=post)
     
     return post
 

@@ -5,18 +5,21 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { authApi } from '@/api/auth';
-import { MotiView } from 'moti';
+import { MotiView, MotiText } from 'moti';
+import { BlurBackground } from '@/components/common/BlurBackground';
+import { useTheme } from '@/context/ThemeContext';
 
 // Validates international phone numbers (7-15 digits, optionally starting with +)
 const isValidPhone = (phone: string): boolean => {
@@ -31,6 +34,7 @@ const formatPhone = (phone: string): string => {
 };
 
 export default function PhoneLoginScreen() {
+    const { colors, isDark } = useTheme();
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -75,97 +79,113 @@ export default function PhoneLoginScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.kav}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="handled"
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.kav}
                 >
-                    {/* Header */}
-                    <MotiView
-                        from={{ opacity: 0, scale: 0.9, translateY: -20 }}
-                        animate={{ opacity: 1, scale: 1, translateY: 0 }}
-                        transition={{ type: 'spring', damping: 15, stiffness: 100 }}
+                    <ScrollView
+                        contentContainerStyle={styles.scroll}
+                        keyboardShouldPersistTaps="handled"
                     >
-                        <LinearGradient
-                            colors={['#EC4899', '#8B5CF6']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.headerGradient}
+                        {/* Animated Logo Section */}
+                        <MotiView
+                            from={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: 'spring' }}
+                            style={styles.logoSection}
                         >
-                            <MaterialCommunityIcons name="cellphone" size={52} color="#FFFFFF" />
-                            <Text style={styles.headerTitle}>Welcome!</Text>
-                            <Text style={styles.headerSubtitle}>
-                                Enter your mobile number to get started
+                             <LinearGradient
+                                colors={[colors.accent, colors.primary]}
+                                style={styles.logoGradient}
+                            >
+                                <MaterialCommunityIcons name="cellphone-message" size={50} color="#FFFFFF" />
+                            </LinearGradient>
+                        </MotiView>
+
+                        {/* Title & Subtitle */}
+                        <MotiView
+                            from={{ opacity: 0, translateY: 20 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            transition={{ delay: 300, type: 'spring' }}
+                            style={styles.textCenter}
+                        >
+                            <Text style={[styles.headerTitle, { color: colors.text }]}>Welcome Back</Text>
+                            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                                Enter your phone number to continue
                             </Text>
-                        </LinearGradient>
-                    </MotiView>
+                        </MotiView>
 
-                    {/* Form */}
-                    <MotiView
-                        from={{ opacity: 0, translateY: 20 }}
-                        animate={{ opacity: 1, translateY: 0 }}
-                        transition={{ type: 'timing', duration: 600, delay: 200 }}
-                        style={styles.form}
-                    >
-                        <Text style={styles.label}>Mobile Number</Text>
-
-                        <View style={styles.inputRow}>
-                            <View style={styles.prefixBox}>
-                                <MaterialCommunityIcons name="phone" size={20} color="#8B5CF6" />
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="+91 98765 43210"
-                                placeholderTextColor="#4B5563"
-                                keyboardType="phone-pad"
-                                autoComplete="tel"
-                                value={phone}
-                                onChangeText={setPhone}
-                                editable={!loading}
-                                maxLength={16}
-                            />
-                        </View>
-
-                        <Text style={styles.hint}>
-                            We'll send a 6-digit OTP to verify your number.
-                        </Text>
-
-                        <TouchableOpacity
-                            style={[styles.button, (!valid || loading) && styles.buttonDisabled]}
-                            onPress={handleSendOtp}
-                            disabled={!valid || loading}
-                            activeOpacity={0.85}
+                        {/* Form Card - Simplified */}
+                        <MotiView
+                            from={{ opacity: 0, translateY: 40 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            transition={{ type: 'timing', duration: 800, delay: 500 }}
+                            style={[styles.formContainer]}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <>
-                                    <Text style={styles.buttonText}>Send OTP</Text>
-                                    <MaterialCommunityIcons name="arrow-right" size={20} color="#FFFFFF" />
-                                </>
-                            )}
-                        </TouchableOpacity>
+                            <Text style={[styles.label, { color: colors.textSecondary }]}>Phone Number</Text>
+                            
+                            <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                                <View style={styles.prefixBox}>
+                                    <MaterialCommunityIcons name="phone" size={20} color={colors.textSecondary} />
+                                </View>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    placeholder="Enter mobile number"
+                                    placeholderTextColor={colors.textMuted}
+                                    keyboardType="phone-pad"
+                                    autoComplete="tel"
+                                    value={phone}
+                                    onChangeText={setPhone}
+                                    editable={!loading}
+                                    maxLength={16}
+                                />
+                            </View>
 
-                        <Text style={styles.footer}>
-                            By continuing, you agree to our{' '}
-                            <Text style={styles.footerLink}>Terms of Service</Text> and{' '}
-                            <Text style={styles.footerLink}>Privacy Policy</Text>.
-                        </Text>
-                    </MotiView>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                            <Button 
+                                label="Send Code" 
+                                variant="primary" 
+                                loading={loading}
+                                disabled={!valid}
+                                onPress={handleSendOtp}
+                                style={{ marginTop: 8 }}
+                            />
+
+                            <View style={styles.dividerRow}>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>Or continue with</Text>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            </View>
+
+                            <Button 
+                                label="Use Email Address" 
+                                variant="secondary" 
+                                disabled={loading}
+                            />
+                        </MotiView>
+
+                        <MotiText 
+                            from={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1200 }}
+                            style={[styles.footer, { color: colors.textMuted }]}
+                        >
+                            By continuing, you agree to our Terms of Service and Privacy Policy
+                        </MotiText>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
     safeArea: {
         flex: 1,
-        backgroundColor: '#020617',
     },
     kav: {
         flex: 1,
@@ -176,103 +196,113 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
         justifyContent: 'center',
     },
-    headerGradient: {
-        borderRadius: 28,
-        padding: 36,
+    logoSection: {
+        alignSelf: 'center',
+        marginBottom: 30,
         alignItems: 'center',
-        marginBottom: 36,
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 12,
+        justifyContent: 'center',
+    },
+    logoGradient: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    textCenter: {
+        alignItems: 'center',
+        marginBottom: 40,
     },
     headerTitle: {
         fontSize: 32,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        marginTop: 16,
+        fontWeight: 'bold',
     },
     headerSubtitle: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.85)',
-        marginTop: 8,
+        fontSize: 16,
+        marginTop: 10,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 24,
+        paddingHorizontal: 10,
     },
-    form: {
-        gap: 12,
+    formContainer: {
+        gap: 16,
     },
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#94A3B8',
-        letterSpacing: 0.5,
+        marginBottom: 4,
     },
     inputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#0F172A',
-        borderRadius: 14,
+        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+        borderRadius: 16,
         borderWidth: 1.5,
-        borderColor: '#1E293B',
+        borderColor: '#334155',
         overflow: 'hidden',
     },
     prefixBox: {
-        paddingHorizontal: 14,
-        paddingVertical: 16,
-        backgroundColor: '#1E293B',
+        paddingLeft: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     input: {
         flex: 1,
-        paddingHorizontal: 14,
-        paddingVertical: 16,
-        fontSize: 17,
+        paddingHorizontal: 16,
+        paddingVertical: 18,
+        fontSize: 18,
         color: '#F8FAFC',
-        letterSpacing: 0.5,
+        fontWeight: '600',
     },
     hint: {
-        fontSize: 12,
-        color: '#475569',
-        lineHeight: 18,
+        fontSize: 13,
+        color: '#64748B',
+        lineHeight: 20,
+        fontStyle: 'italic',
     },
     button: {
         backgroundColor: '#8B5CF6',
-        borderRadius: 14,
-        paddingVertical: 17,
+        borderRadius: 16,
+        paddingVertical: 18,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        marginTop: 8,
+        gap: 12,
+        marginTop: 10,
         shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 15,
+        elevation: 10,
     },
     buttonDisabled: {
-        opacity: 0.45,
+        opacity: 0.3,
         elevation: 0,
         shadowOpacity: 0,
     },
     buttonText: {
         color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
-        letterSpacing: 0.3,
+        fontSize: 18,
+        fontWeight: '800',
+        letterSpacing: 0.5,
     },
     footer: {
         fontSize: 11,
-        color: '#475569',
+        color: 'rgba(148, 163, 184, 0.6)',
         textAlign: 'center',
-        marginTop: 16,
-        lineHeight: 17,
+        marginTop: 40,
     },
-    footerLink: {
-        color: '#8B5CF6',
-        fontWeight: '600',
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 10,
+        gap: 10,
     },
+    divider: {
+        flex: 1,
+        height: 1,
+    },
+    dividerText: {
+        fontSize: 12,
+    }
 });

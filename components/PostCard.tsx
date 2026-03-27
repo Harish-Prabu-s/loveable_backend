@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import { postsApi, Post } from '@/api/posts';
 import { archiveApi } from '@/api/archive';
 import { useTheme } from '@/context/ThemeContext';
@@ -11,6 +12,8 @@ import { toast } from '@/utils/toast';
 import { CommentSheet } from './CommentSheet';
 import { ShareSheet } from './ShareSheet';
 import { DeviceEventEmitter } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AnimatePresence } from 'moti';
 
 function getAvatarUri(photo: string | null | undefined, seed: string | number, gender?: string): string {
     const resolved = getMediaUrl(photo);
@@ -39,6 +42,7 @@ export function PostCard({ post, onLike }: { post: Post; onLike: (id: number) =>
     const [commentsLoading, setCommentsLoading] = useState(false);
     
     const [showShare, setShowShare] = useState(false);
+    const [showHeart, setShowHeart] = useState(false);
 
     const handleLike = () => {
         Animated.sequence([
@@ -160,6 +164,20 @@ export function PostCard({ post, onLike }: { post: Post; onLike: (id: number) =>
                 <Text style={[postStyles.caption, { color: colors.text }]}>{post.caption}</Text>
             ) : null}
 
+            {post.mentioned_users && post.mentioned_users.length > 0 && (
+                <View style={postStyles.mentionsRow}>
+                    {post.mentioned_users.map(u => (
+                        <TouchableOpacity 
+                            key={u.id} 
+                            style={[postStyles.mentionChip, { backgroundColor: colors.primary + '15' }]}
+                            onPress={() => router.push(`/user/${u.id}` as any)}
+                        >
+                            <Text style={[postStyles.mentionText, { color: colors.primary }]}>@{u.username}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+
             {post.image ? (
                 <TouchableOpacity 
                     activeOpacity={1} 
@@ -168,6 +186,8 @@ export function PostCard({ post, onLike }: { post: Post; onLike: (id: number) =>
                         if (now - lastTap.current < 300) {
                             if (tapTimer.current) clearTimeout(tapTimer.current);
                             if (!post.is_liked) handleLike();
+                            setShowHeart(true);
+                            setTimeout(() => setShowHeart(false), 800);
                             lastTap.current = 0;
                         } else {
                             lastTap.current = now;
@@ -178,6 +198,35 @@ export function PostCard({ post, onLike }: { post: Post; onLike: (id: number) =>
                     }}
                 >
                     <Image source={{ uri: post.image }} style={postStyles.postImage} resizeMode="cover" />
+                    <AnimatePresence>
+                        {showHeart && (
+                            <MotiView
+                                from={{ scale: 0, opacity: 0, rotate: '-15deg' }}
+                                animate={{ scale: 1.8, opacity: 1, rotate: '0deg' }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{
+                                    type: 'spring',
+                                    damping: 8,
+                                    stiffness: 150,
+                                }}
+                                style={postStyles.heartOverlay}
+                            >
+                                <LinearGradient
+                                    colors={[colors.danger, colors.accent]}
+                                    style={postStyles.heartGradient}
+                                >
+                                    <MaterialCommunityIcons name="heart" size={80} color="#FFFFFF" />
+                                </LinearGradient>
+                                
+                                <MotiView
+                                    from={{ scale: 1, opacity: 0.8 }}
+                                    animate={{ scale: 2, opacity: 0 }}
+                                    transition={{ type: 'timing', duration: 400 }}
+                                    style={[postStyles.heartPulse, { borderColor: colors.danger }]}
+                                />
+                            </MotiView>
+                        )}
+                    </AnimatePresence>
                 </TouchableOpacity>
             ) : null}
 
@@ -187,7 +236,7 @@ export function PostCard({ post, onLike }: { post: Post; onLike: (id: number) =>
                         <MaterialCommunityIcons
                             name={post.is_liked ? 'heart' : 'heart-outline'}
                             size={22}
-                            color={post.is_liked ? '#EF4444' : colors.textMuted}
+                            color={post.is_liked ? colors.danger : colors.textMuted}
                         />
                     </Animated.View>
                     <Text style={[postStyles.actionCount, { color: colors.textSecondary }]}>{post.likes_count}</Text>
@@ -240,4 +289,49 @@ const postStyles = StyleSheet.create({
     },
     actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     actionCount: { fontSize: 13, fontWeight: '600' },
+    heartOverlay: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginTop: -60,
+        marginLeft: -60,
+        zIndex: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heartGradient: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: 'black',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 15,
+        elevation: 10,
+    },
+    heartPulse: {
+        position: 'absolute',
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 4,
+    },
+    mentionsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 14,
+        paddingBottom: 10,
+        gap: 8,
+    },
+    mentionChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    mentionText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
 });

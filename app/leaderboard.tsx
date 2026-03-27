@@ -21,6 +21,7 @@ interface LeaderboardUser {
     callMinutes: number;
     league: LeagueTier;
     rank: number;
+    streak?: number;
 }
 
 const LEAGUES: { tier: LeagueTier; minPoints: number; color: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
@@ -39,14 +40,14 @@ const getLeague = (points: number) => {
 // Mock Data Generator
 const generateMockLeaderboard = (): LeaderboardUser[] => {
     const users = [
-        { id: '1', name: 'Priya Sharma', points: 52000, appUsageMinutes: 120, callMinutes: 300 },
-        { id: '2', name: 'Anjali Gupta', points: 28000, appUsageMinutes: 90, callMinutes: 150 },
-        { id: '3', name: 'Sneha Patel', points: 12000, appUsageMinutes: 60, callMinutes: 80 },
-        { id: '4', name: 'Riya Singh', points: 6000, appUsageMinutes: 45, callMinutes: 40 },
-        { id: '5', name: 'Neha Verma', points: 2000, appUsageMinutes: 30, callMinutes: 20 },
-        { id: '6', name: 'Kavita Rao', points: 500, appUsageMinutes: 15, callMinutes: 10 },
-        { id: '7', name: 'Meera Reddy', points: 45000, appUsageMinutes: 110, callMinutes: 250 },
-        { id: '8', name: 'Pooja Kumar', points: 8000, appUsageMinutes: 50, callMinutes: 60 },
+        { id: '1', name: 'Priya Sharma', points: 52000, appUsageMinutes: 120, callMinutes: 300, streak: 15 },
+        { id: '2', name: 'Anjali Gupta', points: 28000, appUsageMinutes: 90, callMinutes: 150, streak: 8 },
+        { id: '3', name: 'Sneha Patel', points: 12000, appUsageMinutes: 60, callMinutes: 80, streak: 5 },
+        { id: '4', name: 'Riya Singh', points: 6000, appUsageMinutes: 45, callMinutes: 40, streak: 12 },
+        { id: '5', name: 'Neha Verma', points: 2000, appUsageMinutes: 30, callMinutes: 20, streak: 0 },
+        { id: '6', name: 'Kavita Rao', points: 500, appUsageMinutes: 15, callMinutes: 10, streak: 2 },
+        { id: '7', name: 'Meera Reddy', points: 45000, appUsageMinutes: 110, callMinutes: 250, streak: 20 },
+        { id: '8', name: 'Pooja Kumar', points: 8000, appUsageMinutes: 50, callMinutes: 60, streak: 3 },
     ];
 
     return users.sort((a, b) => b.points - a.points).map((u, index) => ({
@@ -206,6 +207,9 @@ export default function LeaderboardScreen() {
                                         <View style={styles.itemSubtext}>
                                             <Text style={[styles.itemLeague, { color: leagueInfo.color }]}>{leagueInfo.tier}</Text>
                                             <Text style={styles.itemMinutes}> • {u.callMinutes} min calls</Text>
+                                            {u.streak && u.streak > 0 ? (
+                                                <Text style={[styles.itemMinutes, { color: '#EF4444', fontWeight: 'bold' }]}> • 🔥 {u.streak}</Text>
+                                            ) : null}
                                         </View>
                                     </View>
                                     <View style={styles.itemPointsBox}>

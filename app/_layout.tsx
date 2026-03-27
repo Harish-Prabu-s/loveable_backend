@@ -89,7 +89,7 @@ import { useSecurityStore } from '@/store/securityStore';
 import { AppState, AppStateStatus } from 'react-native';
 
 function RootLayoutNav() {
-  const { isDark } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isLoading, token } = useAuth();
   const { initialize: initSecurity, setLocked, recordBackgroundTime, checkLockNeeded } = useSecurityStore();
 
@@ -126,8 +126,8 @@ function RootLayoutNav() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -139,7 +139,7 @@ function RootLayoutNav() {
           screenOptions={{
             animation: 'slide_from_right', // iOS-like slide transition as standard
             headerShown: false,
-            contentStyle: { backgroundColor: isDark ? '#020617' : '#F8FAFC' }
+            contentStyle: { backgroundColor: colors.background }
           }}
         >
           {/* Auth group — phone & otp */}
@@ -169,9 +169,11 @@ function RootLayoutNav() {
           <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="story/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="story/create" options={{ headerShown: false }} />
+          <Stack.Screen name="calling/[targetId]" options={{ headerShown: false }} />
+          <Stack.Screen name="media-viewer" options={{ headerShown: false }} />
         </Stack>
         <SecurityLock />
-        <StatusBar style="auto" />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>
     </GestureHandlerRootView>
   );

@@ -4,6 +4,7 @@ import { MotiView, AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '@/context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ export interface ToastRef {
 }
 
 const Toast = forwardRef<ToastRef>((_, ref) => {
+    const { colors, isDark } = useTheme();
     const [isVisible, setIsVisible] = useState(false);
     const [message, setMessage] = useState('');
     const [type, setType] = useState<ToastType>('info');
@@ -50,12 +52,12 @@ const Toast = forwardRef<ToastRef>((_, ref) => {
     const getColors = () => {
         switch (type) {
             case 'success':
-                return ['#10B981', '#059669'];
+                return [colors.success, colors.success];
             case 'error':
-                return ['#EF4444', '#DC2626'];
+                return [colors.danger, colors.danger];
             case 'info':
             default:
-                return ['#8B5CF6', '#7C3AED'];
+                return [colors.primary, colors.accent];
         }
     };
 

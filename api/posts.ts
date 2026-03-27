@@ -17,6 +17,12 @@ export interface Post {
     is_owner: boolean;
     is_archived: boolean;
     created_at: string;
+    mentioned_users?: {
+        id: number;
+        username: string;
+        display_name: string;
+        photo: string | null;
+    }[];
 }
 
 export const postsApi = {

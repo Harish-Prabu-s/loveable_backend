@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, router } from 'expo-router';
+import { MotiView, AnimatePresence } from 'moti';
 import { notificationsApi, type Notification } from '@/api/notifications';
 import { getMediaUrl } from '@/utils/media';
 import { generateAvatarUrl } from '@/utils/avatar';
@@ -36,10 +37,11 @@ const NOTIFICATION_ICONS: Record<string, { name: any; color: string }> = {
     screenshot: { name: 'camera-off', color: '#EF4444' },
 };
 
-function NotificationItem({ item, onRespond, onFollowBack }: {
+function NotificationItem({ item, onRespond, onFollowBack, index }: {
     item: Notification;
     onRespond?: (id: number, objectId: number, action: 'accept' | 'reject') => void;
     onFollowBack?: (userId: number) => void;
+    index: number;
 }) {
     const icon = NOTIFICATION_ICONS[item.type] || { name: 'bell', color: '#8B5CF6' };
     const avatarUrl = item.actor?.photo
@@ -47,52 +49,58 @@ function NotificationItem({ item, onRespond, onFollowBack }: {
         : generateAvatarUrl(item.actor?.id || 'anon');
 
     return (
-        <TouchableOpacity
-            style={[styles.notifItem, !item.is_read && styles.unreadItem]}
-            onPress={() => {
-                const type = item.type;
-                if (type === 'story_like' || type === 'story_comment' || type === 'story_post' || type === 'mention_story' || type === 'mention_story_comment') {
-                    if (item.object_id) router.push(`/story/${item.object_id}` as any);
-                } else if (type === 'mention_post' || type === 'mention_comment') {
-                    if (item.object_id) router.push(`/post/${item.object_id}` as any);
-                } else if (type === 'mention_reel' || type === 'mention_reel_comment') {
-                    if (item.object_id) router.push(`/reel/${item.object_id}` as any);
-                } else if (type === 'streak_upload' || type === 'streak_comment' || type === 'streak_fire') {
-                    if (item.object_id) router.push(`/streak/${item.object_id}` as any);
-                } else if (item.actor) {
-                    router.push(`/user/${item.actor.id}` as any);
-                }
-            }}
+        <MotiView
+            from={{ opacity: 0, translateX: -20 }}
+            animate={{ opacity: 1, translateX: 0 }}
+            transition={{ delay: index * 50, type: 'timing' }}
         >
-            <View style={styles.notifAvatarWrap}>
-                <Image source={{ uri: avatarUrl }} style={styles.notifAvatar} />
-                <View style={[styles.notifIconBadge, { backgroundColor: icon.color }]}>
-                    <MaterialCommunityIcons name={icon.name} size={12} color="#FFF" />
+            <TouchableOpacity
+                style={[styles.notifItem, !item.is_read && styles.unreadItem]}
+                onPress={() => {
+                    const type = item.type;
+                    if (type === 'story_like' || type === 'story_comment' || type === 'story_post' || type === 'mention_story' || type === 'mention_story_comment') {
+                        if (item.object_id) router.push(`/story/${item.object_id}` as any);
+                    } else if (type === 'mention_post' || type === 'mention_comment') {
+                        if (item.object_id) router.push(`/post/${item.object_id}` as any);
+                    } else if (type === 'mention_reel' || type === 'mention_reel_comment') {
+                        if (item.object_id) router.push(`/reel/${item.object_id}` as any);
+                    } else if (type === 'streak_upload' || type === 'streak_comment' || type === 'streak_fire') {
+                        if (item.object_id) router.push(`/streak/${item.object_id}` as any);
+                    } else if (item.actor) {
+                        router.push(`/user/${item.actor.id}` as any);
+                    }
+                }}
+            >
+                <View style={styles.notifAvatarWrap}>
+                    <Image source={{ uri: avatarUrl }} style={styles.notifAvatar} />
+                    <View style={[styles.notifIconBadge, { backgroundColor: icon.color }]}>
+                        <MaterialCommunityIcons name={icon.name} size={12} color="#FFF" />
+                    </View>
                 </View>
-            </View>
-            <View style={styles.notifContent}>
-                <Text style={styles.notifMessage}>{item.message || item.type.replace(/_/g, ' ')}</Text>
-                <Text style={styles.notifTime}>{new Date(item.created_at).toLocaleDateString()}</Text>
-                {(item.type === 'follow_request' || item.type === 'friend_request') && onRespond && (
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.acceptBtn} onPress={() => onRespond(item.id, item.object_id!, 'accept')}>
-                            <Text style={styles.acceptBtnText}>Accept</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.rejectBtn} onPress={() => onRespond(item.id, item.object_id!, 'reject')}>
-                            <Text style={styles.rejectBtnText}>Decline</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-                {item.type === 'follow_accepted' && onFollowBack && (
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.acceptBtn} onPress={() => onFollowBack(item.actor.id!)}>
-                            <Text style={styles.acceptBtnText}>Follow Back</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
-            {!item.is_read && <View style={styles.unreadDot} />}
-        </TouchableOpacity>
+                <View style={styles.notifContent}>
+                    <Text style={styles.notifMessage}>{item.message || item.type.replace(/_/g, ' ')}</Text>
+                    <Text style={styles.notifTime}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                    {(item.type === 'follow_request' || item.type === 'friend_request') && onRespond && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={styles.acceptBtn} onPress={() => onRespond(item.id, item.object_id!, 'accept')}>
+                                <Text style={styles.acceptBtnText}>Accept</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.rejectBtn} onPress={() => onRespond(item.id, item.object_id!, 'reject')}>
+                                <Text style={styles.rejectBtnText}>Decline</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    {item.type === 'follow_accepted' && onFollowBack && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={styles.acceptBtn} onPress={() => onFollowBack(item.actor.id!)}>
+                                <Text style={styles.acceptBtnText}>Follow Back</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+                {!item.is_read && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+        </MotiView>
     );
 }
 
@@ -173,7 +181,11 @@ export default function NotificationsScreen() {
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <MotiView
+                from={{ opacity: 0, translateY: -20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                style={styles.header}
+            >
                 <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#F1F5F9" />
                 </TouchableOpacity>
@@ -183,7 +195,7 @@ export default function NotificationsScreen() {
                         <Text style={styles.markAllText}>Mark all read</Text>
                     </TouchableOpacity>
                 )}
-            </View>
+            </MotiView>
 
             {loading ? (
                 <View style={styles.centered}>
@@ -203,8 +215,8 @@ export default function NotificationsScreen() {
                     {requestNotifications.length > 0 && (
                         <>
                             <Text style={styles.sectionLabel}>Requests</Text>
-                            {requestNotifications.map(n => (
-                                <NotificationItem key={n.id} item={n} onRespond={(id, objId, act) => handleResponse(id, objId, act, n.type)} />
+                            {requestNotifications.map((n, i) => (
+                                <NotificationItem key={n.id} item={n} index={i} onRespond={(id, objId, act) => handleResponse(id, objId, act, n.type)} />
                             ))}
                         </>
                     )}
@@ -213,8 +225,8 @@ export default function NotificationsScreen() {
                     {otherNotifications.length > 0 && (
                         <>
                             <Text style={styles.sectionLabel}>Activity</Text>
-                            {otherNotifications.map(n => (
-                                <NotificationItem key={n.id} item={n} onFollowBack={handleFollowBack} />
+                            {otherNotifications.map((n, i) => (
+                                <NotificationItem key={n.id} item={n} index={i + requestNotifications.length} onFollowBack={handleFollowBack} />
                             ))}
                         </>
                     )}

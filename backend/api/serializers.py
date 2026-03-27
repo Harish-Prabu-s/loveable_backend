@@ -13,6 +13,21 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'last_login', 'date_joined']
 
+class SimpleUserSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='profile.display_name', read_only=True)
+    photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'display_name', 'photo']
+
+    def get_photo(self, obj):
+        request = self.context.get('request')
+        profile = getattr(obj, 'profile', None)
+        if profile:
+            return get_absolute_media_url(profile.photo, request)
+        return None
+
 class ProfileSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
     is_close_friend = serializers.SerializerMethodField()
@@ -169,10 +184,11 @@ class StorySerializer(serializers.ModelSerializer):
     comments_count = serializers.IntegerField(source='comments.count', read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
+    mentioned_users = SimpleUserSerializer(source='mentions', many=True, read_only=True)
 
     class Meta:
         model = Story
-        fields = ['id', 'user', 'media_url', 'media_type', 'caption', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
+        fields = ['id', 'user', 'media_url', 'media_type', 'caption', 'created_at', 'expires_at', 'user_display_name', 'user_avatar', 'view_count', 'likes_count', 'comments_count', 'is_liked', 'is_owner', 'mentioned_users']
 
     def get_is_owner(self, obj):
         request = self.context.get('request')
@@ -220,10 +236,11 @@ class ReelSerializer(serializers.ModelSerializer):
     comments_count = serializers.IntegerField(source='comments.count', read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
+    mentioned_users = SimpleUserSerializer(source='mentions', many=True, read_only=True)
 
     class Meta:
         model = Reel
-        fields = ['id', 'user', 'video_url', 'caption', 'created_at', 'user_display_name', 'user_avatar', 'likes_count', 'comments_count', 'is_liked', 'is_owner']
+        fields = ['id', 'user', 'video_url', 'caption', 'created_at', 'user_display_name', 'user_avatar', 'likes_count', 'comments_count', 'is_liked', 'is_owner', 'mentioned_users']
 
     def get_is_owner(self, obj):
         request = self.context.get('request')
@@ -297,8 +314,9 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'profile_id', 'display_name', 'username', 'photo', 'gender',
             'caption', 'image', 'likes_count', 'comments_count', 'is_liked', 'is_owner',
-            'created_at'
+            'created_at', 'mentioned_users'
         ]
+    mentioned_users = SimpleUserSerializer(source='mentions', many=True, read_only=True)
 
     def get_photo(self, obj):
         request = self.context.get('request')

@@ -13,6 +13,12 @@ export interface Reel {
     is_liked: boolean;
     is_owner: boolean;
     is_archived: boolean;
+    mentioned_users?: {
+        id: number;
+        username: string;
+        display_name: string;
+        photo: string | null;
+    }[];
 }
 
 export const reelsApi = {

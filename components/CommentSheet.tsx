@@ -82,7 +82,7 @@ export const CommentSheet = ({ visible, onClose, comments, loading, onAddComment
                 <TouchableOpacity style={styles.dismissArea} onPress={onClose} activeOpacity={1} />
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={[styles.sheet, { backgroundColor: isDark ? '#111827' : '#FFFFFF' }]}
+                    style={[styles.sheet, { backgroundColor: colors.background }]}
                 >
                     <View style={[styles.indicator, { backgroundColor: colors.border }]} />
                     
@@ -129,9 +129,9 @@ export const CommentSheet = ({ visible, onClose, comments, loading, onAddComment
                             ]}
                         >
                             {submitting ? (
-                                <ActivityIndicator size="small" color="#FFF" />
+                                <ActivityIndicator size="small" color="#FFFFFF" />
                             ) : (
-                                <MaterialCommunityIcons name="send" size={20} color="#FFF" />
+                                <MaterialCommunityIcons name="send" size={20} color="#FFFFFF" />
                             )}
                         </TouchableOpacity>
                     </View>

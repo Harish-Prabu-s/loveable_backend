@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MotiView, MotiText } from 'moti';
 import { profilesApi } from '@/api/profiles';
 import { walletApi } from '@/api/wallet';
 import { gamificationApi } from '@/api/gamification';
@@ -86,120 +87,125 @@ export default function ExploreScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F9FAFB" />
         }
       >
-        {/* Header Section */}
-        <LinearGradient
-          colors={['#EC4899', '#8B5CF6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
+        <MotiView
+          from={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'timing', duration: 600 }}
         >
-          <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.greeting}>Hi, {profile?.display_name || 'Friend'}! ✨</Text>
-              <Text style={styles.subGreeting}>Ready to connect?</Text>
+          <LinearGradient
+            colors={['#EC4899', '#8B5CF6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
+          >
+            <View style={styles.headerTop}>
+              <View>
+                <Text style={styles.greeting}>Hi, {profile?.display_name || 'Friend'}! ✨</Text>
+                <Text style={styles.subGreeting}>Ready to connect?</Text>
+              </View>
+              <View style={styles.headerIcons}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => router.push('/(tabs)/chat' as any)}
+                >
+                  <MaterialCommunityIcons name="message-text" size={24} color="#FFFFFF" />
+                  <View style={styles.notificationDot} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => router.push('/(tabs)/profile' as any)}
+                >
+                  <MaterialCommunityIcons name="account" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.headerIcons}>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/(tabs)/chat' as any)}
-              >
-                <MaterialCommunityIcons name="message-text" size={24} color="#FFFFFF" />
-                <View style={styles.notificationDot} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/(tabs)/profile' as any)}
-              >
-                <MaterialCommunityIcons name="account" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
 
-          <View style={styles.headerStats}>
-            <View style={styles.statsRow}>
-              <TouchableOpacity style={styles.statBadge} onPress={() => profile?.user && router.push(`/network/followers?userId=${profile.user}` as any)}>
-                <MaterialCommunityIcons name="account-group" size={14} color="#FFFFFF" />
-                <Text style={styles.statText}>{profile?.followers_count || 0} Followers</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statBadge} onPress={() => profile?.user && router.push(`/network/following?userId=${profile.user}` as any)}>
-                <MaterialCommunityIcons name="account-check" size={14} color="#FFFFFF" />
-                <Text style={styles.statText}>{profile?.following_count || 0} Following</Text>
+            <View style={styles.headerStats}>
+              <View style={styles.statsRow}>
+                <TouchableOpacity style={styles.statBadge} onPress={() => profile?.user && router.push(`/network/followers?userId=${profile.user}` as any)}>
+                  <MaterialCommunityIcons name="account-group" size={14} color="#FFFFFF" />
+                  <Text style={styles.statText}>{profile?.followers_count || 0} Followers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.statBadge} onPress={() => profile?.user && router.push(`/network/following?userId=${profile.user}` as any)}>
+                  <MaterialCommunityIcons name="account-check" size={14} color="#FFFFFF" />
+                  <Text style={styles.statText}>{profile?.following_count || 0} Following</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.coinBadge}
+                onPress={() => router.push('/(tabs)/wallet' as any)}
+              >
+                <MaterialCommunityIcons name="database" size={20} color="#FBBF24" />
+                <Text style={styles.coinText}>{wallet?.coin_balance ?? 0}</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.coinBadge}
-              onPress={() => router.push('/(tabs)/wallet' as any)}
-            >
-              <MaterialCommunityIcons name="database" size={20} color="#FBBF24" />
-              <Text style={styles.coinText}>{wallet?.coin_balance ?? 0}</Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </MotiView>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push('/(tabs)/discover' as any)}
-          >
-            <LinearGradient colors={['#A855F7', '#7C3AED']} style={styles.actionIcon}>
-              <MaterialCommunityIcons name="compass" size={24} color="#FFFFFF" />
-            </LinearGradient>
-            <Text style={styles.actionLabel}>Discover</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push('/(tabs)/chat' as any)}
-          >
-            <LinearGradient colors={['#EC4899', '#DB2777']} style={styles.actionIcon}>
-              <MaterialCommunityIcons name="message-text" size={24} color="#FFFFFF" />
-            </LinearGradient>
-            <Text style={styles.actionLabel}>Chat</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push('/(tabs)/wallet' as any)}
-          >
-            <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.actionIcon}>
-              <MaterialCommunityIcons name="wallet" size={24} color="#FFFFFF" />
-            </LinearGradient>
-            <Text style={styles.actionLabel}>Wallet</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => router.push('/(tabs)/profile' as any)}
-          >
-            <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.actionIcon}>
-              <MaterialCommunityIcons name="account" size={24} color="#FFFFFF" />
-            </LinearGradient>
-            <Text style={styles.actionLabel}>Profile</Text>
-          </TouchableOpacity>
+          {[
+            { label: 'Discover', icon: 'compass', colors: ['#A855F7', '#7C3AED'], path: '/(tabs)/discover' },
+            { label: 'Chat', icon: 'message-text', colors: ['#EC4899', '#DB2777'], path: '/(tabs)/chat' },
+            { label: 'Wallet', icon: 'wallet', colors: ['#F59E0B', '#D97706'], path: '/(tabs)/wallet' },
+            { label: 'Profile', icon: 'account', colors: ['#3B82F6', '#2563EB'], path: '/(tabs)/profile' },
+          ].map((action, index) => (
+            <MotiView
+              key={action.label}
+              from={{ opacity: 0, translateY: 20 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: 'spring', delay: 300 + (index * 100) }}
+            >
+              <TouchableOpacity
+                style={styles.actionItem}
+                onPress={() => router.push(action.path as any)}
+              >
+                <LinearGradient colors={action.colors as any} style={styles.actionIcon}>
+                  <MaterialCommunityIcons name={action.icon as any} size={24} color="#FFFFFF" />
+                </LinearGradient>
+                <Text style={styles.actionLabel}>{action.label}</Text>
+              </TouchableOpacity>
+            </MotiView>
+          ))}
         </View>
 
         {/* Mood Grid */}
-        <View style={styles.moodSection}>
+        <MotiView
+          from={{ opacity: 0, translateY: 40 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 800, delay: 500 }}
+          style={styles.moodSection}
+        >
           <Text style={styles.sectionTitle}>How are you feeling?</Text>
           <View style={styles.moodGrid}>
-            {moods.map((mood) => (
-              <TouchableOpacity
+            {moods.map((mood, index) => (
+              <MotiView
                 key={mood.label}
-                style={styles.moodCard}
-                onPress={() => router.push('/(tabs)/discover' as any)}
+                from={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', delay: 700 + (index * 50) }}
               >
-                <View style={[styles.moodIconContainer, { backgroundColor: mood.bg }]}>
-                  <MaterialCommunityIcons name={mood.icon as any} size={24} color={mood.color} />
-                </View>
-                <Text style={styles.moodLabel}>{mood.label}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.moodCard}
+                  onPress={() => router.push('/(tabs)/discover' as any)}
+                >
+                  <View style={[styles.moodIconContainer, { backgroundColor: mood.bg }]}>
+                    <MaterialCommunityIcons name={mood.icon as any} size={24} color={mood.color} />
+                  </View>
+                  <Text style={styles.moodLabel}>{mood.label}</Text>
+                </TouchableOpacity>
+              </MotiView>
             ))}
           </View>
-        </View>
+        </MotiView>
 
         {/* Recommended Users */}
-        <View style={styles.usersSection}>
+        <MotiView
+          from={{ opacity: 0, translateY: 30 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 600, delay: 1000 }}
+          style={styles.usersSection}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recommended for you</Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/discover' as any)}>
@@ -207,23 +213,30 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.usersScroll}>
-            {recommendedUsers.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.userCard}
-                onPress={() => router.push(`/user/${item.user}` as any)}
+            {recommendedUsers.map((item, index) => (
+              <MotiView
+                key={item.id}
+                from={{ opacity: 0, translateX: 50 }}
+                animate={{ opacity: 1, translateX: 0 }}
+                transition={{ type: 'spring', delay: 1200 + (index * 100) }}
               >
-                <Image
-                  source={{ uri: getMediaUrl(item.photo) || 'https://via.placeholder.com/150' }}
-                  style={styles.userAvatar}
-                />
-                <Text style={styles.userName} numberOfLines={1}>{item.display_name}</Text>
-                <View style={styles.onlineBadge}>
-                  <View style={[styles.statusDot, { backgroundColor: item.is_online ? '#10B981' : '#64748B' }]} />
-                  <Text style={styles.statusText}>{item.is_online ? 'Online' : 'Offline'}</Text>
-                </View>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.userCard}
+                  onPress={() => router.push(`/user/${item.user}` as any)}
+                >
+                  <Image
+                    source={{ uri: getMediaUrl(item.photo) || 'https://via.placeholder.com/150' }}
+                    style={styles.userAvatar}
+                  />
+                  <Text style={styles.userName} numberOfLines={1}>{item.display_name}</Text>
+                  <View style={styles.onlineBadge}>
+                    <View style={[styles.statusDot, { backgroundColor: item.is_online ? '#10B981' : '#64748B' }]} />
+                    <Text style={styles.statusText}>{item.is_online ? 'Online' : 'Offline'}</Text>
+                  </View>
+                </TouchableOpacity>
+              </MotiView>
             ))}
           </ScrollView>
-        </View>
+        </MotiView>
       </ScrollView>
     </SafeAreaView>
   );

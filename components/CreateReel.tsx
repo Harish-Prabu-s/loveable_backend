@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { reelsApi } from '@/api/reels';
+import { profilesApi } from '@/api/profiles';
 
 // Requires to add upload endpoint in the backend. Assuming standard multipart flow.
 import client, { fetchWithAuth } from '@/api/client';
@@ -11,8 +12,33 @@ import client, { fetchWithAuth } from '@/api/client';
 export default function CreateReel({ visible, onClose, onCreated }) {
     const [media, setMedia] = useState<string | null>(null);
     const [caption, setCaption] = useState('');
+    const [mentionSearch, setMentionSearch] = useState('');
+    const [showMentionResults, setShowMentionResults] = useState(false);
+    const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [visibility, setVisibility] = useState('all');
     const [loading, setLoading] = useState(false);
+
+    const handleMentionSearch = async (text: string) => {
+        setMentionSearch(text);
+        if (text.length > 1) {
+            try {
+                const results = await profilesApi.listProfiles(text);
+                setFoundUsers(results || []);
+                setShowMentionResults(true);
+            } catch (e) {
+                console.error("Mention search failed", e);
+            }
+        } else {
+            setShowMentionResults(false);
+        }
+    };
+
+    const addMention = (user: any) => {
+        const mentionTag = `@${user.username || user.display_name} `;
+        setCaption(prev => prev + mentionTag);
+        setShowMentionResults(false);
+        setMentionSearch('');
+    };
 
     const pickVideo = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
@@ -131,6 +157,30 @@ export default function CreateReel({ visible, onClose, onCreated }) {
                             />
                         </View>
 
+                        {/* Mention Selection */}
+                        <View style={styles.mentionRow}>
+                            <MaterialCommunityIcons name="at" size={20} color="#3B82F6" />
+                            <TextInput
+                                placeholder="Mention someone..."
+                                placeholderTextColor="#64748B"
+                                style={styles.mentionInput}
+                                value={mentionSearch}
+                                onChangeText={handleMentionSearch}
+                            />
+                        </View>
+
+                        {showMentionResults && foundUsers.length > 0 && (
+                            <View style={styles.mentionResults}>
+                                <ScrollView nestedScrollEnabled>
+                                    {foundUsers.map(u => (
+                                        <TouchableOpacity key={u.id} style={styles.mentionItem} onPress={() => addMention(u)}>
+                                            <Text style={{ color: '#FFF', fontWeight: 'bold' }}>@{u.username}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
                     </View>
                 </KeyboardAvoidingView>
             </View>
@@ -238,5 +288,34 @@ const styles = StyleSheet.create({
     visibilityBtnTextActive: {
         color: '#10B981',
         fontWeight: 'bold',
+    },
+    mentionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#1E293B',
+        marginTop: 10,
+    },
+    mentionInput: {
+        flex: 1,
+        color: '#FFF',
+        fontSize: 16,
+        marginLeft: 10,
+    },
+    mentionResults: {
+        backgroundColor: '#0F172A',
+        borderRadius: 12,
+        marginTop: 8,
+        maxHeight: 150,
+        borderWidth: 1,
+        borderColor: '#1E293B',
+    },
+    mentionItem: {
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#1E293B',
     }
 });
+
+import { ScrollView } from 'react-native';

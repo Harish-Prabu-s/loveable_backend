@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { router } from 'expo-router';
 import { profilesApi } from '@/api/profiles';
 import { getMediaUrl } from '@/utils/media';
@@ -26,10 +27,11 @@ function oppositeGender(gender?: string | null): string | undefined {
   return undefined; // 'O' or undefined → no filter
 }
 
-function ProfileCard({ profile }: { profile: Profile }) {
+function ProfileCard({ profile, index }: { profile: Profile; index: number }) {
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
 
+  // ... same logic ...
   const photo = profile.photo
     ? getMediaUrl(profile.photo) || generateAvatarUrl(profile.id, profile.gender as any)
     : generateAvatarUrl(profile.id, profile.gender as any);
@@ -50,7 +52,12 @@ function ProfileCard({ profile }: { profile: Profile }) {
   };
 
   return (
-    <View style={styles.card}>
+    <MotiView
+      from={{ opacity: 0, scale: 0.9, translateY: 20 }}
+      animate={{ opacity: 1, scale: 1, translateY: 0 }}
+      transition={{ type: 'spring', delay: index * 50 }}
+      style={styles.card}
+    >
       <TouchableOpacity onPress={() => router.push(`/user/${profile.user || profile.id}` as any)}>
         <Image source={{ uri: photo }} style={styles.cardAvatar} />
         <LinearGradient colors={['transparent', 'rgba(2,6,23,0.95)']} style={styles.cardOverlay}>
@@ -76,13 +83,13 @@ function ProfileCard({ profile }: { profile: Profile }) {
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-          onPress={() => router.push({ pathname: '/call/[id]' as any, params: { id: profile.user || profile.id, callType: 'audio', calleeName: profile.display_name } })}
+          onPress={() => router.push(`/calling/${profile.user || profile.id}?callType=audio&calleeName=${encodeURIComponent(profile.display_name)}`)}
         >
           <MaterialCommunityIcons name="phone" size={13} color="#FFF" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
-          onPress={() => router.push({ pathname: '/call/[id]' as any, params: { id: profile.user || profile.id, callType: 'video', calleeName: profile.display_name } })}
+          onPress={() => router.push(`/calling/${profile.user || profile.id}?callType=video&calleeName=${encodeURIComponent(profile.display_name)}`)}
         >
           <MaterialCommunityIcons name="video" size={13} color="#FFF" />
         </TouchableOpacity>
@@ -100,7 +107,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
           <MaterialCommunityIcons name={following ? 'account-check' : 'account-plus'} size={13} color="#FFF" />
         </TouchableOpacity>
       </View>
-    </View>
+    </MotiView>
   );
 }
 
@@ -175,12 +182,22 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <MotiView
+        from={{ opacity: 0, translateY: -20 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'timing', duration: 500 }}
+        style={styles.header}
+      >
         <Text style={styles.title}>Discover</Text>
-      </View>
+      </MotiView>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <MotiView
+        from={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'timing', duration: 400, delay: 200 }}
+        style={styles.searchContainer}
+      >
         <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
           <TextInput
@@ -191,10 +208,15 @@ export default function DiscoverScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
-      </View>
+      </MotiView>
 
       {/* Section Tabs */}
-      <View style={styles.tabsRow}>
+      <MotiView
+        from={{ opacity: 0, translateX: -20 }}
+        animate={{ opacity: 1, translateX: 0 }}
+        transition={{ type: 'timing', duration: 400, delay: 400 }}
+        style={styles.tabsRow}
+      >
         {([
           { key: 'all', label: '👥 All Users' },
           { key: 'popular', label: '🔥 Popular' },
@@ -208,7 +230,7 @@ export default function DiscoverScreen() {
             <Text style={[styles.tabLabel, section === tab.key && styles.tabLabelActive]}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </MotiView>
 
       {/* Grid */}
       <ScrollView
@@ -216,7 +238,7 @@ export default function DiscoverScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B5CF6" />}
       >
         <View style={styles.grid}>
-          {filtered.map(p => <ProfileCard key={p.id} profile={p} />)}
+          {filtered.map((p, index) => <ProfileCard key={p.id} profile={p} index={index} />)}
         </View>
         {filtered.length === 0 && (
           <View style={styles.empty}>

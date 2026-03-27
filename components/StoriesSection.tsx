@@ -16,10 +16,12 @@ import * as ScreenCapture from 'expo-screen-capture';
 import type { Story, StoryView } from '@/types';
 import StoryComposer from './StoryComposer';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function StoriesSection() {
+  const { colors, isDark } = useTheme();
   const { user } = useAuthStore();
   const [stories, setStories] = useState<Story[]>([]);
   const [viewers, setViewers] = useState<StoryView[]>([]);
@@ -152,18 +154,18 @@ export default function StoriesSection() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Stories</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Stories</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Add Story Button */}
         <TouchableOpacity style={styles.storyItem} onPress={() => setShowComposer(true)}>
-          <View style={[styles.avatarRing, styles.addRing]}>
-            <View style={styles.addInner}>
-              <MaterialCommunityIcons name="plus" size={28} color="#8B5CF6" />
+          <View style={[styles.avatarRing, styles.addRing, { borderColor: colors.primary, backgroundColor: colors.surfaceAlt }]}>
+            <View style={[styles.addInner, { backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons name="plus" size={28} color={colors.primary} />
             </View>
           </View>
-          <Text style={styles.storyName} numberOfLines={1}>Add Status</Text>
+          <Text style={[styles.storyName, { color: colors.textSecondary }]} numberOfLines={1}>Add Status</Text>
         </TouchableOpacity>
 
         {/* Story Items */}
@@ -176,13 +178,13 @@ export default function StoriesSection() {
               style={styles.storyItem}
               onPress={() => setActiveStoryGroup({ userId, stories: userStories, currentIndex: 0 })}
             >
-              <View style={[styles.avatarRing, isMultiple ? styles.multipleRing : styles.singleRing]}>
+              <View style={[styles.avatarRing, isMultiple ? { backgroundColor: colors.accent } : { backgroundColor: '#FACC15' }]}>
                 <Image
                   source={{ uri: latestStory.user_avatar || latestStory.image_url }}
-                  style={styles.avatarImage}
+                  style={[styles.avatarImage, { borderColor: colors.background, backgroundColor: colors.surfaceAlt }]}
                 />
               </View>
-              <Text style={styles.storyName} numberOfLines={1}>
+              <Text style={[styles.storyName, { color: colors.textSecondary }]} numberOfLines={1}>
                 {latestStory.user_display_name || `User #${userId}`}
               </Text>
             </TouchableOpacity>
@@ -265,22 +267,21 @@ export default function StoriesSection() {
           })()}
 
           {/* Views Bottom Sheet */}
-          <Modal visible={showViewers} transparent animationType="slide">
             <View style={styles.sheetOverlay}>
               <TouchableOpacity style={styles.sheetDismiss} onPress={() => setShowViewers(false)} />
-              <View style={styles.sheetContent}>
-                <View style={styles.sheetHeader}>
-                  <Text style={styles.sheetTitle}>Story Views</Text>
+              <View style={[styles.sheetContent, { backgroundColor: colors.surface }]}>
+                <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.sheetTitle, { color: colors.text }]}>Story Views</Text>
                   <TouchableOpacity onPress={() => setShowViewers(false)}>
-                    <MaterialCommunityIcons name="close" size={24} color="#0F172A" />
+                    <MaterialCommunityIcons name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                 </View>
 
                 <ScrollView style={styles.sheetScroll}>
                   {viewers.length === 0 ? (
                     <View style={styles.emptyViews}>
-                      <MaterialCommunityIcons name="eye-off" size={32} color="#CBD5E1" />
-                      <Text style={styles.emptyViewsText}>No views yet</Text>
+                      <MaterialCommunityIcons name="eye-off" size={32} color={colors.textMuted} />
+                      <Text style={[styles.emptyViewsText, { color: colors.textMuted }]}>No views yet</Text>
                     </View>
                   ) : (
                     viewers.map((v) => (
@@ -294,12 +295,12 @@ export default function StoriesSection() {
                           // router.push(`/profile/${v.viewer}`); 
                         }}
                       >
-                        <View style={styles.viewerAvatarBg}>
+                        <View style={[styles.viewerAvatarBg, { backgroundColor: colors.surfaceAlt }]}>
                           <Image source={{ uri: v.viewer_avatar || undefined }} style={styles.viewerAvatar} />
                         </View>
                         <View>
-                          <Text style={styles.viewerItemName}>{v.viewer_name || `User #${v.viewer}`}</Text>
-                          <Text style={styles.viewerItemTime}>{new Date(v.viewed_at).toLocaleString()}</Text>
+                          <Text style={[styles.viewerItemName, { color: colors.text }]}>{v.viewer_name || `User #${v.viewer}`}</Text>
+                          <Text style={[styles.viewerItemTime, { color: colors.textSecondary }]}>{new Date(v.viewed_at).toLocaleString()}</Text>
                         </View>
                       </TouchableOpacity>
                     ))

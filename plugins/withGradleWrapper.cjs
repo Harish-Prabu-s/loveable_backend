@@ -22,16 +22,8 @@ const withGradleWrapper = (config) => {
         }
       }
 
-      // 2. Ensure gradle.properties has newArchEnabled (for react-native-worklets)
-      const gradlePropsPath = path.join(platformRoot, 'gradle.properties');
-      if (fs.existsSync(gradlePropsPath)) {
-        let props = fs.readFileSync(gradlePropsPath, 'utf-8');
-        if (!props.includes('newArchEnabled=true')) {
-          props = props.trimEnd() + (props.endsWith('\n') ? '' : '\n') + 'newArchEnabled=true\n';
-          fs.writeFileSync(gradlePropsPath, props);
-          console.log('[withGradleWrapper] Set newArchEnabled=true');
-        }
-      }
+      // 2. Ensure gradle.properties is not overriden with hardcoded newArchEnabled
+      // We removed the forced newArchEnabled=true to allow expo-build-properties to work.
 
       // 3. Add REACT_NATIVE_NODE_MODULES_DIR for worklets resolveReactNativeDirectory
       const appBuildPath = path.join(platformRoot, 'app', 'build.gradle');

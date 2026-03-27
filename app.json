@@ -34,7 +34,9 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.READ_PHONE_STATE"
       ]
     },
     "scheme": "loveable-app",
@@ -44,14 +46,14 @@
     },
     "extra": {
       "signalingUrl": "wss://berneice-untransmigrated-exotically.ngrok-free.dev",
-      "apiUrl": "http://localhost:8000/api",
+      "apiUrl": "http://192.168.1.10:8000/api",
+      "note": "Update apiUrl with your machine's local IP address for mobile testing",
       "eas": {
         "projectId": "4f304a85-6864-4d5e-9b51-8d5ff868e27a"
       }
     },
     "plugins": [
       "./plugins/withMainApplication.cjs",
-      "@config-plugins/react-native-webrtc",
       "expo-secure-store",
       "./plugins/withGradleWrapper.cjs",
       [

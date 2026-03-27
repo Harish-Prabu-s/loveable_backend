@@ -61,6 +61,9 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [visibility, setVisibility] = useState<'all' | 'close_friends'>('all');
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [showMentionResults, setShowMentionResults] = useState(false);
+  const [foundUsers, setFoundUsers] = useState<any[]>([]);
   const { colors } = useTheme();
 
   const resetForm = () => {
@@ -105,6 +108,28 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
     }
+  };
+
+  const handleMentionSearch = async (text: string) => {
+    setMentionSearch(text);
+    if (text.length > 1) {
+      try {
+        const results = await profilesApi.listProfiles(text);
+        setFoundUsers(results || []);
+        setShowMentionResults(true);
+      } catch (e) {
+        console.error("Mention search failed", e);
+      }
+    } else {
+      setShowMentionResults(false);
+    }
+  };
+
+  const addMention = (user: any) => {
+    const mentionTag = `@${user.username || user.display_name} `;
+    setCaption(prev => prev + mentionTag);
+    setShowMentionResults(false);
+    setMentionSearch('');
   };
 
   const handlePost = async () => {
@@ -162,6 +187,38 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
               maxLength={500}
               autoFocus
             />
+          </View>
+
+          {/* Mention Selection */}
+          <View style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+               <MaterialCommunityIcons name="at" size={20} color={colors.primary} />
+               <TextInput
+                 placeholder="Mention someone..."
+                 placeholderTextColor={colors.textMuted}
+                 style={{ flex: 1, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 4 }}
+                 value={mentionSearch}
+                 onChangeText={handleMentionSearch}
+               />
+            </View>
+            
+            {showMentionResults && foundUsers.length > 0 && (
+              <View style={{ backgroundColor: colors.surfaceAlt, borderRadius: 12, padding: 8, maxHeight: 150 }}>
+                <ScrollView nestedScrollEnabled>
+                  {foundUsers.map(u => (
+                    <TouchableOpacity 
+                      key={u.id} 
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border + '50' }}
+                      onPress={() => addMention(u)}
+                    >
+                      <Image source={{ uri: getAvatarUri(u.photo, u.id, u.gender) }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                      <Text style={{ color: colors.text, fontWeight: '600' }}>{u.display_name || u.username}</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12 }}>@{u.username}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
           {/* Selected Image Preview */}

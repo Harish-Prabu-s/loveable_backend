@@ -31,7 +31,7 @@ def create_story(user, media_url: str, media_type: str = 'image', visibility='al
     from ..notifications.services import notify_close_friends_of_content
     from ..notifications.utils import handle_mentions
     notify_close_friends_of_content(user, 'story', story.id)
-    handle_mentions(caption, user, 'story', story.id)
+    handle_mentions(caption, user, 'story', story.id, obj=story)
     
     return story
 

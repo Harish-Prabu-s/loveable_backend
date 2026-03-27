@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
+import { useTheme } from '@/context/ThemeContext';
 import { Video, ResizeMode, Audio } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { reelsApi, Reel } from '@/api/reels';
 import { profilesApi } from '@/api/profiles';
@@ -12,6 +17,8 @@ import { archiveApi } from '@/api/archive';
 const { height, width } = Dimensions.get('window');
 
 export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisible: boolean, isFocused: boolean, onDelete: (id: number) => void }) => {
+    const { colors, isDark } = useTheme();
+    const router = useRouter();
     const videoRef = useRef<Video>(null);
     const [isPlaying, setIsPlaying] = useState(isVisible);
     const [isMuted, setIsMuted] = useState(false);
@@ -27,6 +34,7 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
     const [showShare, setShowShare] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [key, setKey] = useState(0);
+    const [showHeart, setShowHeart] = useState(false);
     const lastTap = useRef(0);
     const tapTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -165,7 +173,9 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
                 clearTimeout(tapTimer.current);
                 tapTimer.current = null;
             }
-            handleLike();
+            if (!isLiked) handleLike();
+            setShowHeart(true);
+            setTimeout(() => setShowHeart(false), 800);
             lastTap.current = 0;
             return;
         }
@@ -210,19 +220,41 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
                         setIsLoading(false);
                     }}
                 />
+                <AnimatePresence>
+                    {showHeart && (
+                        <MotiView
+                            from={{ scale: 0, opacity: 0, rotate: '-20deg' }}
+                            animate={{ scale: 2, opacity: 1, rotate: '0deg' }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{
+                                type: 'spring',
+                                damping: 10,
+                                stiffness: 200,
+                            }}
+                            style={styles.heartOverlay}
+                        >
+                            <LinearGradient
+                                colors={[colors.danger, colors.accent]}
+                                style={styles.heartGradient}
+                            >
+                                <MaterialCommunityIcons name="heart" size={70} color="#FFFFFF" />
+                            </LinearGradient>
+                        </MotiView>
+                    )}
+                </AnimatePresence>
             </TouchableOpacity>
 
             {isLoading && (
-                <View style={[styles.playIconOverlay, { backgroundColor: '#000' }]}>
-                    <ActivityIndicator size="large" color="#8B5CF6" />
+                <View style={[styles.playIconOverlay, { backgroundColor: '#000000' }]}>
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             )}
 
             {error && (
                 <View style={[styles.playIconOverlay, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <TouchableOpacity onPress={handleRetry} style={styles.retryBtn}>
-                        <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Retry</Text>
+                    <TouchableOpacity onPress={handleRetry} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
+                        <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Retry</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -235,22 +267,22 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
 
             <View style={styles.rightActions}>
                 <TouchableOpacity style={styles.actionBtn} onPress={togglePlayPause}>
-                    <MaterialCommunityIcons name={isPlaying ? "pause" : "play"} size={32} color="#FFF" />
+                    <MaterialCommunityIcons name={isPlaying ? "pause" : "play"} size={32} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
-                    <MaterialCommunityIcons name={isLiked ? "heart" : "heart-outline"} size={32} color={isLiked ? "#EF4444" : "#FFF"} />
-                    <Text style={styles.actionText}>{likesCount}</Text>
+                    <MaterialCommunityIcons name={isLiked ? "heart" : "heart-outline"} size={32} color={isLiked ? colors.danger : "#FFFFFF"} />
+                    <Text style={[styles.actionText, { color: '#FFFFFF' }]}>{likesCount}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={handleOpenComments}>
-                    <MaterialCommunityIcons name="comment-outline" size={32} color="#FFF" />
-                    <Text style={styles.actionText}>{item.comments_count}</Text>
+                    <MaterialCommunityIcons name="comment-outline" size={32} color="#FFFFFF" />
+                    <Text style={[styles.actionText, { color: '#FFFFFF' }]}>{item.comments_count}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => setShowShare(true)}>
-                    <MaterialCommunityIcons name="send-outline" size={32} color="#FFF" style={{ transform: [{ rotate: '-45deg' }] }} />
+                    <MaterialCommunityIcons name="send-outline" size={32} color="#FFFFFF" style={{ transform: [{ rotate: '-45deg' }] }} />
                 </TouchableOpacity>
                 {item.is_owner && (
                     <TouchableOpacity style={styles.actionBtn} onPress={handleMenuPress}>
-                        <MaterialCommunityIcons name="dots-vertical" size={32} color="#FFF" />
+                        <MaterialCommunityIcons name="dots-vertical" size={32} color="#FFFFFF" />
                     </TouchableOpacity>
                 )}
             </View>
@@ -258,7 +290,7 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
             <View style={styles.bottomInfo}>
                 <View style={styles.userInfo}>
                     <Image source={{ uri: item.user_avatar || 'https://via.placeholder.com/150' }} style={styles.avatar} />
-                    <Text style={styles.username}>{item.user_display_name}</Text>
+                    <Text style={[styles.username, { color: '#FFFFFF' }]}>{item.user_display_name}</Text>
                     <TouchableOpacity 
                         style={[styles.followBtn, isFollowing && { backgroundColor: 'rgba(255,255,255,0.2)' }]} 
                         onPress={handleFollow}
@@ -267,8 +299,21 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
                     </TouchableOpacity>
                 </View>
                 {item.caption ? (
-                    <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
+                    <Text style={[styles.caption, { color: '#FFFFFF' }]} numberOfLines={2}>{item.caption}</Text>
                 ) : null}
+                {item.mentioned_users && item.mentioned_users.length > 0 && (
+                    <View style={styles.mentionsRow}>
+                        {item.mentioned_users.map(u => (
+                            <TouchableOpacity 
+                                key={u.id} 
+                                style={styles.mentionChip}
+                                onPress={() => router.push(`/user/${u.id}` as any)}
+                            >
+                                <Text style={styles.mentionText}>@{u.username}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
             </View>
 
             <CommentSheet 
@@ -357,20 +402,58 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     followTxt: {
-        color: '#FFF',
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '600',
     },
     caption: {
-        color: '#FFF',
         fontSize: 14,
         marginBottom: 12,
     },
     retryBtn: {
         marginTop: 20,
-        backgroundColor: '#8B5CF6',
         paddingHorizontal: 24,
         paddingVertical: 10,
         borderRadius: 8,
+    },
+    heartOverlay: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginTop: -55,
+        marginLeft: -55,
+        zIndex: 100,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heartGradient: {
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: 'black',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.6,
+        shadowRadius: 20,
+        elevation: 15,
+    },
+    mentionsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: -4,
+        marginBottom: 8,
+    },
+    mentionChip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    mentionText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
     }
 });

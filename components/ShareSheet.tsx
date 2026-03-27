@@ -16,6 +16,7 @@ import { profilesApi } from '@/api/profiles';
 import { getMediaUrl } from '@/utils/media';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { toast } from '@/utils/toast';
+import { walletApi } from '@/api/wallet';
 
 interface Friend {
     user: number;
@@ -62,6 +63,14 @@ export const ShareSheet = ({ visible, onClose, onShare }: ShareSheetProps) => {
         try {
             await onShare(friend.user);
             toast.success(`Shared with ${friend.display_name}`);
+            
+            // Reward user with 10 coins
+            try {
+                await walletApi.earnCoins({ amount: 10, description: `Shared a ${friend.gender === 'F' ? 'reel' : 'post'} with ${friend.display_name}` });
+                toast.success("Reward: You earned 10 coins!");
+            } catch (err) {
+                console.error('Failed to award coins', err);
+            }
         } catch (e) {
             toast.error("Failed to share");
         } finally {

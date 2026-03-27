@@ -11,9 +11,10 @@ def parse_mentions(text):
     # Find @ followed by alphanumeric and underscore, at least 3 chars
     return re.findall(r'@([a-zA-Z0-9_]{3,})', text)
 
-def handle_mentions(text, actor, content_type, object_id, request=None):
+def handle_mentions(text, actor, content_type, object_id, request=None, obj=None):
     """
     Process mentions in text:
+    - Populates the 'mentions' M2M field if obj is provided
     - Creates Notifications
     - Sends Push Notifications
     - Sends a chat message alert
@@ -29,6 +30,10 @@ def handle_mentions(text, actor, content_type, object_id, request=None):
 
     mentioned_users = User.objects.filter(username__in=usernames)
     
+    # Update M2M field if object is provided (for Post, Reel, Story)
+    if obj and hasattr(obj, 'mentions'):
+        obj.mentions.set(mentioned_users)
+
     profile = getattr(actor, 'profile', None)
     sender_name = profile.display_name if profile else actor.username
 

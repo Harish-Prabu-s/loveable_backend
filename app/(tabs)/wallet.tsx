@@ -12,14 +12,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MotiView, MotiText } from 'moti';
 import { walletApi } from '@/api/wallet';
 import { useAuthStore } from '@/store/authStore';
 import { useWalletStore } from '@/store/walletStore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 
 export default function WalletScreen() {
+  const { colors, isDark } = useTheme();
   const { user } = useAuthStore();
   const { wallet, isLoading: loading, fetchWallet } = useWalletStore();
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -73,31 +76,40 @@ export default function WalletScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F9FAFB" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        <Text style={styles.headerTitle}>My Wallet</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>My Wallet</Text>
 
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 600 }}
+          style={[styles.balanceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Available Balance</Text>
             <View style={styles.coinContainer}>
               <MaterialCommunityIcons name="database" size={32} color="#FBBF24" />
-              <Text style={styles.balanceValue}>{loading ? '...' : wallet?.coin_balance ?? 0}</Text>
+              <Text style={[styles.balanceValue, { color: colors.text }]}>{loading ? '...' : wallet?.coin_balance ?? 0}</Text>
             </View>
           </View>
 
           {/* Offer Section */}
-          <View style={styles.offerContainer}>
+          <MotiView
+            from={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', delay: 300 }}
+            style={[styles.offerContainer, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
+          >
             <View style={styles.offerInfo}>
-              <Text style={styles.offerTitle}>Today's Offer (9 AM - 9 PM)</Text>
-              <Text style={styles.offerText}>700 Coins for ₹199</Text>
-              <Text style={styles.offerSubtext}>
+              <Text style={[styles.offerTitle, { color: colors.textMuted }]}>Today's Offer (9 AM - 9 PM)</Text>
+              <Text style={[styles.offerText, { color: colors.text }]}>700 Coins for ₹199</Text>
+              <Text style={[styles.offerSubtext, { color: colors.textMuted }]}>
                 Remaining: {isOfferTime() ? `${remainingClaims}/2` : '0/2'}
               </Text>
             </View>
@@ -111,13 +123,13 @@ export default function WalletScreen() {
             >
               <Text style={styles.offerButtonText}>Get Offer</Text>
             </TouchableOpacity>
-          </View>
+          </MotiView>
 
           {isFemale ? (
-            <View style={styles.earningsContainer}>
+            <View style={[styles.earningsContainer, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
               <View>
-                <Text style={styles.earningsLabel}>Estimated Earnings</Text>
-                <Text style={styles.earningsValue}>₹ {rupees}</Text>
+                <Text style={[styles.earningsLabel, { color: colors.textSecondary }]}>Estimated Earnings</Text>
+                <Text style={[styles.earningsValue, { color: colors.text }]}>₹ {rupees}</Text>
               </View>
               <TouchableOpacity
                 style={[
@@ -141,45 +153,51 @@ export default function WalletScreen() {
               style={styles.addCoinsButton}
             />
           )}
-        </View>
+        </MotiView>
 
         {/* Transactions Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
           <TouchableOpacity onPress={() => router.push('/wallet/transactions' as any)}>
-            <Text style={styles.viewAllText}>View All</Text>
+            <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.transactionsCard}>
+        <View style={[styles.transactionsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {loading && !refreshing ? (
-            <ActivityIndicator size="large" color="#F9FAFB" style={styles.loader} />
+            <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
           ) : transactions.length > 0 ? (
             transactions.slice(0, 10).map((tx, index) => (
-              <View key={tx.id || index} style={styles.transactionItem}>
+              <MotiView
+                key={tx.id || index}
+                from={{ opacity: 0, translateX: -20 }}
+                animate={{ opacity: 1, translateX: 0 }}
+                transition={{ type: 'timing', duration: 400, delay: index * 100 }}
+                style={[styles.transactionItem, { borderBottomColor: colors.border }]}
+              >
                 <View style={styles.txIconContainer}>
                   <MaterialCommunityIcons
                     name={tx.type === 'credit' ? 'plus-circle' : 'minus-circle'}
                     size={24}
-                    color={tx.type === 'credit' ? '#10B981' : '#EF4444'}
+                    color={tx.type === 'credit' ? colors.success : colors.danger}
                   />
                 </View>
                 <View style={styles.txInfo}>
-                  <Text style={styles.txDescription}>{tx.description}</Text>
-                  <Text style={styles.txDate}>
+                  <Text style={[styles.txDescription, { color: colors.text }]}>{tx.description}</Text>
+                  <Text style={[styles.txDate, { color: colors.textMuted }]}>
                     {new Date(tx.created_at).toLocaleDateString()}
                   </Text>
                 </View>
                 <Text style={[
                   styles.txAmount,
-                  { color: tx.type === 'credit' ? '#10B981' : '#F9FAFB' }
+                  { color: tx.type === 'credit' ? colors.success : colors.text }
                 ]}>
                   {tx.type === 'credit' ? '+' : '-'}{tx.amount}
                 </Text>
-              </View>
+              </MotiView>
             ))
           ) : (
-            <Text style={styles.emptyText}>No transactions yet</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>No transactions yet</Text>
           )}
         </View>
       </ScrollView>

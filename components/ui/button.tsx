@@ -8,6 +8,8 @@ import {
   TextStyle,
   TouchableOpacityProps
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/context/ThemeContext';
 
 interface ButtonProps extends TouchableOpacityProps {
   label: string;
@@ -28,21 +30,23 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
+  const { colors } = useTheme();
+
   const getVariantStyle = () => {
     switch (variant) {
-      case 'secondary': return styles.secondary;
-      case 'outline': return styles.outline;
-      case 'ghost': return styles.ghost;
-      default: return styles.primary;
+      case 'secondary': return { backgroundColor: colors.surfaceAlt };
+      case 'outline': return { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border };
+      case 'ghost': return { backgroundColor: 'transparent' };
+      default: return {}; // Gradient handles primary
     }
   };
 
   const getTextStyle = () => {
     switch (variant) {
-      case 'outline': return styles.outlineText;
-      case 'ghost': return styles.ghostText;
-      case 'secondary': return styles.secondaryText;
-      default: return styles.primaryText;
+      case 'outline': return { color: colors.primary };
+      case 'ghost': return { color: colors.textSecondary };
+      case 'secondary': return { color: colors.text };
+      default: return { color: '#FFFFFF' };
     }
   };
 
@@ -61,8 +65,16 @@ export const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.7}
       {...props}
     >
+      {variant === 'primary' && (
+        <LinearGradient
+          colors={[colors.primary, colors.accent]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? '#F9FAFB' : '#000000'} />
+        <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : '#FFFFFF'} />
       ) : (
         <Text style={[styles.textBase, getTextStyle(), textStyle]}>{label}</Text>
       )}
@@ -72,40 +84,15 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 12,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   textBase: {
     fontWeight: '600',
     textAlign: 'center',
-  },
-  primary: {
-    backgroundColor: '#F9FAFB',
-  },
-  primaryText: {
-    color: '#020617',
-  },
-  secondary: {
-    backgroundColor: '#1F2937',
-  },
-  secondaryText: {
-    color: '#F9FAFB',
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  outlineText: {
-    color: '#F9FAFB',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  ghostText: {
-    color: '#9CA3AF',
   },
   sm: {
     paddingVertical: 8,

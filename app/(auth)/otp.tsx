@@ -12,6 +12,7 @@ import {
     ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Button } from '@/components/ui/button';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,10 +20,14 @@ import { authApi } from '@/api/auth';
 import { storage } from '@/lib/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthStore } from '@/store/authStore';
-import type { User } from '@/types';
-import { MotiView } from 'moti';
+import { MotiView, MotiText } from 'moti';
+import { BlurBackground } from '@/components/common/BlurBackground';
+import { PremiumLoader } from '@/components/common/PremiumLoader';
+import { useTheme } from '@/context/ThemeContext';
+import { User } from '@/types';
 
 export default function OtpVerificationScreen() {
+    const { colors, isDark } = useTheme();
     const { phone } = useLocalSearchParams<{ phone: string }>();
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
@@ -174,13 +179,14 @@ export default function OtpVerificationScreen() {
                     <TouchableOpacity
                         style={[
                             styles.otpBox,
-                            digit ? styles.otpBoxFilled : null,
-                            isFocused ? styles.otpBoxFocused : null,
+                            { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                            digit ? { borderColor: colors.primary, backgroundColor: colors.primary + '26' } : null,
+                            isFocused ? { borderColor: colors.accent, borderWidth: 2 } : null,
                         ]}
                         onPress={() => inputRef.current?.focus()}
                         activeOpacity={1}
                     >
-                        <Text style={styles.otpDigit}>{digit}</Text>
+                        <Text style={[styles.otpDigit, { color: colors.text }]}>{digit}</Text>
                     </TouchableOpacity>
                 </MotiView>
             );
@@ -188,97 +194,113 @@ export default function OtpVerificationScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.kav}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="handled"
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.kav}
                 >
-                    {/* Back button */}
-                    <MotiView from={{ opacity: 0, translateX: -10 }} animate={{ opacity: 1, translateX: 0 }} transition={{ delay: 200 }}>
-                        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-                            <MaterialCommunityIcons name="arrow-left" size={24} color="#94A3B8" />
-                        </TouchableOpacity>
-                    </MotiView>
-
-                    {/* Header */}
-                    <MotiView
-                        from={{ opacity: 0, scale: 0.9, translateY: -20 }}
-                        animate={{ opacity: 1, scale: 1, translateY: 0 }}
-                        transition={{ type: 'spring', damping: 15 }}
+                    <ScrollView
+                        contentContainerStyle={styles.scroll}
+                        keyboardShouldPersistTaps="handled"
                     >
-                        <LinearGradient
-                            colors={['#8B5CF6', '#EC4899']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.headerGradient}
+                        {/* Back button */}
+                        <MotiView 
+                            from={{ opacity: 0, translateX: -20 }} 
+                            animate={{ opacity: 1, translateX: 0 }} 
+                            transition={{ delay: 200, type: 'spring' }}
                         >
-                            <MaterialCommunityIcons name="shield-check-outline" size={52} color="#FFFFFF" />
-                            <Text style={styles.headerTitle}>Verify OTP</Text>
-                            <Text style={styles.headerSubtitle}>
-                                Sent to{' '}
-                                <Text style={styles.phoneHighlight}>{phone}</Text>
+                            <TouchableOpacity style={[styles.backBtn, { backgroundColor: colors.surfaceAlt }]} onPress={() => router.back()}>
+                                <MaterialCommunityIcons name="chevron-left" size={28} color={colors.text} />
+                            </TouchableOpacity>
+                        </MotiView>
+
+                        {/* Animated Verification Icon */}
+                        <MotiView
+                            from={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: 'spring', delay: 300 }}
+                            style={styles.iconContainer}
+                        >
+                            <LinearGradient
+                                colors={[colors.primary, colors.accent]}
+                                style={styles.iconGradient}
+                            >
+                                <MaterialCommunityIcons name="shield-lock-outline" size={50} color="#FFFFFF" />
+                            </LinearGradient>
+                        </MotiView>
+
+                        {/* Header Info */}
+                        <MotiView
+                            from={{ opacity: 0, translateY: 10 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            transition={{ delay: 500 }}
+                            style={styles.textCenter}
+                        >
+                            <Text style={[styles.headerTitle, { color: colors.text }]}>Check your phone</Text>
+                            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                                We've sent a 6-digit code to{'\n'}
+                                <Text style={[styles.phoneHighlight, { color: colors.accent }]}>{phone}</Text>
                             </Text>
-                        </LinearGradient>
-                    </MotiView>
+                        </MotiView>
 
-                    {/* OTP Boxes */}
-                    <View style={styles.otpRow}>
-                        {renderOtpBoxes()}
-                        {/* Hidden input captures real keyboard input */}
-                        <TextInput
-                            ref={inputRef}
-                            style={styles.hiddenInput}
-                            keyboardType="number-pad"
-                            maxLength={6}
-                            value={otp}
-                            onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
-                            autoFocus
-                            caretHidden
-                        />
-                    </View>
+                        {/* OTP Input Section */}
+                        <View style={styles.otpRow}>
+                            {renderOtpBoxes()}
+                            <TextInput
+                                ref={inputRef}
+                                style={styles.hiddenInput}
+                                keyboardType="number-pad"
+                                maxLength={6}
+                                value={otp}
+                                onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
+                                autoFocus
+                                caretHidden
+                            />
+                        </View>
 
-                    <MotiView from={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1000 }}>
-                        <TouchableOpacity onPress={handleResend} style={styles.resendBtn}>
-                            <Text style={styles.resendText}>Didn't receive it? <Text style={styles.resendLink}>Resend OTP</Text></Text>
-                        </TouchableOpacity>
-                    </MotiView>
-
-                    {/* Verify Button */}
-                    <MotiView
-                        from={{ opacity: 0, translateY: 20 }}
-                        animate={{ opacity: 1, translateY: 0 }}
-                        transition={{ delay: 1100 }}
-                    >
-                        <TouchableOpacity
-                            style={[styles.button, (!isComplete || loading) && styles.buttonDisabled]}
-                            onPress={handleVerify}
-                            disabled={!isComplete || loading}
-                            activeOpacity={0.85}
+                        <MotiView 
+                            from={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            transition={{ delay: 1000 }}
+                            style={styles.resendContainer}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <>
-                                    <Text style={styles.buttonText}>Verify OTP</Text>
-                                    <MaterialCommunityIcons name="check-circle-outline" size={20} color="#FFFFFF" />
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    </MotiView>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                            <TouchableOpacity onPress={handleResend} style={styles.resendBtn}>
+                                <Text style={[styles.resendText, { color: colors.textSecondary }]}>Didn't receive code? <Text style={[styles.resendLink, { color: colors.accent }]}>Resend Now</Text></Text>
+                            </TouchableOpacity>
+                        </MotiView>
+
+                        {/* Action Button */}
+                        <MotiView
+                            from={{ opacity: 0, translateY: 30 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            transition={{ delay: 800, type: 'spring' }}
+                        >
+                            <Button 
+                                label="Verify Code" 
+                                variant="primary" 
+                                loading={loading}
+                                disabled={!isComplete}
+                                onPress={handleVerify}
+                            />
+                        </MotiView>
+
+                        <Text style={[styles.securityText, { color: '#10B981' }]}>
+                            <MaterialCommunityIcons name="lock-check" size={14} color="#10B981" /> End-to-end encrypted verification
+                        </Text>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
     safeArea: {
         flex: 1,
-        backgroundColor: '#020617',
     },
     kav: {
         flex: 1,
@@ -290,67 +312,75 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     backBtn: {
-        alignSelf: 'flex-start',
-        marginBottom: 16,
-        padding: 8,
-        borderRadius: 10,
-        backgroundColor: '#0F172A',
-    },
-    headerGradient: {
-        borderRadius: 28,
-        padding: 36,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
-        marginBottom: 36,
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 12,
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    iconContainer: {
+        alignSelf: 'center',
+        marginBottom: 24,
+    },
+    iconGradient: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    textCenter: {
+        alignItems: 'center',
+        marginBottom: 40,
     },
     headerTitle: {
-        fontSize: 30,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        marginTop: 16,
+        fontSize: 32,
+        fontWeight: '900',
+        letterSpacing: -1,
     },
     headerSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 8,
+        fontSize: 16,
+        marginTop: 12,
         textAlign: 'center',
+        lineHeight: 24,
     },
     phoneHighlight: {
-        fontWeight: '700',
-        color: '#FFFFFF',
+        color: '#8B5CF6',
+        fontWeight: '800',
     },
     otpRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 12,
-        position: 'relative',
+        marginBottom: 24,
+        paddingHorizontal: 4,
     },
     otpBox: {
-        width: 46,
-        height: 56,
-        borderRadius: 12,
-        backgroundColor: '#0F172A',
-        borderWidth: 1.5,
-        borderColor: '#1E293B',
+        width: 48,
+        height: 64,
+        borderRadius: 16,
+        borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 3,
     },
     otpBoxFilled: {
         borderColor: '#8B5CF6',
-        backgroundColor: 'rgba(139,92,246,0.1)',
+        backgroundColor: 'rgba(139, 92, 246, 0.15)',
     },
     otpBoxFocused: {
         borderColor: '#EC4899',
-        borderWidth: 2,
+        backgroundColor: 'rgba(236, 72, 153, 0.1)',
+        transform: [{ scale: 1.05 }],
     },
     otpDigit: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#F8FAFC',
+        fontSize: 26,
+        fontWeight: '800',
+        color: '#FFFFFF',
     },
     hiddenInput: {
         position: 'absolute',
@@ -358,41 +388,53 @@ const styles = StyleSheet.create({
         height: '100%',
         opacity: 0,
     },
+    resendContainer: {
+        marginBottom: 32,
+    },
     resendBtn: {
         alignSelf: 'center',
-        marginBottom: 28,
-        paddingVertical: 8,
+        padding: 10,
     },
     resendText: {
-        fontSize: 13,
-        color: '#475569',
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.5)',
     },
     resendLink: {
-        color: '#8B5CF6',
-        fontWeight: '700',
+        fontWeight: '800',
+        textDecorationLine: 'underline',
     },
     button: {
         backgroundColor: '#8B5CF6',
-        borderRadius: 14,
-        paddingVertical: 17,
+        borderRadius: 18,
+        paddingVertical: 18,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 12,
         shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 12,
     },
     buttonDisabled: {
-        opacity: 0.45,
+        opacity: 0.3,
         elevation: 0,
         shadowOpacity: 0,
     },
     buttonText: {
         color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
+    securityText: {
+        textAlign: 'center',
+        marginTop: 24,
+        color: '#10B981',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        opacity: 0.8,
+    }
 });

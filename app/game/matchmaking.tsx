@@ -115,15 +115,34 @@ export default function MatchmakingScreen() {
                                 <Text style={styles.buttonText}>Group 4p (Party)</Text>
                             </TouchableOpacity>
                         </>
-                    ) : status === 'searching' ? (
+                                        ) : status === 'searching' ? (
                         <View style={styles.radarContainer}>
+                            {[0, 1, 2].map((i) => (
+                                <MotiView
+                                    key={i}
+                                    from={{ scale: 1, opacity: 0.6 }}
+                                    animate={{ scale: 3.5, opacity: 0 }}
+                                    transition={{
+                                        type: 'timing',
+                                        duration: 2500,
+                                        loop: true,
+                                        delay: i * 800,
+                                    }}
+                                    style={styles.radarCircle}
+                                />
+                            ))}
                             <MotiView
-                                from={{ scale: 1, opacity: 0.8 }}
-                                animate={{ scale: 2.5, opacity: 0 }}
-                                transition={{ type: 'timing', duration: 2000, loop: true }}
-                                style={styles.radarCircle}
-                            />
-                            <MaterialCommunityIcons name="radar" size={80} color="#FCD34D" />
+                                animate={{
+                                    scale: [1, 1.1, 1],
+                                }}
+                                transition={{
+                                    type: 'timing',
+                                    duration: 1000,
+                                    loop: true,
+                                }}
+                            >
+                                <MaterialCommunityIcons name="radar" size={90} color="#FCD34D" />
+                            </MotiView>
                             <Text style={styles.searchingText}>
                                 {mode === 'couple' ? `Connecting with ${coupleName}...` : 'Scanning for opposites...'}
                             </Text>

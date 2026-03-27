@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { streaksApi } from '@/api/streaks';
 import { profilesApi } from '@/api/profiles';
 import { useAuthStore } from '@/store/authStore';
@@ -96,15 +97,28 @@ export default function StreaksScreen() {
     const renderHeader = () => (
         <View style={styles.topHeader}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storyScroll}>
-                <StreakCircle 
-                    isMe={true} 
-                    item={myStreak}
-                    profile={profile || user}
-                    onAddPress={() => setShowCreate(true)} 
-                    onPress={handleOpenViewer} 
-                />
-                {otherFriends.map((u: any) => (
-                    <StreakCircle key={u.user_id} item={u} onPress={handleOpenViewer} />
+                <MotiView
+                    from={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', delay: 100 }}
+                >
+                    <StreakCircle 
+                        isMe={true} 
+                        item={myStreak}
+                        profile={profile || user}
+                        onAddPress={() => setShowCreate(true)} 
+                        onPress={handleOpenViewer} 
+                    />
+                </MotiView>
+                {otherFriends.map((u: any, idx: number) => (
+                    <MotiView
+                        key={u.user_id}
+                        from={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ type: 'spring', delay: 200 + (idx * 50) }}
+                    >
+                        <StreakCircle item={u} onPress={handleOpenViewer} />
+                    </MotiView>
                 ))}
             </ScrollView>
 
@@ -132,33 +146,39 @@ export default function StreaksScreen() {
         }
     };
 
-    const UserListItem = ({ item, onPress }: any) => {
+    const UserListItem = ({ item, index }: any) => {
         return (
-            <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <TouchableOpacity style={styles.listMainAction} onPress={() => onPress(item)}>
-                    <View style={styles.listAvatarWrap}>
-                        <View style={[styles.listInner, { backgroundColor: colors.background }]}>
-                            <Image source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} style={styles.listAvatar} />
+            <MotiView
+                from={{ opacity: 0, translateY: 20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'timing', delay: 400 + (index * 50) }}
+            >
+                <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <TouchableOpacity style={styles.listMainAction} onPress={() => handleOpenViewer(item)}>
+                        <View style={styles.listAvatarWrap}>
+                            <View style={[styles.listInner, { backgroundColor: colors.background }]}>
+                                <Image source={{ uri: item.media?.media_url || avatar(item.photo, item.user_id) }} style={styles.listAvatar} />
+                            </View>
                         </View>
-                    </View>
-                    <View style={styles.listInfo}>
-                        <Text style={[styles.listName, { color: colors.text }]}>{item.display_name || item.username}</Text>
-                        <View style={styles.listStatusRow}>
-                            <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
-                            <Text style={[styles.listSub, { color: colors.textMuted }]}>{item.streak_count} day streak</Text>
+                        <View style={styles.listInfo}>
+                            <Text style={[styles.listName, { color: colors.text }]}>{item.display_name || item.username}</Text>
+                            <View style={styles.listStatusRow}>
+                                <MaterialCommunityIcons name="fire" size={16} color="#EF4444" />
+                                <Text style={[styles.listSub, { color: colors.textMuted }]}>{item.streak_count} day streak</Text>
+                            </View>
                         </View>
-                    </View>
-                </TouchableOpacity>
+                    </TouchableOpacity>
 
-                <View style={styles.listActions}>
-                    <TouchableOpacity style={styles.fireBtn} onPress={() => handleFireUser(item)}>
-                        <MaterialCommunityIcons name="fire" size={24} color="#EF4444" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/chat/${item.user_id}` as any)}>
-                        <MaterialCommunityIcons name="chat-processing-outline" size={22} color={colors.primary} />
-                    </TouchableOpacity>
+                    <View style={styles.listActions}>
+                        <TouchableOpacity style={styles.fireBtn} onPress={() => handleFireUser(item)}>
+                            <MaterialCommunityIcons name="fire" size={24} color="#EF4444" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/chat/${item.user_id}` as any)}>
+                            <MaterialCommunityIcons name="chat-processing-outline" size={22} color={colors.primary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            </MotiView>
         );
     };
 
@@ -166,12 +186,16 @@ export default function StreaksScreen() {
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
             <StatusBar barStyle="light-content" />
             
-            <View style={styles.mainHeader}>
+            <MotiView
+                from={{ opacity: 0, translateY: -20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                style={styles.mainHeader}
+            >
                 <Text style={[styles.title, { color: colors.text }]}>Streaks 🔥</Text>
                 <TouchableOpacity onPress={loadData}>
                     <MaterialCommunityIcons name="refresh" size={24} color={colors.text} />
                 </TouchableOpacity>
-            </View>
+            </MotiView>
 
             {loading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -182,18 +206,25 @@ export default function StreaksScreen() {
                     data={allStreaks}
                     keyExtractor={(item) => item.user_id.toString()}
                     ListHeaderComponent={renderHeader}
-                    renderItem={({ item }) => <UserListItem item={item} onPress={handleOpenViewer} />}
+                    renderItem={({ item, index }) => <UserListItem item={item} index={index} />}
                     contentContainerStyle={styles.listScroll}
                     refreshing={refreshing}
                     onRefresh={onRefresh}
                 />
             )}
 
-            <TouchableOpacity style={styles.fab} onPress={() => setShowCreate(true)}>
-                <LinearGradient colors={['#7C3AED', '#EF4444']} style={styles.fabGrad}>
-                    <MaterialCommunityIcons name="plus" size={32} color="#FFF" />
-                </LinearGradient>
-            </TouchableOpacity>
+            <MotiView
+                from={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', delay: 800 }}
+                style={styles.fab}
+            >
+                <TouchableOpacity onPress={() => setShowCreate(true)}>
+                    <LinearGradient colors={['#7C3AED', '#EF4444']} style={styles.fabGrad}>
+                        <MaterialCommunityIcons name="plus" size={32} color="#FFF" />
+                    </LinearGradient>
+                </TouchableOpacity>
+            </MotiView>
 
             <CreateStreakModal visible={showCreate} onClose={() => setShowCreate(false)} onCreated={loadData} />
             

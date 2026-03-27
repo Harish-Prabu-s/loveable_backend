@@ -34,6 +34,12 @@ def _serialize_post(post, request_user, request=None):
         'is_liked': is_liked,
         'is_owner': post.user == request_user,
         'created_at': post.created_at.isoformat(),
+        'mentioned_users': [{
+            'id': u.id,
+            'username': u.username,
+            'display_name': getattr(u, 'profile', u).display_name if hasattr(u, 'profile') else u.username,
+            'photo': get_absolute_media_url(u.profile.photo, request) if hasattr(u, 'profile') and u.profile.photo else None,
+        } for u in post.mentions.all()]
     }
 
 

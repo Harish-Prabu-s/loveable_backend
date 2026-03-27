@@ -237,9 +237,20 @@ class MatchmakingConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
             
+        # Join personal group for direct messages like MatchFound
+        self.user_group_name = f"user_{self.user.id}"
+        await self.channel_layer.group_add(
+            self.user_group_name,
+            self.channel_name
+        )
         await self.accept()
 
     async def disconnect(self, close_code):
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
         await self.remove_from_queue()
 
     async def receive(self, text_data):
@@ -279,56 +290,13 @@ class MatchmakingConsumer(AsyncWebsocketConsumer):
     def remove_from_queue(self):
         MatchmakingQueue.objects.filter(user=self.user).delete()
 
-    @database_sync_to_async
-    def check_match(self):
-        # We need an atomic lock for a real production environment,
-        # but for this Django model demo we will query for opposites.
-        my_entry = MatchmakingQueue.objects.filter(user=self.user).first()
-        if not my_entry: return
-        
-        mode = my_entry.mode
-        my_gender = my_entry.gender
-        
-        if mode == '2p':
-            target_gender = 'F' if my_gender == 'M' else 'M'
-            target_entry = MatchmakingQueue.objects.filter(
-                mode='2p', gender=target_gender
-            ).exclude(user=self.user).order_by('joined_at').first()
-            
-            if target_entry:
-                # We found a match! Create room and notify both.
-                # In a pure WebSocket architecture, we'd use Channels Group to notify the other user.
-                # For simplicity, we just create the room. The other user's loop or frontend poll 
-                # might detect it, or we can broadcast if we put them in a matchmaking channel group.
-                import uuid
-                room_code = str(uuid.uuid4())[:8]
-                new_room = GameRoom.objects.create(
-                    room_code=room_code,
-                    room_type='random',
-                    status='waiting'
-                )
-                
-                # We notify ourselves
-                from asgiref.sync import async_to_sync
-                from channels.layers import get_channel_layer
-                
-                # To notify the target, they need to be in a group. 
-                # Let's just return the MatchFound to self, and let the target poll, 
-                # OR we can add channel groups per user.
-                # For now, we return it to self.
-                MatchmakingQueue.objects.filter(user__in=[self.user, target_entry.user]).delete()
-                return {'event': 'MatchFound', 'room_id': new_room.id, 'opponent': target_entry.user.username}
-                
-        return None
-
-    # We augment check_match by directly sending the WS message if matched
     async def check_match(self):
         match_data = await self._find_and_create_match()
         if match_data:
             # We found a match. Send to self.
             await self.send(text_data=json.dumps(match_data))
             
-            # To notify the other user, we could use group_send if we registered them to a group like `user_{id}`
+            # To notify the other user, we use group_send to their personal channel
             channel_layer = self.channel_layer
             await channel_layer.group_send(
                 f"user_{match_data['opponent_id']}",
@@ -373,26 +341,3 @@ class MatchmakingConsumer(AsyncWebsocketConsumer):
     # Handle messages sent via group_send to user's personal channel
     async def match_message(self, event):
         await self.send(text_data=json.dumps(event))
-
-    # We must ensure users join a personal group upon connect
-    async def connect(self):
-        self.user = self.scope['user']
-        if self.user.is_anonymous:
-            await self.close()
-            return
-            
-        # Join personal group for direct messages like MatchFound
-        self.user_group_name = f"user_{self.user.id}"
-        await self.channel_layer.group_add(
-            self.user_group_name,
-            self.channel_name
-        )
-        await self.accept()
-
-    async def disconnect(self, close_code):
-        if hasattr(self, 'user_group_name'):
-            await self.channel_layer.group_discard(
-                self.user_group_name,
-                self.channel_name
-            )
-        await self.remove_from_queue()

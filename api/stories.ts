@@ -15,6 +15,12 @@ export interface Story {
   comments_count: number;
   is_liked: boolean;
   viewed?: boolean;
+  mentioned_users?: {
+      id: number;
+      username: string;
+      display_name: string;
+      photo: string | null;
+  }[];
 }
 
 export const storiesApi = {
@@ -62,8 +68,8 @@ export const storiesApi = {
     return await response.json();
   },
 
-  createStory: async (media_url: string, media_type: string = 'image', visibility: string = 'all'): Promise<Story> => {
-    const res = await client.post('/stories/create/', { media_url, media_type, visibility });
+  createStory: async (media_url: string, media_type: string = 'image', visibility: string = 'all', caption: string = ''): Promise<Story> => {
+    const res = await client.post('/stories/create/', { media_url, media_type, visibility, caption });
     return res.data;
   },
 

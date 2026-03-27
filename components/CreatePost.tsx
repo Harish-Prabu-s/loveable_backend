@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useTheme } from '@/context/ThemeContext';
 import { postsApi } from '@/api/posts';
 
 export default function CreatePost({ visible, onClose, onCreated }) {
+    const { colors, isDark } = useTheme();
     const [media, setMedia] = useState<string | null>(null);
     const [caption, setCaption] = useState('');
     const [visibility, setVisibility] = useState('all');
@@ -46,14 +48,14 @@ export default function CreatePost({ visible, onClose, onCreated }) {
 
     return (
         <Modal visible={visible} animationType="slide">
-            <View style={styles.container}>
-                <View style={styles.header}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
                     <TouchableOpacity onPress={onClose}>
-                        <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+                        <MaterialCommunityIcons name="close" size={28} color={colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>New Post</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>New Post</Text>
                     <TouchableOpacity onPress={uploadPost} disabled={loading || !media}>
-                        {loading ? <ActivityIndicator color="#3B82F6" /> : <Text style={[styles.postBtn, !media && { color: '#64748B' }]}>Share</Text>}
+                        {loading ? <ActivityIndicator color={colors.primary} /> : <Text style={[styles.postBtn, { color: colors.primary }, !media && { color: colors.textMuted }]}>Share</Text>}
                     </TouchableOpacity>
                 </View>
 
@@ -98,7 +100,6 @@ export default function CreatePost({ visible, onClose, onCreated }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#020617',
     },
     header: {
         flexDirection: 'row',
@@ -107,9 +108,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: 60,
         paddingBottom: 16,
-        backgroundColor: '#0F172A',
         borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
     },
     title: {
         color: '#FFF',
@@ -135,21 +134,17 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 8,
-        backgroundColor: '#1E293B',
     },
     placeholderBox: {
         width: 80,
         height: 80,
         borderRadius: 8,
-        backgroundColor: '#1E293B',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#334155',
     },
     captionInput: {
         flex: 1,
-        color: '#FFF',
         fontSize: 16,
         minHeight: 80,
         textAlignVertical: 'top',

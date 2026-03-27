@@ -41,6 +41,7 @@ type UiMessage = {
 export default function ChatScreen() {
     const { id: userIdStr } = useLocalSearchParams();
     const userId = Number(userIdStr);
+    console.log(`[Chat] userIdStr: ${userIdStr}, userId: ${userId}`);
     const { user } = useAuthStore();
     const { activeChatEvent } = useNotifications();
     const isFemale = user?.gender === 'F';
@@ -539,7 +540,7 @@ export default function ChatScreen() {
                             />
                         </View>
                         <TouchableOpacity style={styles.iconButton} onPress={() =>
-                            router.push({ pathname: '/call/[id]' as any, params: { id: userId, callType: 'audio', calleeName: otherProfileName } })
+                            router.push(`/calling/${userId}?callType=audio&calleeName=${encodeURIComponent(otherProfileName)}`)
                         }>
                             <MaterialCommunityIcons name="phone" size={24} color="#8B5CF6" />
                         </TouchableOpacity>
@@ -594,10 +595,15 @@ export default function ChatScreen() {
                                             </Text>
                                         )}
                                         {msg.type === 'image' && msg.image && (
-                                            <Image source={{ uri: msg.image }} style={styles.messageImage} />
+                                            <TouchableOpacity onPress={() => router.push({ pathname: '/media-viewer', params: { uri: msg.image, type: 'image' } })}>
+                                                <Image source={{ uri: msg.image }} style={styles.messageImage} />
+                                            </TouchableOpacity>
                                         )}
                                         {msg.type === 'video' && msg.image && (
-                                            <TouchableOpacity style={styles.mediaContainer} onPress={() => {}}>
+                                            <TouchableOpacity 
+                                                style={styles.mediaContainer} 
+                                                onPress={() => router.push({ pathname: '/media-viewer', params: { uri: msg.image, type: 'video' } })}
+                                            >
                                                 <Image source={{ uri: msg.image }} style={styles.messageImage} />
                                                 <View style={styles.playOverlay}>
                                                     <MaterialCommunityIcons name="play-circle" size={48} color="#FFFFFF" />
