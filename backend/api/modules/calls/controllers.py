@@ -14,6 +14,7 @@ class InitiateCallView(APIView):
     def post(self, request):
         callee_id = request.data.get('callee_id')
         call_type = request.data.get('call_type', 'VOICE').upper()  # VOICE or VIDEO
+        room_id = request.data.get('room_id')
 
         if not callee_id:
             return Response({'detail': 'callee_id required.'}, status=400)
@@ -29,7 +30,7 @@ class InitiateCallView(APIView):
             return Response({'detail': 'Cannot call yourself.'}, status=400)
 
         try:
-            session = initiate_call(request.user, callee, call_type)
+            session = initiate_call(request.user, callee, call_type, room_id)
         except PermissionError as e:
             return Response({'detail': str(e)}, status=403)
 

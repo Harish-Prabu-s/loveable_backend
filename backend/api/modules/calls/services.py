@@ -20,7 +20,7 @@ def can_receive_call(user, call_type: str) -> tuple[bool, str]:
     return True, ''
 
 
-def initiate_call(caller, callee, call_type: str) -> CallSession:
+def initiate_call(caller, callee, call_type: str, room_id: str = None) -> CallSession:
     """Create a new call session.  Validates safety settings."""
     allowed, reason = can_receive_call(callee, call_type)
     if not allowed:
@@ -33,6 +33,7 @@ def initiate_call(caller, callee, call_type: str) -> CallSession:
         caller=caller,
         callee=callee,
         call_type=call_type,
+        room_id=room_id,
         coins_per_min=coins_per_min,
         started_at=timezone.now(),
     )
@@ -49,6 +50,7 @@ def initiate_call(caller, callee, call_type: str) -> CallSession:
             'content': {
                 'type': 'incoming-call',
                 'sessionId': session.id,
+                'roomId': session.room_id,
                 'callerName': caller.profile.display_name if hasattr(caller, 'profile') else 'User',
                 'callerPhoto': caller.profile.photo.url if hasattr(caller, 'profile') and caller.profile.photo else None,
                 'callType': 'video' if call_type == 'VIDEO' else 'audio',

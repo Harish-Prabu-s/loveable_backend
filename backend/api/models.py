@@ -262,6 +262,7 @@ class CallSession(models.Model):
     caller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='calls_made')
     callee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='calls_received')
     call_type = models.CharField(max_length=10, choices=CALL_TYPE_CHOICES)
+    room_id = models.CharField(max_length=50, null=True, blank=True)
     duration_seconds = models.IntegerField(default=0)
     coins_per_min = models.IntegerField(default=0)
     coins_spent = models.IntegerField(default=0)

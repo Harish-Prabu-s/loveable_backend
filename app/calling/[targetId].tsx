@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-    Image, StatusBar, Alert, Platform, PermissionsAndroid, FlatList
+    Image, StatusBar, Alert, Platform, PermissionsAndroid, FlatList, ActivityIndicator
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -106,15 +106,114 @@ function MeetingView({ calleeName, photoUri, status, setStatus, elapsed, coinRat
 }
 
 export default function CallScreen() {
-    const params = useLocalSearchParams<{ targetId: string }>();
+    const params = useLocalSearchParams<{
+        targetId: string;
+        sessionId?: string;
+        roomId?: string;
+        isIncoming?: string;
+        callType?: string;
+        calleeName?: string;
+        calleePhoto?: string;
+    }>();
+    
     console.log(`[Calling] Params: ${JSON.stringify(params)}`);
+
+    const isIncoming = params.isIncoming === 'true';
+    const [meetingId, setMeetingId] = useState<string | null>(isIncoming && params.roomId ? params.roomId : null);
+    const [meetingToken] = useState(VIDEOSDK_TOKEN);
+    const [status, setStatus] = useState<string>('connecting');
+    const [elapsed, setElapsed] = useState(0);
+    const [coinRate, setCoinRate] = useState(0);
+
+    useEffect(() => {
+        async function setupCall() {
+            if (Platform.OS === 'android') {
+                try {
+                    const granted = await PermissionsAndroid.requestMultiple([
+                        PermissionsAndroid.PERMISSIONS.CAMERA,
+                        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+                    ]);
+                    if (
+                        granted[PermissionsAndroid.PERMISSIONS.CAMERA] !== PermissionsAndroid.RESULTS.GRANTED ||
+                        granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED
+                    ) {
+                        Alert.alert('Permissions Required', 'Camera and mic permissions are required for the call.');
+                        router.back();
+                        return;
+                    }
+                } catch (err) {
+                    console.warn(err);
+                }
+            }
+
+            if (!isIncoming) {
+                try {
+                    const type = (params.callType || 'VOICE').toUpperCase() as 'VOICE' | 'VIDEO';
+                    
+                    // 1. Generate VideoSDK Room ID first!
+                    let generatedRoomId = '';
+                    try {
+                         generatedRoomId = await videoSdkApi.createMeeting(meetingToken);
+                    } catch (err: any) {
+                         Alert.alert('VideoSDK Error', 'Invalid VideoSDK token or network error. Please configure VIDEOSDK_TOKEN.');
+                         router.back();
+                         return;
+                    }
+
+                    // 2. Register call with backend using this Room ID
+                    const session = await callsApi.initiate(Number(params.targetId), type, generatedRoomId);
+                    
+                    setMeetingId(generatedRoomId);
+                    setCoinRate(session.coins_per_min || 0);
+                } catch (error: any) {
+                    Alert.alert('Call Failed', error?.response?.data?.detail || 'Could not start call');
+                    router.back();
+                }
+            }
+        }
+        setupCall();
+    }, [isIncoming, params.targetId, params.callType]);
+
+    useEffect(() => {
+        let timer: any;
+        if (status === 'active') {
+            timer = setInterval(() => setElapsed(e => e + 1), 1000);
+        }
+        return () => clearInterval(timer);
+    }, [status]);
+
+    if (!meetingId) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <ActivityIndicator size="large" color="#6366F1" />
+                <Text style={{ color: '#fff', marginTop: 16, fontSize: 16 }}>Initiating Call...</Text>
+                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 30, padding: 10 }}>
+                    <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     return (
-        <View style={{ flex: 1, backgroundColor: 'red', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 24 }}>Call screen for user: {params.targetId}</Text>
-            <TouchableOpacity onPress={() => router.back()}>
-                <Text style={{ color: 'white', marginTop: 20 }}>Go Back</Text>
-            </TouchableOpacity>
-        </View>
+        <MeetingProvider
+            config={{
+                meetingId,
+                name: 'User', // Could be dynamic from auth state if needed
+                micEnabled: true,
+                webcamEnabled: params.callType === 'video' || params.callType === 'VIDEO',
+            }}
+            token={meetingToken}
+        >
+            <MeetingView
+                calleeName={params.calleeName || 'User'}
+                photoUri={params.calleePhoto || 'https://via.placeholder.com/150'}
+                status={status}
+                setStatus={setStatus}
+                elapsed={elapsed}
+                coinRate={coinRate}
+            />
+        </MeetingProvider>
     );
 }
 

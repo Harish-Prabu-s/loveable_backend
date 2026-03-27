@@ -11,6 +11,7 @@ import { chatApi } from '@/api/chat';
 
 interface IncomingCallData {
     sessionId: number;
+    roomId?: string;
     callerId: number;
     callerName: string;
     callerPhoto: string | null;
@@ -159,13 +160,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const handleAccept = async () => {
         if (!incomingCall) return;
-        const { sessionId, callType, callerName, callerPhoto, callerId } = incomingCall;
+        const { sessionId, roomId, callType, callerName, callerPhoto, callerId } = incomingCall;
         try {
             await chatApi.startCallOnRoom(sessionId);
             setIncomingCall(null);
             router.push({
                 pathname: `/calling/${callerId}`,
-                params: { sessionId: String(sessionId), isIncoming: 'true', callType, calleeName: callerName, calleePhoto: callerPhoto }
+                params: { sessionId: String(sessionId), roomId: roomId ? String(roomId) : String(sessionId), isIncoming: 'true', callType, calleeName: callerName, calleePhoto: callerPhoto }
             } as any);
         } catch (err) {
             console.error('Failed to start call:', err);
