@@ -83,36 +83,147 @@ class CallConsumer(BaseRealtimeConsumer):
 
 class CallRoomConsumer(AsyncWebsocketConsumer):
     """
-    Handles WebRTC signaling within a specific call room.
+    Production-grade WebRTC signaling consumer.
+    Handles targeted signalling between peers and tracks room state.
     """
     async def connect(self):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         self.room_group_name = f'call_room_{self.room_id}'
+        self.user = self.scope.get('user')
 
+        if not self.user or self.user.is_anonymous:
+            logger.warning(f"[WS Call] Connection rejected for anonymous user in room {self.room_id}")
+            await self.close(code=4001)  # Custom code for auth failure
+            return
+
+        self.user_id = self.user.id
+        
+        # Add to room group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
         await self.accept()
-        logger.info(f"[WS] Call Room {self.room_id} connected")
 
-    async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        # Broadcast signaling message to others in the room
+        # Notify others and get current participants (this is simplified, usually use Redis for real state)
+        # For now, we broadcast that we joined. Clients will track the list.
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'signal_message',
-                'message': data
+                'type': 'participant_joined',
+                'user_id': self.user_id,
+                'display_name': getattr(self.user.profile, 'display_name', self.user.username),
+                'photo': getattr(self.user.profile, 'photo', None),
+                'from_channel': self.channel_name
             }
         )
+        
+        logger.info(f"[WS Call] User {self.user_id} joined room {self.room_id}")
 
-    async def signal_message(self, event):
-        # Send signal to WebSocket
+    async def disconnect(self, close_code):
+        if hasattr(self, 'room_group_name'):
+            # Notify others
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'participant_left',
+                    'user_id': self.user_id
+                }
+            )
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+            logger.info(f"[WS Call] User {self.user_id} left room {self.room_id}")
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            msg_type = data.get('type')
+            target_id = data.get('target_user_id')
+
+            # Attach sender info
+            data['from_user_id'] = self.user_id
+
+            if msg_type in ['call-offer', 'call-answer', 'ice-candidate']:
+                if target_id:
+                    # Targeted signal to a specific user
+                    target_group = f"call_room_user_{target_id}" # We'll need users to join their own groups too or use channel_name
+                    # Actually, a simpler way in Channels is to have each user join a private group too
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'relay_signal',
+                            'message': data,
+                            'target_user_id': target_id
+                        }
+                    )
+                else:
+                    # Broadcast signal (only for specific room-wide events)
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'relay_signal',
+                            'message': data
+                        }
+                    )
+            
+            elif msg_type == 'chat-message':
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': data
+                    }
+                )
+
+            elif msg_type == 'media-state' or msg_type == 'screen-share':
+                # Broadcast media state changes (mute, video off)
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'relay_signal',
+                        'message': data
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"[WS Call] Error handling message: {e}")
+
+    # ── Group Message Handlers ───────────────────────────────────────────────
+
+    async def participant_joined(self, event):
+        # Notify client about a new participant
+        if event['user_id'] != self.user_id:
+            await self.send(text_data=json.dumps({
+                'type': 'participant-joined',
+                'user_id': event['user_id'],
+                'display_name': event['display_name'],
+                'photo': event['photo']
+            }))
+            # If we are the newly joined user, we might want a 'room-joined' event with ALL current users
+            # but in this simple mesh, the existing users will see us and send offers.
+
+    async def participant_left(self, event):
+        if event['user_id'] != self.user_id:
+            await self.send(text_data=json.dumps({
+                'type': 'participant-left',
+                'user_id': event['user_id']
+            }))
+
+    async def relay_signal(self, event):
+        message = event['message']
+        target_id = event.get('target_user_id')
+
+        # If targeted, only send to the target
+        if target_id is not None:
+            if target_id == self.user_id:
+                await self.send(text_data=json.dumps(message))
+        else:
+            # Broadcast to everyone EXCEPT sender
+            if message.get('from_user_id') != self.user_id:
+                await self.send(text_data=json.dumps(message))
+
+    async def chat_message(self, event):
         await self.send(text_data=json.dumps(event['message']))
+

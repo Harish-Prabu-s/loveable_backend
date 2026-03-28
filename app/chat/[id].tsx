@@ -544,7 +544,7 @@ export default function ChatScreen() {
                                 pathname: '/call/[id]',
                                 params: {
                                     id: userId,
-                                    callType: 'audio',
+                                    callType: 'VOICE',
                                     calleeName: otherProfileName,
                                     calleePhoto: otherProfilePhoto || ''
                                 }
@@ -557,7 +557,7 @@ export default function ChatScreen() {
                                 pathname: '/call/[id]',
                                 params: {
                                     id: userId,
-                                    callType: 'video',
+                                    callType: 'VIDEO',
                                     calleeName: otherProfileName,
                                     calleePhoto: otherProfilePhoto || ''
                                 }

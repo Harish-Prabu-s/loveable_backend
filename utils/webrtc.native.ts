@@ -34,7 +34,6 @@ function fallbackToMocks() {
         getAudioTracks() { return []; }
         getVideoTracks() { return []; }
         release() {}
-        toURL() { return ''; }
     };
     InCallManager = {
         start: () => {},

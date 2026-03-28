@@ -87,7 +87,7 @@ function ProfileCard({ profile, index }: { profile: Profile; index: number }) {
             pathname: '/call/[id]',
             params: {
               id: profile.user || profile.id,
-              callType: 'audio',
+              callType: 'VOICE',
               calleeName: profile.display_name,
               calleePhoto: photo
             }
@@ -101,7 +101,7 @@ function ProfileCard({ profile, index }: { profile: Profile; index: number }) {
             pathname: '/call/[id]',
             params: {
               id: profile.user || profile.id,
-              callType: 'video',
+              callType: 'VIDEO',
               calleeName: profile.display_name,
               calleePhoto: photo
             }

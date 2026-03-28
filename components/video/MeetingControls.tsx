@@ -1,13 +1,27 @@
 import React from "react";
 import { View, TouchableOpacity, StyleSheet, Platform } from "react-native";
-import { useMeeting } from "@videosdk.live/react-native-sdk";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { MotiView } from "moti";
 import { useTheme } from "@/context/ThemeContext";
 
-export const MeetingControls: React.FC = () => {
+interface MeetingControlsProps {
+  micOn: boolean;
+  webcamOn: boolean;
+  onToggleMic: () => void;
+  onToggleWebcam: () => void;
+  onHangup: () => void;
+  onSwitchCamera?: () => void;
+}
+
+export const MeetingControls: React.FC<MeetingControlsProps> = ({
+  micOn,
+  webcamOn,
+  onToggleMic,
+  onToggleWebcam,
+  onHangup,
+  onSwitchCamera
+}) => {
   const { colors } = useTheme();
-  const { localMicOn, localWebcamOn, toggleMic, toggleWebcam, leave, changeWebcam } = useMeeting();
 
   return (
     <MotiView
@@ -19,31 +33,31 @@ export const MeetingControls: React.FC = () => {
       <View style={[styles.controlsRow, { backgroundColor: "rgba(0,0,0,0.6)" }]}>
         {/* Mic Toggle */}
         <TouchableOpacity
-          onPress={() => toggleMic()}
-          style={[styles.iconBtn, !localMicOn && styles.iconBtnActive]}
+          onPress={() => onToggleMic()}
+          style={[styles.iconBtn, !micOn && styles.iconBtnActive]}
         >
           <MaterialCommunityIcons
-            name={localMicOn ? "microphone" : "microphone-off"}
+            name={micOn ? "microphone" : "microphone-off"}
             size={28}
-            color={localMicOn ? "#FFF" : "#EF4444"}
+            color={micOn ? "#FFF" : "#EF4444"}
           />
         </TouchableOpacity>
 
         {/* Video Toggle */}
         <TouchableOpacity
-          onPress={() => toggleWebcam()}
-          style={[styles.iconBtn, !localWebcamOn && styles.iconBtnActive]}
+          onPress={() => onToggleWebcam()}
+          style={[styles.iconBtn, !webcamOn && styles.iconBtnActive]}
         >
           <MaterialCommunityIcons
-            name={localWebcamOn ? "video" : "video-off"}
+            name={webcamOn ? "video" : "video-off"}
             size={28}
-            color={localWebcamOn ? "#FFF" : "#EF4444"}
+            color={webcamOn ? "#FFF" : "#EF4444"}
           />
         </TouchableOpacity>
 
         {/* Camera Switch */}
         <TouchableOpacity
-          onPress={() => changeWebcam()}
+          onPress={() => onSwitchCamera?.()}
           style={styles.iconBtn}
         >
           <MaterialCommunityIcons name="camera-flip" size={28} color="#FFF" />
@@ -51,7 +65,7 @@ export const MeetingControls: React.FC = () => {
 
         {/* Leave Meeting (End Call) */}
         <TouchableOpacity
-          onPress={() => leave()}
+          onPress={() => onHangup()}
           style={styles.endCallBtn}
         >
           <MaterialCommunityIcons name="phone-hangup" size={32} color="#FFF" />

@@ -283,7 +283,7 @@ export default function PublicProfileScreen() {
                                 pathname: '/call/[id]',
                                 params: {
                                     id: profile.user,
-                                    callType: 'audio',
+                                    callType: 'VOICE',
                                     calleeName: profile.display_name,
                                     calleePhoto: profile.photo ? getMediaUrl(profile.photo) : generateAvatarUrl(profile.id, profile.gender)
                                 }
@@ -301,7 +301,7 @@ export default function PublicProfileScreen() {
                                 pathname: '/call/[id]',
                                 params: {
                                     id: profile.user,
-                                    callType: 'video',
+                                    callType: 'VIDEO',
                                     calleeName: profile.display_name,
                                     calleePhoto: profile.photo ? getMediaUrl(profile.photo) : generateAvatarUrl(profile.id, profile.gender)
                                 }

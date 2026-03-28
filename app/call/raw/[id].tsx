@@ -177,7 +177,7 @@ export default function RawCallScreen() {
             <View style={styles.remoteContainer}>
                 {remoteStream ? (
                     <RTCView
-                        streamURL={(remoteStream as any).toURL()}
+                        stream={remoteStream}
                         style={styles.fullVideo}
                         objectFit="cover"
                     />
@@ -193,7 +193,7 @@ export default function RawCallScreen() {
             <View style={styles.localContainer}>
                 {localStream && (
                     <RTCView
-                        streamURL={(localStream as any).toURL()}
+                        stream={localStream}
                         style={styles.localVideo}
                         objectFit="cover"
                         zOrder={1}

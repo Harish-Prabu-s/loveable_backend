@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: vibely
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+
+  sfu:
+    build:
+      context: ./sfu-server
+      dockerfile: Dockerfile
+    environment:
+      - ANNOUNCED_IP=127.0.0.1
+    network_mode: "host" # Mediasoup works best with host network for RTP port management
+    # Alternately, expose entire port range if not using host mode
+    # ports:
+    #   - "3000:3000"
+    #   - "40000-40100:40000-40100/udp"
+
+volumes:
+  postgres_data:

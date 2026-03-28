@@ -1,15 +1,18 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useParticipant, RTCView, MediaStream } from "@videosdk.live/react-native-sdk";
 import { MotiView, MotiText } from "moti";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface ParticipantViewProps {
-  participantId: string;
+  stream: any;
+  displayName: string;
+  isLocal?: boolean;
 }
 
-export const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId }) => {
-  const { displayName, webcamStream, webcamOn, micOn } = useParticipant(participantId);
+import { RTCView } from "@/utils/webrtc.native";
+
+export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displayName, isLocal }) => {
+  const hasStream = stream && (stream.getVideoTracks().length > 0 || stream.getAudioTracks().length > 0);
 
   return (
     <MotiView
@@ -17,12 +20,13 @@ export const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId 
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ type: "timing", duration: 400 }}
-      style={styles.container}
+      style={[styles.container, isLocal && styles.localContainer]}
     >
-      {webcamOn && webcamStream ? (
+      {hasStream ? (
         <RTCView
-          streamURL={new MediaStream([webcamStream.track]).toURL()}
+          stream={stream}
           objectFit="cover"
+          mirror={isLocal}
           style={styles.rtcView}
         />
       ) : (
@@ -32,16 +36,9 @@ export const ParticipantView: React.FC<ParticipantViewProps> = ({ participantId 
         </View>
       )}
 
-      {/* Mic Status Indicator */}
-      {!micOn && (
-        <View style={styles.micOffIndicator}>
-          <MaterialCommunityIcons name="microphone-off" size={18} color="#EF4444" />
-        </View>
-      )}
-
       {/* Name Label */}
       <View style={styles.nameLabel}>
-        <Text style={styles.nameText}>{displayName}</Text>
+        <Text style={styles.nameText}>{isLocal ? 'Me' : displayName}</Text>
       </View>
     </MotiView>
   );
@@ -58,6 +55,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
+  },
+  localContainer: {
+    borderColor: "#6366F1",
+    borderWidth: 2,
   },
   rtcView: {
     flex: 1,
