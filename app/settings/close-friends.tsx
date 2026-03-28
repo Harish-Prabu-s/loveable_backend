@@ -14,7 +14,8 @@ export default function CloseFriendsScreen() {
     const loadFriends = async () => {
         try {
             const data = await closeFriendsApi.list();
-            setFriends(data);
+            // Filter out any entries that missing the nested user object to prevent crashes
+            setFriends(data.filter(f => !!f.close_friend));
         } catch (error) {
             console.error('Failed to load close friends:', error);
         } finally {
@@ -38,6 +39,7 @@ export default function CloseFriendsScreen() {
 
     const renderItem = ({ item }: { item: CloseFriend }) => {
         const u = item.close_friend;
+        if (!u) return null; // Safety fallback
         return (
             <View style={styles.friendRow}>
                 <Image
