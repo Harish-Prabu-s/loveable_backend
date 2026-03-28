@@ -42,16 +42,21 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     setLocked: (locked: boolean) => set({ isLocked: locked, lastBackgroundTime: null }),
 
     setPin: async (pin: string | null) => {
+        const { securityApi } = await import('@/api/security');
         if (pin) {
+            await securityApi.setLock('pin', pin);
             await storage.setItem('app_lock_pin', pin);
         } else {
+            // Clearing lock
             await storage.removeItem('app_lock_pin');
         }
         set({ pin, pattern: null });
     },
 
     setPattern: async (pattern: string | null) => {
+        const { securityApi } = await import('@/api/security');
         if (pattern) {
+            await securityApi.setLock('pattern', pattern);
             await storage.setItem('app_lock_pattern', pattern);
         } else {
             await storage.removeItem('app_lock_pattern');
@@ -60,6 +65,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     },
 
     toggleBiometrics: async (enabled: boolean) => {
+        const { securityApi } = await import('@/api/security');
+        await securityApi.updateSettings({ biometrics_enabled: enabled });
         await storage.setItem('biometrics_enabled', String(enabled));
         set({ biometricsEnabled: enabled });
     },

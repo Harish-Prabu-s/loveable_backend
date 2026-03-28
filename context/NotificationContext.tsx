@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { WebSocketClient } from '@/utils/websocket';
 import { chatApi } from '@/api/chat';
+import { callsApi } from '@/api/vibely';
 
 interface IncomingCallData {
     sessionId: number;
@@ -162,7 +163,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (!incomingCall) return;
         const { sessionId, roomId, callType, callerName, callerPhoto, callerId } = incomingCall;
         try {
-            await chatApi.startCallOnRoom(sessionId);
+            await callsApi.accept(sessionId);
             setIncomingCall(null);
             router.push({
                 pathname: `/call/${callerId}`,
@@ -178,7 +179,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (!incomingCall) return;
         const { sessionId } = incomingCall;
         try {
-            await chatApi.endCallOnRoom(sessionId, 0, 0);
+            await callsApi.end(sessionId);
         } catch (err) {
             console.error('Failed to decline call:', err);
         } finally {

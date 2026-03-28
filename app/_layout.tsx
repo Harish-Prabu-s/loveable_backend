@@ -180,14 +180,18 @@ function RootLayoutNav() {
   );
 }
 
+import { SecurityProvider } from '@/context/SecurityContext';
+
 export default function RootLayout() {
   return (
     <AppThemeProvider>
       <AuthProvider>
-        <NotificationProvider>
-          <RootLayoutNav />
-        </NotificationProvider>
-        <GlobalToast />
+        <SecurityProvider>
+          <NotificationProvider>
+            <RootLayoutNav />
+          </NotificationProvider>
+          <GlobalToast />
+        </SecurityProvider>
       </AuthProvider>
     </AppThemeProvider>
   );

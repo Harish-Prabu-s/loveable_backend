@@ -5,7 +5,7 @@ from rest_framework import status
 from django.contrib.auth.models import User
 from api.models import CallSession
 from .serializers import CallSessionSerializer
-from .services import initiate_call, end_call
+from .services import initiate_call, end_call, accept_call
 
 
 class InitiateCallView(APIView):
@@ -35,6 +35,26 @@ class InitiateCallView(APIView):
             return Response({'detail': str(e)}, status=403)
 
         return Response(CallSessionSerializer(session).data, status=201)
+
+
+class AcceptCallView(APIView):
+    """POST /api/calls/accept/ — accept an incoming call session."""
+
+    def post(self, request):
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({'detail': 'session_id required.'}, status=400)
+
+        try:
+            session = CallSession.objects.get(pk=session_id)
+        except CallSession.DoesNotExist:
+            return Response({'detail': 'Session not found.'}, status=404)
+
+        if session.callee != request.user:
+            return Response({'detail': 'Not your call to accept.'}, status=403)
+
+        session = accept_call(session)
+        return Response(CallSessionSerializer(session).data)
 
 
 class EndCallView(APIView):

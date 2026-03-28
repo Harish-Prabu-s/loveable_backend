@@ -7,6 +7,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSecurityStore } from '@/store/securityStore';
 import { toast } from '@/utils/toast';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import PatternLock from './lock/PatternLock';
 
 const { width, height } = Dimensions.get('window');
@@ -190,7 +191,13 @@ export const SecurityLock = () => {
                         </>
                     )}
 
-                    <TouchableOpacity style={styles.forgotBtn} onPress={() => toast.info("Please use your fingerprint or contact support")}>
+                    <TouchableOpacity 
+                        style={styles.forgotBtn} 
+                        onPress={() => {
+                            setLocked(false); // Temporarily unlock to navigate
+                            router.push('/security/recovery' as any);
+                        }}
+                    >
                         <Text style={styles.forgotText}>Forgot PIN?</Text>
                     </TouchableOpacity>
                 </MotiView>

@@ -4,7 +4,8 @@ from django.conf import settings
 from .models import (
     Profile, Wallet, CoinTransaction, Payment, Withdrawal,
     Game, LevelProgress, Offer, LeagueTier, CallSession,
-    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel, Streak, Post, PostLike
+    Badge, DailyReward, Room, Message, Story, Gift, GiftTransaction, StoryView, Follow, Reel, Streak, Post, PostLike,
+    CloseFriend
 )
 from .utils import get_absolute_media_url
 
@@ -16,10 +17,12 @@ class UserSerializer(serializers.ModelSerializer):
 class SimpleUserSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='profile.display_name', read_only=True)
     photo = serializers.SerializerMethodField()
+    gender = serializers.CharField(source='profile.gender', read_only=True)
+    user_id = serializers.IntegerField(source='id', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'display_name', 'photo']
+        fields = ['id', 'user_id', 'username', 'display_name', 'photo', 'gender']
 
     def get_photo(self, obj):
         request = self.context.get('request')
@@ -65,7 +68,6 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_is_close_friend(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            from .models import CloseFriend
             return CloseFriend.objects.filter(user=request.user, close_friend=obj.user).exists()
         return False
 
@@ -168,7 +170,6 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['id', 'room', 'sender', 'content', 'type', 'media_url', 'duration_seconds', 'created_at', 'is_seen', 'expires_at']
-
 
 class StreakSerializer(serializers.ModelSerializer):
     class Meta:
@@ -274,6 +275,7 @@ class GiftTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = GiftTransaction
         fields = ['id', 'sender', 'receiver', 'gift', 'created_at']
+
 class ContactSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     username = serializers.CharField()
@@ -352,3 +354,10 @@ class PostSerializer(serializers.ModelSerializer):
         if user:
             return obj.user == user
         return False
+
+class CloseFriendSerializer(serializers.ModelSerializer):
+    close_friend = SimpleUserSerializer()
+
+    class Meta:
+        model = CloseFriend
+        fields = ['id', 'close_friend', 'created_at']

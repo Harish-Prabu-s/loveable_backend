@@ -31,6 +31,6 @@ def remove_close_friend_service(user: User, target_user_id: int):
         return False, "User not found"
 
 def list_close_friends_service(user: User, request=None):
+    from ...serializers import CloseFriendSerializer
     close_friends = CloseFriend.objects.filter(user=user).select_related('close_friend__profile')
-    profiles = [cf.close_friend.profile for cf in close_friends if hasattr(cf.close_friend, 'profile')]
-    return ProfileSerializer(profiles, many=True, context={'request': request}).data
+    return CloseFriendSerializer(close_friends, many=True, context={'request': request}).data

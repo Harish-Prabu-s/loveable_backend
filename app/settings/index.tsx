@@ -158,17 +158,21 @@ export default function SettingsScreen() {
     // ── App lock picker ───────────────────────────────────────────────────────
     const chooseAppLock = () => {
         const options: any[] = [
-            { text: '🔓 None', onPress: () => {
-                update({ app_lock_type: 'none' });
-                toggleBiometrics(false);
-                setPin(null);
-            } },
             { text: '🔢 PIN', onPress: () => router.push('/settings/set-pin' as any) },
             { text: '🔷 Pattern', onPress: () => router.push('/settings/set-pattern' as any) },
         ];
         if (biometricAvailable) {
             options.push({ text: '👆 Fingerprint / Face ID', onPress: () => update({ app_lock_type: 'biometric' }) });
         }
+        
+        if (settings.app_lock_type !== 'none') {
+            options.unshift({ text: '🔓 Disable App Lock', style: 'destructive', onPress: () => {
+                update({ app_lock_type: 'none' });
+                toggleBiometrics(false);
+                setPin(null);
+            } });
+        }
+
         options.push({ text: 'Cancel', style: 'cancel' });
         Alert.alert('App Lock', 'Choose lock method', options);
     };
@@ -294,6 +298,15 @@ export default function SettingsScreen() {
                             </View>
                         }
                     />
+                    {settings.app_lock_type === 'pin' && (
+                        <SettingRow
+                            icon="lock-reset"
+                            iconBg="#7C3AED"
+                            label="Change PIN"
+                            onPress={() => router.push('/settings/set-pin' as any)}
+                            right={<MaterialCommunityIcons name="chevron-right" size={20} color="#475569" />}
+                        />
+                    )}
                     {Platform.OS === 'android' && biometricAvailable && (
                         <SettingRow
                             icon="fingerprint"

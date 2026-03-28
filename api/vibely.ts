@@ -13,6 +13,8 @@ export const monetizationApi = {
 export const callsApi = {
     initiate: (calleeId: number, callType: 'VOICE' | 'VIDEO', roomId?: string) =>
         apiClient.post('/calls/initiate/', { callee_id: calleeId, call_type: callType, room_id: roomId }).then(r => r.data),
+    accept: (sessionId: number) =>
+        apiClient.post('/calls/accept/', { session_id: sessionId }).then(r => r.data),
     end: (sessionId: number) =>
         apiClient.post('/calls/end/', { session_id: sessionId }).then(r => r.data),
     getLogs: () => apiClient.get('/calls/logs/').then(r => r.data),

@@ -97,6 +97,8 @@ class UserSetting(models.Model):
     app_lock_type = models.CharField(max_length=20, choices=APP_LOCK_CHOICES, default='none')
     app_lock_value = models.CharField(max_length=255, blank=True)
     notifications_enabled = models.BooleanField(default=True)
+    biometrics_enabled = models.BooleanField(default=False)
+    face_unlock_enabled = models.BooleanField(default=False)
 
 class Notification(models.Model):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

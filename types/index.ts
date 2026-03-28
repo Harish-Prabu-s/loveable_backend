@@ -18,6 +18,10 @@ export interface User {
   bio?: string;
   interests?: string[];
   app_lock_enabled?: boolean;
+  app_lock_type?: 'none' | 'pin' | 'pattern';
+  app_lock_value?: string;
+  biometrics_enabled?: boolean;
+  face_unlock_enabled?: boolean;
 }
 
 export interface Profile {

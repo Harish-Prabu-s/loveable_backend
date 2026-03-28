@@ -74,6 +74,13 @@ def initiate_call(caller, callee, call_type: str, room_id: str = None) -> CallSe
     return session
 
 
+def accept_call(session: CallSession) -> CallSession:
+    """Mark a call session as active when the callee accepts."""
+    session.started_at = timezone.now()
+    session.save(update_fields=['started_at'])
+    return session
+
+
 def end_call(session: CallSession) -> dict:
     """End a call session, compute coins, deduct from caller wallet, update league stats."""
     if session.ended_at:

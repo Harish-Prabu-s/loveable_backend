@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Profile, OTP, Wallet, CoinTransaction, DeletionRequest
+from .models import Profile, OTP, Wallet, CoinTransaction, DeletionRequest, UserSetting
 from .serializers import WalletSerializer, CoinTransactionSerializer
 from django.conf import settings
 try:
@@ -30,6 +30,7 @@ def get_or_create_profile(phone: str) -> tuple[User, bool]:
     user = User.objects.create_user(username=username, password=None)
     Profile.objects.create(user=user, phone_number=phone, is_verified=False)
     Wallet.objects.create(user=user)
+    UserSetting.objects.create(user=user)
     return user, True
 
 @api_view(['GET'])
