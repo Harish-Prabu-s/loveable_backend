@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
-from api.models import Profile, Wallet, LeagueStats, Follow, Story, StoryLike
+from api.models import Profile, Wallet, LeagueStats, Follow, Story, StoryLike, CallSession
 from api.modules.monetization.services import seed_default_rules
 
 # 50 realistic names split by gender
@@ -115,7 +115,6 @@ class Command(BaseCommand):
                         total_call_seconds=call_sec,
                         longest_call_seconds=random.randint(0, call_sec // 2 + 1),
                         total_calls_received=calls_rcv,
-                        total_time_seconds=random.randint(call_sec, call_sec + 50000),
                         bet_match_wins=bet_wins,
                     )
                 )
@@ -134,6 +133,34 @@ class Command(BaseCommand):
             for target in targets:
                 Follow.objects.get_or_create(follower=user, following=target)
 
+        # Random Call Sessions
+        self.stdout.write('Generating random call sessions...')
+        # Create a mix of calls where each seeded user participates
+        for _ in range(count * 8):
+            caller = random.choice(all_users_created)
+            callee = random.choice([u for u in all_users_created if u != caller])
+            call_type = random.choice(['VOICE', 'VIDEO'])
+            # Duration between 1 minute and 3 hours
+            duration = random.randint(60, 10800)
+            
+            # Start time within the last 30 days
+            start_time = timezone.now() - timedelta(
+                days=random.randint(0, 30), 
+                hours=random.randint(0, 23),
+                minutes=random.randint(0, 59)
+            )
+            
+            CallSession.objects.create(
+                caller=caller,
+                callee=callee,
+                call_type=call_type,
+                duration_seconds=duration,
+                started_at=start_time,
+                ended_at=start_time + timedelta(seconds=duration),
+                coins_per_min=random.randint(5, 50),
+                coins_spent=(duration // 60 + 1) * 10
+            )
+
         self.stdout.write(self.style.SUCCESS(
-            f'Done! Created {len(all_users_created)} demo users with profiles, wallets, league stats, and follows.'
+            f'Done! Created {len(all_users_created)} demo users and hundreds of call sessions.'
         ))

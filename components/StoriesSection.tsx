@@ -2,8 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
-  Dimensions, ActivityIndicator, SafeAreaView, Pressable
+  Dimensions, ActivityIndicator, Pressable
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
@@ -267,6 +268,7 @@ export default function StoriesSection() {
           })()}
 
           {/* Views Bottom Sheet */}
+          {showViewers && (
             <View style={styles.sheetOverlay}>
               <TouchableOpacity style={styles.sheetDismiss} onPress={() => setShowViewers(false)} />
               <View style={[styles.sheetContent, { backgroundColor: colors.surface }]}>
@@ -291,7 +293,6 @@ export default function StoriesSection() {
                         onPress={() => {
                           setShowViewers(false);
                           setActiveStoryGroup(null);
-                          // Need to replace this with correct router call to profile screen
                           // router.push(`/profile/${v.viewer}`); 
                         }}
                       >
@@ -308,7 +309,7 @@ export default function StoriesSection() {
                 </ScrollView>
               </View>
             </View>
-          </Modal>
+          )}
         </View>
       </Modal>
     </View>

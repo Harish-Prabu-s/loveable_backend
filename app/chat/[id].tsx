@@ -540,14 +540,41 @@ export default function ChatScreen() {
                             />
                         </View>
                         <TouchableOpacity style={styles.iconButton} onPress={() =>
-                            router.push(`/calling/${userId}?callType=audio&calleeName=${encodeURIComponent(otherProfileName)}`)
+                            router.push({
+                                pathname: '/call/[id]',
+                                params: {
+                                    id: userId,
+                                    callType: 'audio',
+                                    calleeName: otherProfileName,
+                                    calleePhoto: otherProfilePhoto || ''
+                                }
+                            } as any)
                         }>
                             <MaterialCommunityIcons name="phone" size={24} color="#8B5CF6" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.iconButton} onPress={() =>
-                            router.push({ pathname: '/call/[id]' as any, params: { id: userId, callType: 'video', calleeName: otherProfileName } })
+                            router.push({
+                                pathname: '/call/[id]',
+                                params: {
+                                    id: userId,
+                                    callType: 'video',
+                                    calleeName: otherProfileName,
+                                    calleePhoto: otherProfilePhoto || ''
+                                }
+                            } as any)
                         }>
                             <MaterialCommunityIcons name="video" size={24} color="#8B5CF6" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.iconButton} onPress={() =>
+                            router.push({
+                                pathname: '/call/raw/[id]',
+                                params: {
+                                    id: userId,
+                                    calleeName: otherProfileName,
+                                }
+                            } as any)
+                        }>
+                            <MaterialCommunityIcons name="shield-check" size={24} color="#F59E0B" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.iconButton} onPress={() => setShowGiftModal(true)}>
                             <MaterialCommunityIcons name="gift-outline" size={24} color="#EC4899" />

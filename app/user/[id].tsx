@@ -279,7 +279,15 @@ export default function PublicProfileScreen() {
                     <View style={styles.commGrid}>
                         <TouchableOpacity
                             style={styles.commCard}
-                                onPress={() => router.push(`/calling/${profile.user}?callType=audio`)}
+                            onPress={() => router.push({
+                                pathname: '/call/[id]',
+                                params: {
+                                    id: profile.user,
+                                    callType: 'audio',
+                                    calleeName: profile.display_name,
+                                    calleePhoto: profile.photo ? getMediaUrl(profile.photo) : generateAvatarUrl(profile.id, profile.gender)
+                                }
+                            } as any)}
                         >
                             <View style={[styles.commIconBg, { backgroundColor: '#FEE2E2' }]}>
                                 <MaterialCommunityIcons name="phone" size={28} color="#EF4444" />
@@ -289,7 +297,15 @@ export default function PublicProfileScreen() {
 
                         <TouchableOpacity
                             style={styles.commCard}
-                                onPress={() => router.push(`/calling/${profile.user}?callType=video`)}
+                            onPress={() => router.push({
+                                pathname: '/call/[id]',
+                                params: {
+                                    id: profile.user,
+                                    callType: 'video',
+                                    calleeName: profile.display_name,
+                                    calleePhoto: profile.photo ? getMediaUrl(profile.photo) : generateAvatarUrl(profile.id, profile.gender)
+                                }
+                            } as any)}
                         >
                             <View style={[styles.commIconBg, { backgroundColor: '#E0E7FF' }]}>
                                 <MaterialCommunityIcons name="video" size={28} color="#6366F1" />
@@ -297,7 +313,26 @@ export default function PublicProfileScreen() {
                             <Text style={styles.commLabel}>Video Call</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.commCard} onPress={() => router.push(`/chat/${profile.user}` as any)}>
+                        <TouchableOpacity
+                            style={styles.commCard}
+                            onPress={() => router.push({
+                                pathname: '/call/raw/[id]',
+                                params: {
+                                    id: profile.user,
+                                    calleeName: profile.display_name,
+                                }
+                            } as any)}
+                        >
+                            <View style={[styles.commIconBg, { backgroundColor: '#FEF3C7' }]}>
+                                <MaterialCommunityIcons name="shield-check" size={28} color="#D97706" />
+                            </View>
+                            <Text style={styles.commLabel}>Private Call</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.commCard}
+                            onPress={() => router.push(`/chat/${profile.user}` as any)}
+                        >
                             <View style={[styles.commIconBg, { backgroundColor: '#DCFCE7' }]}>
                                 <MaterialCommunityIcons name="chat" size={28} color="#22C55E" />
                             </View>
@@ -521,17 +556,19 @@ const styles = StyleSheet.create({
     },
     commGrid: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
         gap: 12,
     },
     commCard: {
-        flex: 1,
+        width: '48%',
         backgroundColor: '#0F172A',
         borderRadius: 20,
         padding: 16,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#1E293B',
+        marginBottom: 4,
     },
     commIconBg: {
         width: 56,

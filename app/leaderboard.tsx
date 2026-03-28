@@ -37,32 +37,10 @@ const getLeague = (points: number) => {
     return LEAGUES.find(l => points >= l.minPoints) || LEAGUES[LEAGUES.length - 1];
 };
 
-// Mock Data Generator
-const generateMockLeaderboard = (): LeaderboardUser[] => {
-    const users = [
-        { id: '1', name: 'Priya Sharma', points: 52000, appUsageMinutes: 120, callMinutes: 300, streak: 15 },
-        { id: '2', name: 'Anjali Gupta', points: 28000, appUsageMinutes: 90, callMinutes: 150, streak: 8 },
-        { id: '3', name: 'Sneha Patel', points: 12000, appUsageMinutes: 60, callMinutes: 80, streak: 5 },
-        { id: '4', name: 'Riya Singh', points: 6000, appUsageMinutes: 45, callMinutes: 40, streak: 12 },
-        { id: '5', name: 'Neha Verma', points: 2000, appUsageMinutes: 30, callMinutes: 20, streak: 0 },
-        { id: '6', name: 'Kavita Rao', points: 500, appUsageMinutes: 15, callMinutes: 10, streak: 2 },
-        { id: '7', name: 'Meera Reddy', points: 45000, appUsageMinutes: 110, callMinutes: 250, streak: 20 },
-        { id: '8', name: 'Pooja Kumar', points: 8000, appUsageMinutes: 50, callMinutes: 60, streak: 3 },
-    ];
-
-    return users.sort((a, b) => b.points - a.points).map((u, index) => ({
-        ...u,
-        rank: index + 1,
-        league: getLeague(u.points).tier,
-    }));
-};
-
-const { width } = Dimensions.get('window');
-
 export default function LeaderboardScreen() {
     const { user } = useAuthStore();
-    const [activeTab, setActiveTab] = useState<'global' | 'streaks' | 'video' | 'audio'>('global');
-    const [users, setUsers] = useState<LeaderboardUser[]>([]);
+    const [activeTab, setActiveTab] = useState<'callers' | 'streaks' | 'video' | 'audio'>('callers');
+    const [callersUsers, setCallersUsers] = useState<any[]>([]);
     const [streakUsers, setStreakUsers] = useState<any[]>([]);
     const [videoUsers, setVideoUsers] = useState<any[]>([]);
     const [audioUsers, setAudioUsers] = useState<any[]>([]);
@@ -75,8 +53,9 @@ export default function LeaderboardScreen() {
     const loadData = async () => {
         setLoading(true);
         try {
-            if (activeTab === 'global') {
-                setUsers(generateMockLeaderboard());
+            if (activeTab === 'callers') {
+                const data = await gamificationApi.getTotalCallLeaderboard();
+                setCallersUsers(data);
             } else if (activeTab === 'streaks') {
                 const data = await gamificationApi.getStreakLeaderboard();
                 setStreakUsers(data);
@@ -94,17 +73,12 @@ export default function LeaderboardScreen() {
         }
     };
 
-    const currentUserStats: LeaderboardUser = {
-        id: 'me',
-        name: user?.phone_number || 'You',
-        points: 1500,
-        appUsageMinutes: 25,
-        callMinutes: 15,
-        rank: 99,
-        league: getLeague(1500).tier
+    const formatDuration = (seconds: number) => {
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        if (hrs > 0) return `${hrs}h ${mins}m`;
+        return `${mins}m`;
     };
-
-    const currentLeague = getLeague(currentUserStats.points);
 
     return (
         <View style={styles.container}>
@@ -130,27 +104,11 @@ export default function LeaderboardScreen() {
                                     <View>
                                         <Text style={styles.currentUserName}>{user?.phone_number || 'Guest'}</Text>
                                         <View style={styles.leagueBadge}>
-                                            <MaterialCommunityIcons name={currentLeague.icon} size={16} color={currentLeague.color} />
-                                            <Text style={[styles.leagueText, { color: currentLeague.color }]}>
-                                                {currentLeague.tier} League
+                                            <Text style={[styles.leagueText, { color: '#8B5CF6' }]}>
+                                                Active Participant
                                             </Text>
                                         </View>
                                     </View>
-                                </View>
-                                <View style={styles.currentUserPointsBox}>
-                                    <Text style={styles.pointsLarge}>{currentUserStats.points.toLocaleString()}</Text>
-                                    <Text style={styles.pointsLabel}>Total Points</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.statsRow}>
-                                <View style={styles.statBox}>
-                                    <MaterialCommunityIcons name="clock-outline" size={16} color="#60A5FA" />
-                                    <Text style={styles.statLabel}>{currentUserStats.appUsageMinutes} min App Usage</Text>
-                                </View>
-                                <View style={styles.statBox}>
-                                    <MaterialCommunityIcons name="phone" size={16} color="#4ADE80" />
-                                    <Text style={styles.statLabel}>{currentUserStats.callMinutes} min Calls</Text>
                                 </View>
                             </View>
                         </View>
@@ -165,10 +123,10 @@ export default function LeaderboardScreen() {
                     style={{ maxHeight: 60 }}
                 >
                     <TouchableOpacity 
-                        style={[styles.tabButton, activeTab === 'global' && styles.activeTabButton]}
-                        onPress={() => setActiveTab('global')}
+                        style={[styles.tabButton, activeTab === 'callers' && styles.activeTabButton]}
+                        onPress={() => setActiveTab('callers')}
                     >
-                        <Text style={[styles.tabText, activeTab === 'global' && styles.activeTabText]}>Global</Text>
+                        <Text style={[styles.tabText, activeTab === 'callers' && styles.activeTabText]}>Top Callers 🏆</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.tabButton, activeTab === 'streaks' && styles.activeTabButton]}
@@ -195,30 +153,6 @@ export default function LeaderboardScreen() {
                     {loading ? (
                         <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 20 }} />
                     ) : (
-                        activeTab === 'global' ? users.map((u) => {
-                            const leagueInfo = getLeague(u.points);
-                            const isTop3 = u.rank <= 3;
-                            return (
-                                <View key={u.id} style={styles.listItem}>
-                                    <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>#{u.rank}</Text>
-                                    <Image source={{ uri: generateAvatarUrl(u.id, undefined) }} style={styles.itemAvatar} />
-                                    <View style={styles.itemInfo}>
-                                        <Text style={styles.itemName}>{u.name}</Text>
-                                        <View style={styles.itemSubtext}>
-                                            <Text style={[styles.itemLeague, { color: leagueInfo.color }]}>{leagueInfo.tier}</Text>
-                                            <Text style={styles.itemMinutes}> • {u.callMinutes} min calls</Text>
-                                            {u.streak && u.streak > 0 ? (
-                                                <Text style={[styles.itemMinutes, { color: '#EF4444', fontWeight: 'bold' }]}> • 🔥 {u.streak}</Text>
-                                            ) : null}
-                                        </View>
-                                    </View>
-                                    <View style={styles.itemPointsBox}>
-                                        <Text style={styles.itemPoints}>{u.points.toLocaleString()}</Text>
-                                        <Text style={styles.itemPointsLabel}>Pts</Text>
-                                    </View>
-                                </View>
-                            );
-                        }) : 
                         activeTab === 'streaks' ? streakUsers.map((item, index) => {
                             const isTop3 = index < 3;
                             return (
@@ -234,16 +168,12 @@ export default function LeaderboardScreen() {
                                     </View>
                                 </TouchableOpacity>
                             );
-                        }) :
-                        (activeTab === 'video' ? videoUsers : audioUsers).map((item, index) => {
-                            const isVideo = activeTab === 'video';
+                        }) : 
+                        (activeTab === 'callers' ? callersUsers : (activeTab === 'video' ? videoUsers : audioUsers)).map((item, index) => {
                             const isTop3 = index < 3;
-                            const formatDuration = (seconds: number) => {
-                                const hrs = Math.floor(seconds / 3600);
-                                const mins = Math.floor((seconds % 3600) / 60);
-                                if (hrs > 0) return `${hrs}h ${mins}m`;
-                                return `${mins}m`;
-                            };
+                            const color = activeTab === 'video' ? "#3B82F6" : (activeTab === 'audio' ? "#10B981" : "#8B5CF6");
+                            const icon = activeTab === 'video' ? "video" : (activeTab === 'audio' ? "phone" : "clock-check");
+                            
                             return (
                                 <TouchableOpacity key={item.user_id} style={styles.listItem} onPress={() => router.push(`/user/${item.user_id}` as any)}>
                                     <Text style={[styles.rankText, isTop3 && styles.rankTextTop3]}>#{index + 1}</Text>
@@ -254,8 +184,8 @@ export default function LeaderboardScreen() {
                                     </View>
                                     <View style={styles.itemPointsBox}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <MaterialCommunityIcons name={isVideo ? "video" : "phone"} size={14} color={isVideo ? "#3B82F6" : "#10B981"} />
-                                            <Text style={[styles.itemPoints, { color: isVideo ? "#3B82F6" : "#10B981" }]}>
+                                            <MaterialCommunityIcons name={icon as any} size={14} color={color} />
+                                            <Text style={[styles.itemPoints, { color }]}>
                                                 {formatDuration(item.total_duration)}
                                             </Text>
                                         </View>

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View, Text, StyleSheet, TouchableOpacity,
     Image, StatusBar, Alert, Platform, PermissionsAndroid, FlatList, ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { MotiView, AnimatePresence } from 'moti';
-import { MeetingProvider, useMeeting, useParticipant } from '@videosdk.live/react-native-sdk';
+import { MeetingProvider, useMeeting, useParticipant } from '@/utils/videoSdk.native';
 import { videoSdkApi, VIDEOSDK_TOKEN } from '@/api/videoSdk';
 import { callsApi, monetizationApi } from '@/api/vibely';
 import { getMediaUrl } from '@/utils/media';
@@ -107,7 +108,7 @@ function MeetingView({ calleeName, photoUri, status, setStatus, elapsed, coinRat
 
 export default function CallScreen() {
     const params = useLocalSearchParams<{
-        targetId: string;
+        id: string;
         sessionId?: string;
         roomId?: string;
         isIncoming?: string;
@@ -161,7 +162,7 @@ export default function CallScreen() {
                     }
 
                     // 2. Register call with backend using this Room ID
-                    const session = await callsApi.initiate(Number(params.targetId), type, generatedRoomId);
+                    const session = await callsApi.initiate(Number(params.id), type, generatedRoomId);
                     
                     setMeetingId(generatedRoomId);
                     setCoinRate(session.coins_per_min || 0);
@@ -172,7 +173,7 @@ export default function CallScreen() {
             }
         }
         setupCall();
-    }, [isIncoming, params.targetId, params.callType]);
+    }, [isIncoming, params.id, params.callType]);
 
     useEffect(() => {
         let timer: any;

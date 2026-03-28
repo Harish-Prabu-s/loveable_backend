@@ -165,7 +165,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             await chatApi.startCallOnRoom(sessionId);
             setIncomingCall(null);
             router.push({
-                pathname: `/calling/${callerId}`,
+                pathname: `/call/${callerId}`,
                 params: { sessionId: String(sessionId), roomId: roomId ? String(roomId) : String(sessionId), isIncoming: 'true', callType, calleeName: callerName, calleePhoto: callerPhoto }
             } as any);
         } catch (err) {

@@ -39,4 +39,9 @@ export const gamificationApi = {
     const response = await apiClient.get('leaderboard/audio-call-time/');
     return response.data;
   },
+
+  getTotalCallLeaderboard: async (): Promise<any[]> => {
+    const response = await apiClient.get('leaderboard/total-call-time/');
+    return response.data;
+  },
 };

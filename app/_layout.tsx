@@ -168,8 +168,9 @@ function RootLayoutNav() {
           <Stack.Screen name="network/following" options={{ headerShown: false }} />
           <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="story/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="story/create" options={{ headerShown: false }} />
-          <Stack.Screen name="calling/[targetId]" options={{ headerShown: false }} />
+          <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="call/raw/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="test-nav" options={{ headerShown: false }} />
           <Stack.Screen name="media-viewer" options={{ headerShown: false }} />
         </Stack>
         <SecurityLock />

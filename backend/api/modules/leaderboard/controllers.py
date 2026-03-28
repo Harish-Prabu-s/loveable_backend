@@ -55,3 +55,19 @@ def audio_call_leaderboard_view(request):
             'total_duration': user.total_duration
         })
     return Response(data)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def total_call_leaderboard_view(request):
+    users = get_call_time_leaderboard_service('ALL')
+    data = []
+    for i, user in enumerate(users):
+        p = getattr(user, 'profile', None)
+        data.append({
+            'rank': i + 1,
+            'user_id': user.id,
+            'username': user.username,
+            'display_name': p.display_name if p else user.username,
+            'profile_pic': p.photo.url if p and p.photo else None,
+            'total_duration': user.total_duration
+        })
+    return Response(data)

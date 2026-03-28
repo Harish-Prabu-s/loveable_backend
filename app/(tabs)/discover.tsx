@@ -83,21 +83,55 @@ function ProfileCard({ profile, index }: { profile: Profile; index: number }) {
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-          onPress={() => router.push(`/calling/${profile.user || profile.id}?callType=audio&calleeName=${encodeURIComponent(profile.display_name)}`)}
+          onPress={() => router.push({
+            pathname: '/call/[id]',
+            params: {
+              id: profile.user || profile.id,
+              callType: 'audio',
+              calleeName: profile.display_name,
+              calleePhoto: photo
+            }
+          } as any)}
         >
           <MaterialCommunityIcons name="phone" size={13} color="#FFF" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
-          onPress={() => router.push(`/calling/${profile.user || profile.id}?callType=video&calleeName=${encodeURIComponent(profile.display_name)}`)}
+          onPress={() => router.push({
+            pathname: '/call/[id]',
+            params: {
+              id: profile.user || profile.id,
+              callType: 'video',
+              calleeName: profile.display_name,
+              calleePhoto: photo
+            }
+          } as any)}
         >
           <MaterialCommunityIcons name="video" size={13} color="#FFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: '#F59E0B' }]}
+          onPress={() => router.push({
+            pathname: '/call/raw/[id]',
+            params: {
+              id: profile.user || profile.id,
+              calleeName: profile.display_name,
+            }
+          } as any)}
+        >
+          <MaterialCommunityIcons name="shield-check" size={13} color="#000" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: '#8B5CF6' }]}
           onPress={() => router.push({ pathname: '/chat/[id]' as any, params: { id: profile.user || profile.id } })}
         >
           <MaterialCommunityIcons name="chat" size={13} color="#FFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: '#FFFFFF' }]}
+          onPress={() => router.push('/test-nav' as any)}
+        >
+          <MaterialCommunityIcons name="test-tube" size={13} color="#000" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, { backgroundColor: following ? '#475569' : '#EC4899', opacity: followLoading ? 0.6 : 1 }]}

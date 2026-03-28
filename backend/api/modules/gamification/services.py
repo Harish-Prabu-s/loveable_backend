@@ -66,11 +66,20 @@ def get_streak_leaderboard_service(limit: int = 50):
 def get_call_time_leaderboard_service(call_type: str, limit: int = 50):
     """
     Optimized: Get top users by total call duration in a single query.
+    If call_type is 'ALL', sum Video and Voice.
     """
+    # Filter by call_type if not 'ALL'
+    if call_type.upper() == 'ALL':
+        q_made = Q()
+        q_received = Q()
+    else:
+        q_made = Q(calls_made__call_type=call_type.upper())
+        q_received = Q(calls_received__call_type=call_type.upper())
+
     # Sum duration from both calls_made and calls_received roles.
     return User.objects.filter(is_active=True).annotate(
-        total_made=Sum('calls_made__duration_seconds', filter=Q(calls_made__call_type=call_type.upper())),
-        total_received=Sum('calls_received__duration_seconds', filter=Q(calls_received__call_type=call_type.upper()))
+        total_made=Sum('calls_made__duration_seconds', filter=q_made),
+        total_received=Sum('calls_received__duration_seconds', filter=q_received)
     ).annotate(
         total_duration=Case(
             When(total_made__isnull=False, total_received__isnull=False, then=F('total_made') + F('total_received')),
