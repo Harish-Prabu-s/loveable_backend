@@ -24,18 +24,24 @@ class CallConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket
     async def receive(self, text_data):
         data = json.loads(text_data)
+        print(f"AG_WS_DEBUG: Signal received in room {self.room_id}: {data.get('type')}")
         
         # We just relay all signaling messages to others in the room
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'signal_message',
-                'message': data
+                'message': data,
+                'sender_channel_name': self.channel_name # To avoid sending back to self
             }
         )
 
     # Receive message from room group
     async def signal_message(self, event):
+        # Don't send back to the sender
+        if self.channel_name == event.get('sender_channel_name'):
+            return
+
         message = event['message']
         await self.send(text_data=json.dumps(message))
 
