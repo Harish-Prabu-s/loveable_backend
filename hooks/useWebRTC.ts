@@ -395,14 +395,14 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
   const toggleMute = useCallback(() => {
     const next = !isMuted;
-    localStreamRef.current?.getAudioTracks().forEach((t: any) => t.enabled = !next);
+    localStreamRef.current?.getAudioTracks?.().forEach((t: any) => t.enabled = !next);
     setIsMuted(next);
     wsRef.current?.send(JSON.stringify({ type: "media-state", audio: !next, video: !isVideoOff }));
   }, [isMuted, isVideoOff]);
 
   const toggleVideo = useCallback(() => {
     const next = !isVideoOff;
-    localStreamRef.current?.getVideoTracks().forEach((t: any) => t.enabled = !next);
+    localStreamRef.current?.getVideoTracks?.().forEach((t: any) => t.enabled = !next);
     setIsVideoOff(next);
     wsRef.current?.send(JSON.stringify({ type: "media-state", audio: !isMuted, video: !next }));
   }, [isMuted, isVideoOff]);
