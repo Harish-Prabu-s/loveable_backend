@@ -16,6 +16,7 @@ import { useSecurityStore } from '@/store/securityStore';
 import { authApi } from '@/api/auth';
 import { useTheme } from '@/context/ThemeContext';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -66,8 +67,9 @@ function SettingRow({
 export default function SettingsScreen() {
     const { logout: authContextLogout, user: authUser } = useAuth();
     const { user, logout: storeLogout } = useAuthStore();
-    const { setHighSecurity, setPin, highSecurityType } = useSecurityStore();
+    const { setHighSecurity, setPin, highSecurityType, clearAllSecurityData } = useSecurityStore();
     const { isDark, setTheme } = useTheme();
+    const isFocused = useIsFocused();
     const gender = user?.gender ?? authUser?.gender;
 
     const [settings, setSettings] = useState<UserSettings>({
@@ -89,8 +91,10 @@ export default function SettingsScreen() {
             const bio = await LocalAuthentication.hasHardwareAsync().catch(() => false);
             setBiometricAvailable(bio);
         };
-        load();
-    }, []);
+        if (isFocused) {
+            load();
+        }
+    }, [isFocused]);
 
     // ── Persist settings ──────────────────────────────────────────────────────
     const update = async (patch: Partial<UserSettings>) => {
@@ -354,11 +358,9 @@ export default function SettingsScreen() {
                                 'This will remove your PIN, Pattern, and Biometric lock settings. Are you sure?',
                                 [
                                     { text: 'Cancel', style: 'cancel' },
-                                    { text: 'Reset All', style: 'destructive', onPress: () => {
-                                        update({ app_lock_type: 'none' });
-                                        setHighSecurity('none');
-                                        setPin(null);
-                                        Alert.alert('Security Reset', 'All security locks have been cleared.');
+                                    { text: 'Reset All', style: 'destructive', onPress: async () => {
+                                        await clearAllSecurityData();
+                                        Alert.alert('Security Reset', 'All security locks and biometric data have been cleared.');
                                     }}
                                 ]
                             );

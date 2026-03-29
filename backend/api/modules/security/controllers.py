@@ -40,9 +40,24 @@ def update_security_settings(request):
     face = request.data.get('face_unlock_enabled')
     face_data = request.data.get('face_registration_data')
     fingerprint_data = request.data.get('fingerprint_registration_data')
+    app_lock_type = request.data.get('app_lock_type')
+    wipe = request.data.get('wipe', False)
     
     settings = get_user_settings(request.user)
+
+    if wipe:
+        settings.app_lock_type = 'none'
+        settings.biometrics_enabled = False
+        settings.face_unlock_enabled = False
+        settings.face_registration_data = None
+        settings.fingerprint_registration_data = None
+        settings.app_lock_value = None
+        settings.app_lock_pattern = None
+        settings.save()
+        return Response({'success': True, 'message': 'All security data cleared.'})
     
+    if app_lock_type is not None:
+        settings.app_lock_type = app_lock_type
     if biometrics is not None:
         settings.biometrics_enabled = biometrics
     if face is not None:

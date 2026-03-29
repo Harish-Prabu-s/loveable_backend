@@ -27,7 +27,8 @@ export const securityApi = {
      */
     updateSettings: async (settings: { 
         biometrics_enabled?: boolean; 
-        face_unlock_enabled?: boolean 
+        face_unlock_enabled?: boolean;
+        app_lock_type?: 'none' | 'pin' | 'pattern' | 'biometric';
     }): Promise<SecurityStatus> => {
         const res = await client.post('/security/update-settings/', settings);
         return res.data;

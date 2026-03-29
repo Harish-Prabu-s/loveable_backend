@@ -44,10 +44,8 @@ export const LockScreen = () => {
     useEffect(() => {
         if (isLocked && highSecurityType !== 'none') {
             if (highSecurityType === 'face') setShowCamera(true);
-            const timer = setTimeout(() => {
-                authenticateBiometrics();
-            }, 800);
-            return () => clearTimeout(timer);
+            // Trigger immediately for better UX
+            authenticateBiometrics();
         }
     }, [isLocked, highSecurityType]);
 

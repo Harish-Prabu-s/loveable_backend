@@ -18,6 +18,7 @@ interface SecurityState {
     setPattern: (pattern: string | null) => Promise<void>;
     setHighSecurity: (type: 'none' | 'fingerprint' | 'face') => Promise<void>;
     enrollBiometrics: (type: 'face' | 'fingerprint', data: any) => Promise<void>;
+    clearAllSecurityData: () => Promise<void>;
     recordBackgroundTime: () => void;
     checkLockNeeded: () => boolean;
 }
@@ -55,8 +56,10 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         const { securityApi } = await import('@/api/security');
         if (pin) {
             await securityApi.setLock('pin', pin);
+            await securityApi.updateSettings({ app_lock_type: 'pin' });
             await storage.setItem('app_lock_pin', pin);
         } else {
+            await securityApi.updateSettings({ app_lock_type: 'none' });
             await storage.removeItem('app_lock_pin');
         }
         set({ pin, pattern: null });
@@ -66,8 +69,10 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         const { securityApi } = await import('@/api/security');
         if (pattern) {
             await securityApi.setLock('pattern', pattern);
+            await securityApi.updateSettings({ app_lock_type: 'pattern' });
             await storage.setItem('app_lock_pattern', pattern);
         } else {
+            await securityApi.updateSettings({ app_lock_type: 'none' });
             await storage.removeItem('app_lock_pattern');
         }
         set({ pattern, pin: null });
@@ -79,7 +84,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         // Sync with backend
         await securityApi.updateSettings({ 
             biometrics_enabled: type === 'fingerprint',
-            face_unlock_enabled: type === 'face'
+            face_unlock_enabled: type === 'face',
+            app_lock_type: type !== 'none' ? 'biometric' : 'none'
         });
 
         await storage.setItem('high_security_type', type);
@@ -102,6 +108,32 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
 
         await securityApi.updateSettings(payload);
         await get().setHighSecurity(type);
+    },
+    
+    clearAllSecurityData: async () => {
+        const { securityApi } = await import('@/api/security');
+        
+        // 1. Wipe backend
+        await securityApi.updateSettings({ wipe: true } as any);
+        
+        // 2. Clear local storage
+        await Promise.all([
+            storage.removeItem('app_lock_pin'),
+            storage.removeItem('app_lock_pattern'),
+            storage.removeItem('high_security_type'),
+            storage.removeItem('face_registration_data'),
+            storage.removeItem('fingerprint_registration_data'),
+        ]);
+        
+        // 3. Update store state
+        set({
+            pin: null,
+            pattern: null,
+            highSecurityType: 'none',
+            faceData: null,
+            fingerprintData: null,
+            isLocked: false
+        });
     },
 
     recordBackgroundTime: () => set({ lastBackgroundTime: Date.now() }),

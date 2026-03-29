@@ -64,8 +64,10 @@ export default function ResetAppLockScreen() {
             await setPin(null);
             await setPattern(null);
 
-            Alert.alert('Identity Verified', 'Your security settings have been reset. You should now establish a new protective lock.', [
-                { text: 'Setup New PIN', onPress: () => router.push('/settings/set-pin' as any) }
+            Alert.alert('Identity Verified', 'Your security settings have been reset. What would you like to do next?', [
+                { text: 'Set New App PIN', onPress: () => router.push('/settings/set-pin' as any) },
+                { text: 'Reset Account Password', onPress: () => router.push('/settings/reset-password' as any) },
+                { text: 'Later', style: 'cancel' }
             ]);
         } catch (error: any) {
             Alert.alert('Verification Failed', 'The code entered is invalid or has expired.');
