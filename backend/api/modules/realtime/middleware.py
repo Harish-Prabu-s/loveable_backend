@@ -20,6 +20,10 @@ class JWTAuthMiddleware:
 
     async def __call__(self, scope, receive, send):
         close_old_connections()
+        
+        # Deep Trace Logging for 404/Signaling Debugging
+        path = scope.get('path', 'unknown')
+        logger.info(f"[WS Auth] New Connection Attempt | Path: {path}")
 
         # Get the token from query string
         query_string = parse_qs(scope['query_string'].decode())

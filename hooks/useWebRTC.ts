@@ -366,7 +366,17 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       baseUrl = baseUrl.replace('ws:', 'wss:');
     }
     
-    const wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
+    let wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
+    if (!wsUrl.includes('/ws/call/room/')) {
+        // Fallback for custom or missing base paths
+        wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
+    }
+    
+    // Ensure the path structure is strictly ws/call/room/<id>/ (with trailing slash)
+    const urlParts = wsUrl.split('?');
+    if (!urlParts[0].endsWith('/')) {
+        wsUrl = `${urlParts[0]}/${urlParts[1] ? '?' + urlParts[1] : ''}`;
+    }
 
     try {
       console.log(`[WebRTC] Protocol: ${baseUrl.startsWith('wss') ? 'SECURE (WSS)' : 'STANDARD (WS)'}`);
