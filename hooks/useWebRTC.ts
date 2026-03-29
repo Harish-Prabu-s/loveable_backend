@@ -27,7 +27,8 @@ if (Platform.OS !== "web") {
     RTCPeerConnection = webrtc.RTCPeerConnection;
     mediaDevices = webrtc.mediaDevices;
     MediaStream = webrtc.MediaStream;
-    InCallManager = require("@videosdk.live/react-native-incallmanager").default;
+    const icm = require("@videosdk.live/react-native-incallmanager");
+    InCallManager = icm.default ?? icm;
   } catch {
     // React Native stubs
     RTCPeerConnection = class { close() {} onicecandidate = null; ontrack = null; };
@@ -439,9 +440,9 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     const init = async () => {
       setStatus("connecting");
       try {
-        InCallManager.start({ media: kind });
-        InCallManager.setKeepScreenOn(true);
-        InCallManager.setForceSpeakerphoneOn(kind === "video");
+        InCallManager?.start?.({ media: kind });
+        InCallManager?.setKeepScreenOn?.(true);
+        InCallManager?.setForceSpeakerphoneOn?.(kind === "video");
 
         const constraints = {
           audio: { 
@@ -479,7 +480,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     return () => {
       isCancelled.current = true;
-      InCallManager.stop();
+      InCallManager?.stop?.();
       wsRef.current?.close();
       localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
       setLocalStream(null);
@@ -492,7 +493,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   }, [participants, onParticipantChange]);
 
   const hangup = useCallback(() => {
-    InCallManager.stop();
+    InCallManager?.stop?.();
     wsRef.current?.close();
     localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
     setLocalStream(null);
