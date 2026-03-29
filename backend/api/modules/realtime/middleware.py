@@ -1,5 +1,6 @@
 import os
 import django
+import logging
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'vibely_backend.settings')
 django.setup()
@@ -7,9 +8,18 @@ django.setup()
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser, User
 from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from django.db import close_old_connections
 from urllib.parse import parse_qs, unquote
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+logger = logging.getLogger(__name__)
+
+@database_sync_to_async
+def get_user(user_id):
+    try:
+        return User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return AnonymousUser()
 
 class JWTAuthMiddleware:
     """
@@ -19,6 +29,7 @@ class JWTAuthMiddleware:
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
+        # Close old database connections to prevent usage of timed out connections
         close_old_connections()
         
         # Deep Trace Logging for 404/Signaling Debugging
@@ -26,8 +37,12 @@ class JWTAuthMiddleware:
         logger.info(f"[WS Auth] New Connection Attempt | Path: {path}")
 
         # Get the token from query string
-        query_string = parse_qs(scope['query_string'].decode())
-        token_raw = query_string.get('token')
+        try:
+            query_string = parse_qs(scope['query_string'].decode())
+            token_raw = query_string.get('token')
+        except Exception as e:
+            logger.error(f"[WS Auth] Query string decoding failed: {e}")
+            token_raw = None
 
         if not token_raw:
             scope['user'] = AnonymousUser()

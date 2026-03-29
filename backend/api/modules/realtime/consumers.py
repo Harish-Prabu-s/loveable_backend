@@ -232,3 +232,13 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event['message']))
 
+class CatchAllConsumer(AsyncWebsocketConsumer):
+    """
+    Diagnostic consumer that catches all unmatched WebSocket paths
+    and logs the attempt. This helps identify routing discrepancies.
+    """
+    async def connect(self):
+        path = self.scope.get('path', 'unknown')
+        logger.warning(f"[WS ROUTER] UNMATCHED PATH: {path}")
+        await self.close(code=4004) # Not Found
+
