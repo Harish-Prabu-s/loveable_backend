@@ -64,7 +64,7 @@ module.exports = {
 			listenIps: [
 				{
 					ip: '0.0.0.0',
-					announcedIp: process.env.ANNOUNCED_IP || '72.62.195.63',
+					announcedIp: process.env.ANNOUNCED_IP || 'loveable.sbs',
 				},
 			],
 			initialAvailableOutgoingBitrate: 1000000,

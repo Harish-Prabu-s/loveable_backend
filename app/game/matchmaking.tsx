@@ -50,7 +50,7 @@ export default function MatchmakingScreen() {
 
     const startRandomMatch = (playerMode: '2p' | '4p') => {
         setStatus('searching');
-        const wsUrl = `ws://72.62.195.63:8001/ws/matchmaking/`;
+        const wsUrl = `wss://loveable.sbs/ws/matchmaking/`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 

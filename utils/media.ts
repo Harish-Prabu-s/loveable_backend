@@ -24,24 +24,23 @@ const getBaseMediaUrl = (): string => {
         const host = hostUri.split(':')[0];
 
         // Production Server URL for dev if needed
-        const PROD_IP = '72.62.195.63';
-        const PORT = '8001';
+        const PROD_DOMAIN = 'loveable.sbs';
 
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
             // Use the actual production server for media instead of local
-            return `http://${PROD_IP}:${PORT}`;
+            return `https://${PROD_DOMAIN}`;
         }
 
         // Android emulator: maps to host production server
         if (Platform.OS === 'android') {
-            return `http://${PROD_IP}:${PORT}`;
+            return `https://${PROD_DOMAIN}`;
         }
 
         // iOS simulator
-        return `http://${PROD_IP}:${PORT}`;
+        return `https://${PROD_DOMAIN}`;
     }
 
-    return 'http://72.62.195.63:8001';
+    return 'https://loveable.sbs';
 };
 
 const BASE_MEDIA_URL = getBaseMediaUrl().trim();

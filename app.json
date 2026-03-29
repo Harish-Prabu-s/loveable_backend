@@ -46,7 +46,7 @@
     },
     "extra": {
       "signalingUrl": "wss://berneice-untransmigrated-exotically.ngrok-free.dev",
-      "apiUrl": "http://72.62.195.63:8001/api",
+      "apiUrl": "https://loveable.sbs/api",
       "note": "Update apiUrl with your machine's local IP address for mobile testing",
       "eas": {
         "projectId": "4f304a85-6864-4d5e-9b51-8d5ff868e27a"

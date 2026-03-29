@@ -5,7 +5,7 @@ import { ensureHttps } from '@/utils/url';
 
 const getBaseUrl = () => {
   // Production server URL
-  const prodUrl = 'http://72.62.195.63:8001/api/';
+  const prodUrl = 'https://loveable.sbs/api/';
   console.log(`[API] Using Base URL: ${prodUrl}`);
   return prodUrl;
 };
