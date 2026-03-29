@@ -113,5 +113,13 @@ export const authApi = {
     const response = await apiClient.post('auth/complete-profile/', data);
     return response.data;
   },
+  requestResetOTP: async (email: string) => {
+    return await authApi.sendOTPEmail(email);
+  },
+
+  verifyResetOTP: async (email: string, otp: string) => {
+    return await authApi.verifyOTPEmail({ email, otp });
+  },
+
   getBaseUrl: () => apiClient.defaults.baseURL,
 };

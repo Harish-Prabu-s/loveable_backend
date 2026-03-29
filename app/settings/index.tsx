@@ -162,9 +162,10 @@ export default function SettingsScreen() {
         const options: any[] = [
             { text: '🔢 PIN', onPress: () => router.push('/settings/set-pin' as any) },
             { text: '🔷 Pattern', onPress: () => router.push('/settings/set-pattern' as any) },
+            { text: '🔑 Forgot PIN / Recovery', onPress: () => router.push('/settings/reset-app-lock' as any) },
         ];
         if (biometricAvailable) {
-            options.push({ text: '👆 Fingerprint / Face ID', onPress: () => update({ app_lock_type: 'biometric' }) });
+            options.push({ text: '👆 Fingerprint / Face ID', onPress: () => router.push('/settings/biometric-setup' as any) });
         }
         
         if (settings.app_lock_type !== 'none') {
@@ -381,6 +382,13 @@ export default function SettingsScreen() {
                 <Text style={styles.hint}>
                     This email is used to send recovery codes if you forget your App Lock PIN or Pattern.
                 </Text>
+                <TouchableOpacity 
+                    style={styles.recoveryBtn} 
+                    onPress={() => router.push('/settings/reset-app-lock' as any)}
+                >
+                    <MaterialCommunityIcons name="lock-reset" size={16} color="#8B5CF6" />
+                    <Text style={styles.recoveryText}>Forgot App Lock Secret?</Text>
+                </TouchableOpacity>
 
                 {/* ── Privacy ──────────────────────────────────────────── */}
                 <SectionHeader title="Privacy" icon="eye-off" />
@@ -494,4 +502,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
     },
     logoutBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+    recoveryBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        marginTop: 12, gap: 6, paddingVertical: 8,
+    },
+    recoveryText: { color: '#8B5CF6', fontSize: 13, fontWeight: '700' },
 });

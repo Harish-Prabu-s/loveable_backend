@@ -1,160 +1,125 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    TouchableOpacity, 
-    ActivityIndicator, 
-    Alert, 
-    Dimensions 
+import {
+    View, Text, StyleSheet, TouchableOpacity,
+    ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { MotiView, AnimatePresence } from 'moti';
+import { router } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { router, Stack } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSecurityStore } from '@/store/securityStore';
+import { useTheme } from '@/context/ThemeContext';
 import { notificationsApi } from '@/api/notifications';
 
-const { width } = Dimensions.get('window');
-
 export default function BiometricSetupScreen() {
-    const { toggleBiometrics, setPin } = useSecurityStore();
-    const [loading, setLoading] = useState(false);
-    const [available, setAvailable] = useState(false);
-    const [biometricType, setBiometricType] = useState<string>('Biometric');
+    const { isDark } = useTheme();
+    const { toggleBiometrics } = useSecurityStore();
+    const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'failed'>('idle');
+    const [compatible, setCompatible] = useState(false);
+    const [enrolled, setEnrolled] = useState(false);
 
     useEffect(() => {
-        checkSupport();
+        const check = async () => {
+            const hasHardware = await LocalAuthentication.hasHardwareAsync();
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+            setCompatible(hasHardware);
+            setEnrolled(isEnrolled);
+        };
+        check();
     }, []);
 
-    const checkSupport = async () => {
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        
-        setAvailable(hasHardware && isEnrolled);
-        
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            setBiometricType('Face ID / Recognition');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-            setBiometricType('Fingerprint');
+    const handleSetup = async () => {
+        if (!compatible) {
+            Alert.alert('Error', 'Your device does not support biometric authentication.');
+            return;
         }
-    };
 
-    const handleRegister = async () => {
-        setLoading(true);
+        if (!enrolled) {
+            Alert.alert('Error', 'No biometrics (Face ID/Fingerprint) enrolled on this device. Please set them up in your device settings first.');
+            return;
+        }
+
+        setStatus('scanning');
         try {
             const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: `Verify your ${biometricType} to enable App Lock`,
+                promptMessage: 'Verify identity to enable App Lock',
                 fallbackLabel: 'Use Passcode',
+                disableDeviceFallback: false,
             });
 
             if (result.success) {
-                // Success: Update backend and store
+                setStatus('success');
+                toggleBiometrics(true);
+                // Also update server settings
                 try {
                     await notificationsApi.updateSettings({ app_lock_type: 'biometric' });
-                    toggleBiometrics(true);
-                    setPin(null); // Clear PIN if switching to biometric
-                    
-                    Alert.alert(
-                        'Registration Successful',
-                        `${biometricType} has been linked to your account. Your app is now secure.`,
-                        [{ text: 'Continue', onPress: () => router.back() }]
-                    );
-                } catch (apiErr) {
-                    Alert.alert('Error', 'Failed to update remote settings, but biometric lock is enabled locally.');
-                    toggleBiometrics(true);
-                    router.back();
-                }
+                } catch { /* silent fallback */ }
+                
+                setTimeout(() => {
+                    Alert.alert('Success', 'Biometric App Lock enabled successfully.', [
+                        { text: 'OK', onPress: () => router.back() }
+                    ]);
+                }, 1000);
             } else {
-                Alert.alert('Verification Failed', 'Could not verify your identity. Please try again.');
+                setStatus('failed');
+                Alert.alert('Authentication Failed', 'We could not verify your identity.');
             }
-        } catch (e) {
-            Alert.alert('Error', 'An error occurred during biometric authentication.');
-        } finally {
-            setLoading(false);
+        } catch (error) {
+            setStatus('failed');
+            Alert.alert('Error', 'Something went wrong during authentication.');
         }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Stack.Screen options={{ headerShown: false }} />
-            <LinearGradient
-                colors={['#0F172A', '#1E1B4B']}
-                style={StyleSheet.absoluteFill}
-            />
-
+        <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#020617' : '#F8FAFC' }]}>
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="chevron-left" size={32} color="#FFF" />
+                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                    <MaterialCommunityIcons name="arrow-left" size={24} color={isDark ? "#FFF" : "#000"} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Biometric Setup</Text>
-                <View style={{ width: 44 }} />
+                <Text style={[styles.title, { color: isDark ? "#FFF" : "#000" }]}>Biometric Security</Text>
+                <View style={{ width: 40 }} />
             </View>
 
             <View style={styles.content}>
-                <MotiView
-                    from={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', damping: 12 }}
-                    style={styles.iconContainer}
-                >
-                    <LinearGradient
-                        colors={['#8B5CF6', '#6366F1']}
-                        style={styles.iconGradient}
-                    >
+                <View style={styles.iconContainer}>
+                    {status === 'scanning' ? (
+                        <ActivityIndicator size="large" color="#8B5CF6" />
+                    ) : (
                         <MaterialCommunityIcons 
-                            name={biometricType.includes('Face') ? "face-recognition" : "fingerprint"} 
-                            size={64} 
-                            color="#FFF" 
+                            name={status === 'success' ? "face-recognition" : "fingerprint"} 
+                            size={100} 
+                            color={status === 'success' ? '#10B981' : '#8B5CF6'} 
                         />
-                    </LinearGradient>
-                </MotiView>
+                    )}
+                </View>
 
-                <Text style={styles.title}>Secure Your Account</Text>
+                <Text style={[styles.subtitle, { color: isDark ? "#E2E8F0" : "#1E293B" }]}>
+                    {status === 'success' ? 'Biometrics Registered!' : 'Enable Face ID / Fingerprint'}
+                </Text>
+                
                 <Text style={styles.description}>
-                    Register your {biometricType} to unlock Vibely instantly without needing to enter a PIN every time.
+                    Add an extra layer of security to Vibely. Use your device's biometric sensors to unlock the app instantly and securely.
                 </Text>
 
                 <View style={styles.featureList}>
-                    <FeatureItem icon="shield-check" text="Bank-grade encryption" />
-                    <FeatureItem icon="clock-fast" text="Instant 1-tap unlock" />
-                    <FeatureItem icon="eye-off" text="No data stored on our servers" />
+                    <FeatureItem icon="shield-check" text="Secure local authentication" />
+                    <FeatureItem icon="flash" text="Instant app access" />
+                    <FeatureItem icon="lock-outline" text="Protects your private chats" />
                 </View>
 
-                {!available && (
-                    <View style={styles.errorBox}>
-                        <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#EF4444" />
-                        <Text style={styles.errorText}>
-                           No biometric data found. Please register a fingerprint or face in your phone settings first.
-                        </Text>
-                    </View>
-                )}
-
                 <TouchableOpacity 
-                    style={[styles.primaryBtn, !available && styles.disabledBtn]} 
-                    onPress={handleRegister}
-                    disabled={loading || !available}
-                    activeOpacity={0.8}
+                    style={[styles.mainBtn, status === 'success' && { backgroundColor: '#10B981' }]} 
+                    onPress={handleSetup}
+                    disabled={status === 'scanning'}
                 >
-                    {loading ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <>
-                            <Text style={styles.btnText}>Verify & Register</Text>
-                            <MaterialCommunityIcons name="arrow-right" size={20} color="#FFF" />
-                        </>
-                    )}
+                    <Text style={styles.mainBtnText}>
+                        {status === 'success' ? 'Already Enabled' : 'Verify & Enable Now'}
+                    </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                    style={styles.secondaryBtn} 
-                    onPress={() => router.back()}
-                >
-                    <Text style={styles.secondaryBtnText}>Set up later</Text>
-                </TouchableOpacity>
+                <Text style={styles.hint}>
+                    Your biometric data stays on your device and is never sent to our servers.
+                </Text>
             </View>
         </SafeAreaView>
     );
@@ -163,7 +128,7 @@ export default function BiometricSetupScreen() {
 function FeatureItem({ icon, text }: { icon: string; text: string }) {
     return (
         <View style={styles.featureItem}>
-            <MaterialCommunityIcons name={icon as any} size={20} color="#8B5CF6" />
+            <MaterialCommunityIcons name={icon as any} size={18} color="#8B5CF6" style={{ width: 24 }} />
             <Text style={styles.featureText}>{text}</Text>
         </View>
     );
@@ -173,52 +138,28 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 12,
+        paddingHorizontal: 20, paddingVertical: 16,
     },
     backBtn: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-    content: {
-        flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center',
-    },
+    title: { fontSize: 18, fontWeight: '700' },
+    content: { flex: 1, padding: 30, alignItems: 'center', justifyContent: 'center' },
     iconContainer: {
-        marginBottom: 40,
-        shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.4, shadowRadius: 20, elevation: 15,
+        width: 180, height: 180, borderRadius: 90,
+        backgroundColor: 'rgba(139,92,246,0.08)',
+        alignItems: 'center', justifyContent: 'center', marginBottom: 40,
+        borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)',
     },
-    iconGradient: {
-        width: 120, height: 120, borderRadius: 32,
-        alignItems: 'center', justifyContent: 'center',
-    },
-    title: {
-        fontSize: 28, fontWeight: '800', color: '#FFF',
-        textAlign: 'center', marginBottom: 12,
-    },
-    description: {
-        fontSize: 15, color: 'rgba(255,255,255,0.6)',
-        textAlign: 'center', lineHeight: 22, paddingHorizontal: 20,
-        marginBottom: 40,
-    },
-    featureList: {
-        width: '100%', backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 20, padding: 20, marginBottom: 40, gap: 16,
-    },
-    featureItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    featureText: { color: '#E2E8F0', fontSize: 15, fontWeight: '500' },
-    errorBox: {
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        padding: 16, borderRadius: 12, marginBottom: 30,
-    },
-    errorText: { flex: 1, color: '#EF4444', fontSize: 13, fontWeight: '600' },
-    primaryBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    subtitle: { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 16 },
+    description: { fontSize: 15, color: '#64748B', textAlign: 'center', lineHeight: 24, marginBottom: 32 },
+    featureList: { alignSelf: 'stretch', marginBottom: 40, paddingHorizontal: 20 },
+    featureItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    featureText: { fontSize: 15, color: '#94A3B8', fontWeight: '500' },
+    mainBtn: {
         backgroundColor: '#8B5CF6', width: '100%', height: 60,
-        borderRadius: 18, gap: 10,
-        shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+        borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+        shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
     },
-    disabledBtn: { backgroundColor: '#334155', opacity: 0.6 },
-    btnText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-    secondaryBtn: { marginTop: 24, padding: 12 },
-    secondaryBtnText: { color: '#94A3B8', fontSize: 15, fontWeight: '600' },
+    mainBtnText: { color: '#FFF', fontSize: 17, fontWeight: '800' },
+    hint: { marginTop: 20, fontSize: 12, color: '#475569', textAlign: 'center' },
 });
