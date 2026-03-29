@@ -6,7 +6,7 @@ interface SecurityState {
     isLocked: boolean;
     pin: string | null;
     pattern: string | null;
-    biometricsEnabled: boolean;
+    highSecurityType: 'none' | 'fingerprint' | 'face';
     lastBackgroundTime: number | null;
     lockGracePeriod: number; // in milliseconds, default 30s
 
@@ -14,7 +14,7 @@ interface SecurityState {
     setLocked: (locked: boolean) => void;
     setPin: (pin: string | null) => Promise<void>;
     setPattern: (pattern: string | null) => Promise<void>;
-    toggleBiometrics: (enabled: boolean) => Promise<void>;
+    setHighSecurity: (type: 'none' | 'fingerprint' | 'face') => Promise<void>;
     recordBackgroundTime: () => void;
     checkLockNeeded: () => boolean;
 }
@@ -23,19 +23,20 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     isLocked: false,
     pin: null,
     pattern: null,
-    biometricsEnabled: false,
+    highSecurityType: 'none',
     lastBackgroundTime: null,
     lockGracePeriod: 0, // Instant lock
 
     initialize: async () => {
         const pin = await storage.getItem('app_lock_pin');
         const pattern = await storage.getItem('app_lock_pattern');
-        const bioStr = await storage.getItem('biometrics_enabled');
+        const highSec = await storage.getItem('high_security_type') as any || 'none';
+        
         set({
             pin,
             pattern,
-            biometricsEnabled: bioStr === 'true',
-            isLocked: !!pin || !!pattern || bioStr === 'true' // Lock on start if any method exists
+            highSecurityType: highSec,
+            isLocked: !!pin || !!pattern || highSec !== 'none'
         });
     },
 
@@ -47,7 +48,6 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
             await securityApi.setLock('pin', pin);
             await storage.setItem('app_lock_pin', pin);
         } else {
-            // Clearing lock
             await storage.removeItem('app_lock_pin');
         }
         set({ pin, pattern: null });
@@ -64,18 +64,24 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         set({ pattern, pin: null });
     },
 
-    toggleBiometrics: async (enabled: boolean) => {
+    setHighSecurity: async (type: 'none' | 'fingerprint' | 'face') => {
         const { securityApi } = await import('@/api/security');
-        await securityApi.updateSettings({ biometrics_enabled: enabled });
-        await storage.setItem('biometrics_enabled', String(enabled));
-        set({ biometricsEnabled: enabled });
+        
+        // Sync with backend
+        await securityApi.updateSettings({ 
+            biometrics_enabled: type === 'fingerprint',
+            face_unlock_enabled: type === 'face'
+        });
+
+        await storage.setItem('high_security_type', type);
+        set({ highSecurityType: type });
     },
 
     recordBackgroundTime: () => set({ lastBackgroundTime: Date.now() }),
 
     checkLockNeeded: () => {
-        const { pin, pattern, biometricsEnabled } = get();
-        if (!pin && !pattern && !biometricsEnabled) return false;
+        const { pin, pattern, highSecurityType } = get();
+        if (!pin && !pattern && highSecurityType === 'none') return false;
         // Requirement: "Even if the app is reopened within 1 second -> require authentication"
         return true; 
     },

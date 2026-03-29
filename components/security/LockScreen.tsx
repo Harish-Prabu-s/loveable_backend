@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions, Pla
 import { MotiView, MotiText, AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSecurity } from '@/context/SecurityContext';
+import { useSecurityStore } from '@/store/securityStore';
 import { useAuth } from '@/context/AuthContext';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
@@ -21,6 +22,7 @@ const { width, height } = Dimensions.get('window');
  */
 export const LockScreen = () => {
     const { isLocked, setIsLocked, authenticateBiometrics, isBiometricsAvailable } = useSecurity();
+    const { highSecurityType } = useSecurityStore();
     const { user } = useAuth();
     const [pin, setPin] = useState('');
     const [error, setError] = useState(false);
@@ -130,6 +132,36 @@ export const LockScreen = () => {
                         ))}
                     </View>
 
+                    {/* Biometric Fallback Trigger (Other Security Option) */}
+                    <AnimatePresence>
+                        {highSecurityType !== 'none' && pin.length === 0 && !error && (
+                            <MotiView
+                                from={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                style={styles.biometricFallback}
+                            >
+                                <TouchableOpacity 
+                                    onPress={authenticateBiometrics}
+                                    style={styles.bioPromptBtn}
+                                >
+                                    <MaterialCommunityIcons 
+                                        name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
+                                        size={48} 
+                                        color="#8B5CF6" 
+                                    />
+                                    <Text style={styles.bioPromptText}>
+                                        Use {highSecurityType === 'face' ? 'Face ID' : 'Fingerprint'}
+                                    </Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity style={styles.otherOptionBtn}>
+                                    <Text style={styles.otherOptionText}>OR USE PIN TO UNLOCK</Text>
+                                </TouchableOpacity>
+                            </MotiView>
+                        )}
+                    </AnimatePresence>
+
                     {/* Custom Keypad */}
                     <View style={styles.keypad}>
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
@@ -143,14 +175,14 @@ export const LockScreen = () => {
                             </TouchableOpacity>
                         ))}
                         
-                        {/* Biometrics Toggle */}
+                        {/* Biometrics Toggle (Small Icon in Keypad) */}
                         <TouchableOpacity 
                             onPress={authenticateBiometrics} 
-                            style={[styles.key, !isBiometricsAvailable && { opacity: 0 }]}
-                            disabled={!isBiometricsAvailable}
+                            style={[styles.key, highSecurityType === 'none' && { opacity: 0 }]}
+                            disabled={highSecurityType === 'none'}
                         >
                             <MaterialCommunityIcons 
-                                name={user?.face_unlock_enabled ? "face-recognition" : "fingerprint"} 
+                                name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
                                 size={32} 
                                 color="rgba(255,255,255,0.8)" 
                             />
@@ -273,5 +305,37 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 255, 255, 0.5)',
         fontSize: 14,
         fontWeight: '600',
+    },
+    biometricFallback: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 30,
+        gap: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        padding: 20,
+        borderRadius: 25,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    bioPromptBtn: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+    },
+    bioPromptText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    otherOptionBtn: {
+        marginTop: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    otherOptionText: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 1,
     },
 });

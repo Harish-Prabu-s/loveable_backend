@@ -66,7 +66,7 @@ function SettingRow({
 export default function SettingsScreen() {
     const { logout: authContextLogout, user: authUser } = useAuth();
     const { user, logout: storeLogout } = useAuthStore();
-    const { toggleBiometrics, setPin } = useSecurityStore();
+    const { setHighSecurity, setPin, highSecurityType } = useSecurityStore();
     const { isDark, setTheme } = useTheme();
     const gender = user?.gender ?? authUser?.gender;
 
@@ -165,13 +165,14 @@ export default function SettingsScreen() {
             { text: '🔑 Forgot PIN / Recovery', onPress: () => router.push('/settings/reset-app-lock' as any) },
         ];
         if (biometricAvailable) {
-            options.push({ text: '👆 Fingerprint / Face ID', onPress: () => router.push('/settings/biometric-setup' as any) });
+            options.push({ text: '📸 Face Lock', onPress: () => router.push('/settings/biometric-setup' as any) });
+            options.push({ text: '👆 Fingerprint Lock', onPress: () => router.push('/settings/biometric-setup' as any) });
         }
         
-        if (settings.app_lock_type !== 'none') {
+        if (settings.app_lock_type !== 'none' || highSecurityType !== 'none') {
             options.unshift({ text: '🔓 Disable App Lock', style: 'destructive', onPress: () => {
                 update({ app_lock_type: 'none' });
-                toggleBiometrics(false);
+                setHighSecurity('none');
                 setPin(null);
             } });
         }
@@ -323,7 +324,7 @@ export default function SettingsScreen() {
                                         { text: 'Cancel', style: 'cancel' },
                                         { text: 'Disable', style: 'destructive', onPress: () => {
                                             update({ app_lock_type: 'none' });
-                                            toggleBiometrics(false);
+                                            setHighSecurity('none');
                                         }}
                                     ]);
                                 } else {
@@ -355,7 +356,7 @@ export default function SettingsScreen() {
                                     { text: 'Cancel', style: 'cancel' },
                                     { text: 'Reset All', style: 'destructive', onPress: () => {
                                         update({ app_lock_type: 'none' });
-                                        toggleBiometrics(false);
+                                        setHighSecurity('none');
                                         setPin(null);
                                         Alert.alert('Security Reset', 'All security locks have been cleared.');
                                     }}

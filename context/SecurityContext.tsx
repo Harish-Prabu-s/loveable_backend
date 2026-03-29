@@ -16,12 +16,15 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth();
     const [isLocked, setIsLocked] = useState(false);
     const [isBiometricsAvailable, setIsBiometricsAvailable] = useState(false);
+    const [supportedTypes, setSupportedTypes] = useState<LocalAuthentication.AuthenticationType[]>([]);
 
     // Check biometric availability on mount
     useEffect(() => {
         (async () => {
             const hasHardware = await LocalAuthentication.hasHardwareAsync();
             const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+            const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+            setSupportedTypes(types);
             setIsBiometricsAvailable(hasHardware && isEnrolled);
         })();
     }, []);
