@@ -12,7 +12,7 @@ interface ParticipantViewProps {
 import { RTCView } from "@/utils/webrtc.native";
 
 export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displayName, isLocal }) => {
-  const hasStream = stream && (stream.getVideoTracks().length > 0 || stream.getAudioTracks().length > 0);
+  const hasStream = !!stream && typeof stream.getVideoTracks === 'function' && (stream.getVideoTracks().length > 0 || stream.getAudioTracks().length > 0);
 
   return (
     <MotiView
