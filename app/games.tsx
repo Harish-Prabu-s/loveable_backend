@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     Image, ActivityIndicator, Alert, Dimensions, Modal
@@ -143,7 +143,7 @@ export default function GamesScreen() {
         }, 2000);
     };
 
-    const handleGameOver = (winner: 'me' | 'opponent' | 'draw') => {
+    const handleGameOver = useCallback((winner: 'me' | 'opponent' | 'draw') => {
         if (isBetMode) {
             if (winner === 'me') {
                 Alert.alert("Victory!", "You Won! +30 Coins added to wallet.");
@@ -158,10 +158,11 @@ export default function GamesScreen() {
             else Alert.alert("Result", "Draw!");
         }
         setActiveGame(null);
-    };
+    }, [isBetMode, setActiveGame]);
 
     if (activeGame) {
-        const gameOver = (winner: 'me' | 'opponent') => handleGameOver(winner);
+        // No need to wrap this in another function if it's already stable
+        const gameOver = handleGameOver;
         return (
             <SafeAreaView style={styles.gameContainer}>
                 <View style={styles.gameHeader}>

@@ -11,7 +11,4 @@ websocket_urlpatterns = [
     
     # Critical fix for WebRTC Signaling: Captures alphanumeric room IDs correctly with optional leading slash
     re_path(r'^/?ws/call/room/(?P<room_id>[\w\-_]+)/?$', consumers.CallRoomConsumer.as_asgi()),
-
-    # Diagnostic Catch-all: If none of the above match, log the attempt for path tracing.
-    re_path(r'^.*$', consumers.CatchAllConsumer.as_asgi()),
 ]

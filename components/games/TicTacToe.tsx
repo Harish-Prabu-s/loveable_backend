@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -22,14 +22,16 @@ export default function TicTacToe({ onGameOver }: { onGameOver: (winner: 'me' | 
     return null;
   };
 
-  const result = calculateWinner(board);
+  const result = useMemo(() => calculateWinner(board), [board]);
   const winner = result?.winner;
 
   useEffect(() => {
     if (result?.line) {
       setWinningLine(result.line);
+    } else {
+      setWinningLine(null);
     }
-  }, [result]);
+  }, [result?.line]);
 
   const handleClick = (i: number) => {
     if (winner || board[i]) return;

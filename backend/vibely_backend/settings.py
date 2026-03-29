@@ -22,8 +22,11 @@ class AuthDebugMiddleware:
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')
 DEBUG = True
-ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4', '10.130.45.184', 'berneice-untransmigrated-exotically.ngrok-free.dev']
-CSRF_TRUSTED_ORIGINS = ['https://berneice-untransmigrated-exotically.ngrok-free.dev']
+ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4', '10.130.45.184']
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.ngrok-free.dev',
+    'https://berneice-untransmigrated-exotically.ngrok-free.dev'
+]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
