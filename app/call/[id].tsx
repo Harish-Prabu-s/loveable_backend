@@ -143,9 +143,9 @@ export default function CallScreen() {
                 {participants.length > 0 ? (
                     <View style={styles.gridInner}>
                         {/* If 1 participant, show full screen. If more, show grid. */}
-                        {participants.map((p) => (
+                        {participants.map((p, index) => (
                             <ParticipantView 
-                                key={p.userId}
+                                key={p.userId || `p-${index}`}
                                 stream={p.stream} 
                                 displayName={p.displayName} 
                             />

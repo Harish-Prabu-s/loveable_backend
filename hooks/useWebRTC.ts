@@ -32,18 +32,33 @@ if (Platform.OS !== "web") {
     const icm = require("@videosdk.live/react-native-incallmanager");
     InCallManager = icm.default ?? icm;
   } catch {
-    // React Native stubs
-    RTCPeerConnection = class { close() {} onicecandidate = null; ontrack = null; };
-    mediaDevices = { getUserMedia: async () => ({ getTracks: () => [] }) };
-    MediaStream = class { getTracks() { return []; } release() {} };
-    InCallManager = { start: () => {}, stop: () => {} };
+    // Production-ready stubs: Ensure no-op instead of "is not a function" crashes
+    RTCPeerConnection = class {
+      close() {}
+      onicecandidate = null;
+      ontrack = null;
+      oniceconnectionstatechange = null;
+      onconnectionstatechange = null;
+      onicegatheringstatechange = null;
+      addTrack() {}
+      removeTrack() {}
+      async createOffer() { return { type: 'offer', sdp: '' }; }
+      async createAnswer() { return { type: 'answer', sdp: '' }; }
+      async setLocalDescription() {}
+      async setRemoteDescription() {}
+      async addIceCandidate() {}
+      getStats() { return Promise.resolve(new Map()); }
+    };
+    mediaDevices = { getUserMedia: async () => ({ getTracks: () => [], getAudioTracks: () => [], getVideoTracks: () => [] }) };
+    MediaStream = class { getTracks() { return []; } getVideoTracks() { return []; } getAudioTracks() { return []; } release() {} };
+    InCallManager = { start: () => {}, stop: () => {}, setKeepScreenOn: () => {}, setForceSpeakerphoneOn: () => {} };
   }
 } else {
-  // Web browser globals
+  // Web browser globals (Standardize names for consistency)
   RTCPeerConnection = (window as any).RTCPeerConnection;
   mediaDevices = (navigator as any).mediaDevices;
   MediaStream = (window as any).MediaStream;
-  InCallManager = { start: () => {}, stop: () => {} };
+  InCallManager = { start: () => {}, stop: () => {}, setKeepScreenOn: () => {}, setForceSpeakerphoneOn: () => {} };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -230,7 +245,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
         // Initiator: We send the offer
         const pcJoined = createPeerConnection(remoteId);
+        if (!pcJoined || typeof pcJoined.createOffer !== 'function') {
+          console.error(`[WebRTC] PC for ${remoteId} is invalid or lacks createOffer`);
+          return;
+        }
+
         try {
+          console.log(`[WebRTC] Signaling: Creating offer for ${remoteId}`);
           const offer = await pcJoined.createOffer();
           await pcJoined.setLocalDescription(offer);
           console.log(`[WebRTC] Signaling: Sending offer to ${remoteId}`);
@@ -246,8 +267,11 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
       case "participant-left":
         console.log(`[WebRTC] Participant left: ${remoteId}`);
-        pcs.current.get(remoteId)?.close();
-        pcs.current.delete(remoteId);
+        const pcLeft = pcs.current.get(remoteId);
+        if (pcLeft) {
+            pcLeft.close?.();
+            pcs.current.delete(remoteId);
+        }
         pendingCandidates.current.delete(remoteId);
         setParticipants(p => p.filter(item => item.userId !== remoteId));
         break;
@@ -255,6 +279,11 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       case "call-offer":
         console.log(`[WebRTC] Received offer from ${remoteId}`);
         const pcOffer = createPeerConnection(remoteId);
+        if (!pcOffer || typeof pcOffer.setRemoteDescription !== 'function') {
+            console.error(`[WebRTC] PC for ${remoteId} is invalid or lacks setRemoteDescription`);
+            return;
+        }
+
         try {
             await pcOffer.setRemoteDescription(data.offer);
             const answer = await pcOffer.createAnswer();
@@ -359,12 +388,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         protocol = 'wss';
     }
     
-    // 2. Base URL clean-up
-    let baseUrl = BASE_URL.replace(/^http(s)?:\/\//, '').replace(/\/api$/, '');
+    // 2. Base URL clean-up: Extract only host and port (e.g., "10.67.114.184:8000")
+    // Using new URL() is robust against trailing slashes/paths in BASE_URL
+    const urlObj = new URL(BASE_URL);
+    const host = urlObj.host;
     
-    // 3. Construct Final Signaling URL with strict path structure
-    // We ensure the path is exactly /ws/call/room/<id>/
-    const wsUrl = `${protocol}://${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
+    // 3. Construct Final Signaling URL
+    const wsUrl = `${protocol}://${host}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
 
     try {
       console.log(`[WebRTC] Protocol: ${protocol.toUpperCase()}`);
