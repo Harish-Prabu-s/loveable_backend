@@ -45,9 +45,12 @@ class JWTAuthMiddleware:
                 
                 # Get the user from the database
                 scope['user'] = await get_user(user_id)
-                logger.info(f"[WS Auth] Authenticated user {user_id}")
+                if not scope['user'] or scope['user'].is_anonymous:
+                    logger.error(f"[WS Auth] User ID {user_id} not found in database")
+                else:
+                    logger.info(f"[WS Auth] Successfully authenticated user {user_id}")
             except Exception as e:
-                logger.error(f"[WS Auth] Token validation failed: {e}")
+                logger.error(f"[WS Auth] Token validation failed: {str(e)}")
                 scope['user'] = AnonymousUser()
 
         return await self.inner(scope, receive, send)

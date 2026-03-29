@@ -368,8 +368,8 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        console.log(`[WebRTC] WS OPEN: Room ${rId}`);
         reconCount.current = 0;
-        // setStatus("connected"); // WS is open, but we wait for Peer Connection for full 'active'
       };
 
       ws.onmessage = (ev) => {
@@ -378,12 +378,15 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         handleSignal(data);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         if (isCancelled.current) return;
+        console.warn(`[WebRTC] WS CLOSED: Code ${e.code}, Reason: ${e.reason || 'None'}`);
         scheduleReconnect(rId);
       };
 
-      ws.onerror = (e) => console.warn("[WebRTC] WS Error:", e);
+      ws.onerror = (e) => {
+        console.error("[WebRTC] WS ERROR:", e);
+      };
     } catch (err) {
       console.error("[WebRTC] Connect failed:", err);
       scheduleReconnect(rId);
@@ -392,13 +395,20 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
   const scheduleReconnect = useCallback((rId: string) => {
     if (reconCount.current >= MAX_RECONNECT_ATTEMPTS) {
+      console.error(`[WebRTC] MAX RECONNECT REACHED (${MAX_RECONNECT_ATTEMPTS}). Failing.`);
       setStatus("failed");
       return;
     }
+    
+    // Exponential backoff: 2s, 4s, 8s, 16s, 32s (capped)
+    const delay = Math.min(30000, RECONNECT_DELAY * Math.pow(2, reconCount.current));
+    console.log(`[WebRTC] Scheduling reconnect in ${delay}ms (Attempt ${reconCount.current + 1})`);
+    
     setStatus("reconnecting");
-    const delay = RECONNECT_DELAY * Math.pow(2, reconCount.current);
     reconCount.current++;
-    setTimeout(() => connect(rId), delay);
+    setTimeout(() => {
+        if (!isCancelled.current) connect(rId);
+    }, delay);
   }, [connect]);
 
   // ── Media Controls ──────────────────────────────────────────────────────

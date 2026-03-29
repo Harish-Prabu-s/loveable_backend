@@ -87,13 +87,13 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
     Handles targeted signalling between peers and tracks room state.
     """
     async def connect(self):
-        self.room_id = self.scope['url_route']['kwargs']['room_id']
+        self.room_id = str(self.scope['url_route']['kwargs']['room_id'])
         self.room_group_name = f'call_room_{self.room_id}'
         self.user = self.scope.get('user')
 
         if not self.user or self.user.is_anonymous:
-            logger.warning(f"[WS Call] Connection rejected for anonymous user in room {self.room_id}")
-            await self.close(code=4001)  # Custom code for auth failure
+            logger.warning(f"[WS Call] REJECTED (Unauthenticated). Room: {self.room_id}")
+            await self.close(code=4001)
             return
 
         self.user_id = self.user.id
@@ -104,6 +104,7 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
+        logger.info(f"[WS Call] User {self.user_id} ACCEPTED. Room: {self.room_id}")
 
         # Notify others and get current participants (this is simplified, usually use Redis for real state)
         # For now, we broadcast that we joined. Clients will track the list.
