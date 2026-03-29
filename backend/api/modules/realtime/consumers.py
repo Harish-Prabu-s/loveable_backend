@@ -86,40 +86,73 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
     Production-grade WebRTC signaling consumer.
     Handles targeted signalling between peers and tracks room state.
     """
+    @database_sync_to_async
+    def get_user_profile_data(self):
+        """
+        Safely fetch profile data in a synchronous database context.
+        This prevents 'RelatedObjectDoesNotExist' and async event loop crashes.
+        """
+        try:
+            profile = getattr(self.user, 'profile', None)
+            if profile:
+                photo_url = None
+                if profile.photo:
+                    try:
+                        photo_url = profile.photo.url if hasattr(profile.photo, 'url') else str(profile.photo)
+                    except Exception:
+                        photo_url = None
+                return {
+                    'display_name': profile.display_name or self.user.username,
+                    'photo': photo_url
+                }
+        except Exception as e:
+            logger.error(f"[WS Call] Error fetching profile for user {self.user.id}: {e}")
+        
+        return {
+            'display_name': self.user.username,
+            'photo': None
+        }
+
     async def connect(self):
-        self.room_id = str(self.scope['url_route']['kwargs']['room_id'])
-        self.room_group_name = f'call_room_{self.room_id}'
-        self.user = self.scope.get('user')
-
-        if not self.user or self.user.is_anonymous:
-            logger.warning(f"[WS Call] REJECTED (Unauthenticated). Room: {self.room_id}")
-            await self.close(code=4001)
-            return
-
-        self.user_id = self.user.id
-        
-        # Add to room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-        await self.accept()
-        logger.info(f"[WS Call] User {self.user_id} ACCEPTED. Room: {self.room_id}")
-
-        # Notify others and get current participants (this is simplified, usually use Redis for real state)
-        # For now, we broadcast that we joined. Clients will track the list.
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'participant_joined',
-                'user_id': self.user_id,
-                'display_name': getattr(self.user.profile, 'display_name', self.user.username),
-                'photo': getattr(self.user.profile, 'photo', None),
-                'from_channel': self.channel_name
-            }
-        )
-        
-        logger.info(f"[WS Call] User {self.user_id} joined room {self.room_id}")
+        try:
+            self.room_id = str(self.scope['url_route']['kwargs']['room_id'])
+            self.room_group_name = f'call_room_{self.room_id}'
+            self.user = self.scope.get('user')
+    
+            if not self.user or self.user.is_anonymous:
+                logger.warning(f"[WS Call] REJECTED (Unauthenticated). Room: {self.room_id}")
+                await self.close(code=4001)
+                return
+    
+            self.user_id = self.user.id
+            
+            # Add to room group
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+            await self.accept()
+            logger.info(f"[WS Call] User {self.user_id} ACCEPTED. Room: {self.room_id}")
+    
+            # Notify others and get current participants
+            # Use the helper to fetch DB data safely
+            profile_data = await self.get_user_profile_data()
+    
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'participant_joined',
+                    'user_id': self.user_id,
+                    'display_name': profile_data['display_name'],
+                    'photo': profile_data['photo'],
+                    'from_channel': self.channel_name
+                }
+            )
+            
+            logger.info(f"[WS Call] User {self.user_id} joined room {self.room_id}")
+        except Exception as e:
+            logger.error(f"[WS Call] Connection failed with error: {str(e)}")
+            await self.close(code=1011)
 
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
