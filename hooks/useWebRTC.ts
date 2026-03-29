@@ -19,25 +19,28 @@ import { storage } from "@/lib/storage";
 let RTCPeerConnection: any;
 let mediaDevices: any;
 let MediaStream: any;
-let Device: any; // mediasoup-client Device
+let InCallManager: any;
 
 if (Platform.OS !== "web") {
   try {
-    const webrtc = require("react-native-webrtc");
+    const webrtc = require("@videosdk.live/react-native-webrtc");
     RTCPeerConnection = webrtc.RTCPeerConnection;
     mediaDevices = webrtc.mediaDevices;
     MediaStream = webrtc.MediaStream;
+    InCallManager = require("@videosdk.live/react-native-incallmanager").default;
   } catch {
     // React Native stubs
     RTCPeerConnection = class { close() {} onicecandidate = null; ontrack = null; };
     mediaDevices = { getUserMedia: async () => ({ getTracks: () => [] }) };
     MediaStream = class { getTracks() { return []; } release() {} };
+    InCallManager = { start: () => {}, stop: () => {} };
   }
 } else {
   // Web browser globals
   RTCPeerConnection = (window as any).RTCPeerConnection;
   mediaDevices = (navigator as any).mediaDevices;
   MediaStream = (window as any).MediaStream;
+  InCallManager = { start: () => {}, stop: () => {} };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -129,16 +132,18 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     if (pcs.current.has(remoteId)) return pcs.current.get(remoteId);
 
     console.log(`[WebRTC] Creating PC for user ${remoteId}`);
-    const pc = new RTCPeerConnection({
-        iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" }
-        ]
-    });
+    const iceServers = [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        // Add production TURN servers here
+        // { urls: "turn:your-turn-server.com:3478", username: "user", credential: "pwd" }
+    ];
+
+    const pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = (ev: any) => {
         if (ev.candidate) {
-            console.log(`[WebRTC] Local ICE candidate for ${remoteId}`);
+            console.log(`[WebRTC] ICE candidate generated for ${remoteId}: ${ev.candidate.candidate.substring(0, 30)}...`);
             wsRef.current?.send(JSON.stringify({
                 type: "ice-candidate",
                 target_user_id: remoteId,
@@ -147,8 +152,35 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         }
     };
 
+    pc.onicegatheringstatechange = () => {
+        console.log(`[WebRTC] ICE Gathering State (${remoteId}): ${pc.iceGatheringState}`);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log(`[WebRTC] ICE Connection State (${remoteId}): ${iceState}`);
+        
+        switch (iceState) {
+            case 'checking':
+                setStatus('connecting');
+                break;
+            case 'connected':
+            case 'completed':
+                setStatus('connected');
+                break;
+            case 'failed':
+                console.warn(`[WebRTC] ICE failed for ${remoteId}. Attempting restart?`);
+                setStatus('failed');
+                break;
+            case 'disconnected':
+                console.log(`[WebRTC] ICE disconnected for ${remoteId}`);
+                setStatus('reconnecting');
+                break;
+        }
+    };
+
     pc.ontrack = (ev: any) => {
-        console.log(`[WebRTC] Got remote track from user ${remoteId}`);
+        console.log(`[WebRTC] SUCCESS: Got remote track from user ${remoteId}`);
         setStatus('connected');
         setParticipants(prev => prev.map(p => 
             p.userId === remoteId ? { ...p, stream: ev.streams[0] } : p
@@ -197,14 +229,14 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         try {
           const offer = await pcJoined.createOffer();
           await pcJoined.setLocalDescription(offer);
-          console.log(`[WebRTC] Sending offer to ${remoteId}`);
+          console.log(`[WebRTC] Signaling: Sending offer to ${remoteId}`);
           wsRef.current?.send(JSON.stringify({
               type: "call-offer",
               target_user_id: remoteId,
               offer
           }));
         } catch (err) {
-          console.error("[WebRTC] Offer creation failed:", err);
+          console.error("[WebRTC] ERROR: Offer creation failed:", err);
         }
         break;
 
@@ -407,11 +439,25 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     const init = async () => {
       setStatus("connecting");
       try {
+        InCallManager.start({ media: kind });
+        InCallManager.setKeepScreenOn(true);
+        InCallManager.setForceSpeakerphoneOn(kind === "video");
+
         const constraints = {
-          audio: { echoCancellation: true, noiseSuppression: true },
-          video: kind === "video" ? { frameRate: 30, width: 1280, height: 720 } : false
+          audio: { 
+            echoCancellation: true, 
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: kind === "video" ? { 
+            frameRate: 30, 
+            width: 1280, 
+            height: 720,
+            facingMode: 'user'
+          } : false
         };
 
+        console.log(`[WebRTC] Requesting media with constraints:`, constraints);
         const stream = await mediaDevices.getUserMedia(constraints);
         if (isCancelled.current) {
           stream.getTracks().forEach((t: any) => t.stop());
@@ -420,10 +466,11 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
         localStreamRef.current = stream;
         setLocalStream(stream);
+        console.log(`[WebRTC] Media stream obtained. Joining room: ${roomId}`);
         await connect(roomId);
 
       } catch (err) {
-        console.error("[WebRTC] Media init failed:", err);
+        console.error("[WebRTC] CRITICAL: Media init failed:", err);
         setStatus("failed");
       }
     };
@@ -432,6 +479,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     return () => {
       isCancelled.current = true;
+      InCallManager.stop();
       wsRef.current?.close();
       localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
       setLocalStream(null);
@@ -444,6 +492,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   }, [participants, onParticipantChange]);
 
   const hangup = useCallback(() => {
+    InCallManager.stop();
     wsRef.current?.close();
     localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
     setLocalStream(null);

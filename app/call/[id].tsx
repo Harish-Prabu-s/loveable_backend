@@ -53,11 +53,12 @@ export default function CallScreen() {
     const [status, setStatus] = useState<'connecting' | 'active' | 'ended'>('connecting');
 
     useEffect(() => {
+        console.log(`[CallScreen] Connection Status Update: ${connectionStatus}`);
         if (connectionStatus === 'connected') {
             setStatus('active');
         } else if (connectionStatus === 'failed') {
             setStatus('ended');
-            setTimeout(() => router.replace('/(tabs)/discover'), 1500);
+            setTimeout(() => router.replace('/(tabs)/discover'), 2000);
         }
     }, [connectionStatus]);
 
@@ -115,11 +116,20 @@ export default function CallScreen() {
         return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     };
 
-    if (!roomId || status === 'connecting' && !localStream) {
+    if (!roomId) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#6366F1" />
-                <Text style={styles.loadingText}>Initializing Call...</Text>
+                <Text style={styles.loadingText}>Creating Room...</Text>
+            </View>
+        );
+    }
+
+    if (status === 'connecting' && !localStream) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#6366F1" />
+                <Text style={styles.loadingText}>Initializing Media...</Text>
             </View>
         );
     }
@@ -184,7 +194,13 @@ export default function CallScreen() {
                     <View style={styles.headerInfo}>
                         <Text style={styles.calleeName}>{params.calleeName || 'User'}</Text>
                         <Text style={styles.statusText}>
-                            {status === 'active' ? formatTime(elapsed) : 'Connecting...'}
+                            {status === 'active' 
+                                ? formatTime(elapsed) 
+                                : connectionStatus === 'connecting' 
+                                    ? 'Connecting Partners...' 
+                                    : connectionStatus === 'reconnecting'
+                                        ? 'Reconnecting...'
+                                        : 'Waiting for response...'}
                         </Text>
                     </View>
                     

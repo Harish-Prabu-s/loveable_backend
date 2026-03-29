@@ -145,7 +145,7 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
             # Attach sender info
             data['from_user_id'] = self.user_id
 
-            if msg_type in ['call-offer', 'call-answer', 'ice-candidate']:
+            if msg_type in ['call-offer', 'call-answer', 'ice-candidate', 'call-accept', 'call-reject']:
                 if target_id:
                     # Targeted signal to a specific user
                     target_group = f"call_room_user_{target_id}" # We'll need users to join their own groups too or use channel_name
