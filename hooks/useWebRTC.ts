@@ -360,9 +360,15 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       baseUrl = BASE_URL.replace(/^http/, 'ws').replace(/\/api$/, '');
     }
     
-    const wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${token}`;
+    // Production Hardening: Force WSS if the BASE_URL is HTTPS (e.g. ngrok)
+    if (BASE_URL.startsWith('https') && baseUrl.startsWith('ws:')) {
+      baseUrl = baseUrl.replace('ws:', 'wss:');
+    }
+    
+    const wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
 
     try {
+      console.log(`[WebRTC] Protocol: ${baseUrl.startsWith('wss') ? 'SECURE (WSS)' : 'STANDARD (WS)'}`);
       console.log(`[WebRTC] Connecting to room: ${rId}`);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
