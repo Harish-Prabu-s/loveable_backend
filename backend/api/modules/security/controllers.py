@@ -13,6 +13,7 @@ from .services import (
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def set_app_lock(request):
+    """Set the application lock type and value (PIN/Pattern/etc)"""
     lock_type = request.data.get('lock_type')
     value = request.data.get('value')
     if not lock_type or not value:
@@ -24,6 +25,7 @@ def set_app_lock(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def verify_app_lock(request):
+    """Verify the provided lock value against stored settings"""
     value = request.data.get('value')
     if not value:
         return Response({'error': 'value is required.'}, status=400)
@@ -36,6 +38,7 @@ def verify_app_lock(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_security_settings(request):
+    """Bulk update security preferences and clear data if requested"""
     biometrics = request.data.get('biometrics_enabled')
     face = request.data.get('face_unlock_enabled')
     face_data = request.data.get('face_registration_data')
@@ -43,6 +46,7 @@ def update_security_settings(request):
     app_lock_type = request.data.get('app_lock_type')
     wipe = request.data.get('wipe', False)
     
+    # Ensure get_user_settings is available from current namespace
     settings = get_user_settings(request.user)
 
     if wipe:
@@ -73,6 +77,7 @@ def update_security_settings(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def initiate_lock_reset(request):
+    """Trigger an email OTP for lock reset"""
     success, msg = initiate_lock_reset_service(request.user)
     if success:
         return Response({'success': True, 'message': msg})
@@ -81,6 +86,7 @@ def initiate_lock_reset(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def verify_reset_otp(request):
+    """Verify reset OTP and clear current lock if valid"""
     code = request.data.get('code')
     if not code:
         return Response({'error': 'OTP code is required.'}, status=400)

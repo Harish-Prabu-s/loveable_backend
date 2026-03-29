@@ -5,7 +5,7 @@ import { ensureHttps } from '@/utils/url';
 
 const getBaseUrl = () => {
   // Local network IP address
-  const localUrl = 'http://10.67.114.184:8000/api';
+  const localUrl = 'http://10.67.114.184:8000/api/';
   console.log(`[API] Using Base URL: ${localUrl}`);
   return localUrl;
 };

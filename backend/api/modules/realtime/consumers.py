@@ -1,6 +1,7 @@
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
@@ -106,10 +107,10 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
                     'photo': photo_url
                 }
         except Exception as e:
-            logger.error(f"[WS Call] Error fetching profile for user {self.user.id}: {e}")
+            logger.error(f"[WS Call] Error fetching profile for user {getattr(self.user, 'id', 'unknown')}: {e}")
         
         return {
-            'display_name': self.user.username,
+            'display_name': getattr(self.user, 'username', 'Unknown User'),
             'photo': None
         }
 
@@ -186,8 +187,6 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
             if msg_type in ['call-offer', 'call-answer', 'ice-candidate', 'call-accept', 'call-reject']:
                 if target_id:
                     # Targeted signal to a specific user
-                    target_group = f"call_room_user_{target_id}" # We'll need users to join their own groups too or use channel_name
-                    # Actually, a simpler way in Channels is to have each user join a private group too
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -239,8 +238,6 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
                 'display_name': event['display_name'],
                 'photo': event['photo']
             }))
-            # If we are the newly joined user, we might want a 'room-joined' event with ALL current users
-            # but in this simple mesh, the existing users will see us and send offers.
 
     async def participant_left(self, event):
         if event['user_id'] != self.user_id:
@@ -274,4 +271,3 @@ class CatchAllConsumer(AsyncWebsocketConsumer):
         path = self.scope.get('path', 'unknown')
         logger.warning(f"[WS ROUTER] UNMATCHED PATH: {path}")
         await self.close(code=4004) # Not Found
-

@@ -104,8 +104,9 @@ export const LockScreen = () => {
         }
     }, [isLocked, highSecurityType]);
 
-    // Determine if any fallback exists
-    const hasAppFallback = !!(user?.app_lock_value || pin || pattern);
+    // Determine if any fallback exists (PIN or Pattern)
+    // Strictly verify that the values are not just empty strings
+    const hasAppFallback = !!((user?.app_lock_value && user.app_lock_value.length > 0) || (pin && pin.length > 0) || (pattern && pattern.length > 0));
     const isBiometricOnly = highSecurityType !== 'none' && !hasAppFallback;
 
     const onAuthenticate = async () => {

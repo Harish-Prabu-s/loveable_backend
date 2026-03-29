@@ -48,15 +48,19 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         const failCount = await storage.getItem('app_lock_fail_count');
         const lockoutUntil = await storage.getItem('app_lock_lockout_until');
         
+        // Clean up empty strings or nulls to force null type
+        const cleanPin = (pin && pin.length > 0) ? pin : null;
+        const cleanPattern = (pattern && pattern.length > 0) ? pattern : null;
+        
         set({
-            pin,
-            pattern,
+            pin: cleanPin,
+            pattern: cleanPattern,
             highSecurityType: highSec,
             faceData: faceData ? JSON.parse(faceData) : null,
             fingerprintData: fingerprintData ? JSON.parse(fingerprintData) : null,
             failCount: failCount ? parseInt(failCount) : 0,
             lockoutUntil: lockoutUntil ? parseInt(lockoutUntil) : null,
-            isLocked: !!pin || !!pattern || highSec !== 'none'
+            isLocked: !!cleanPin || !!cleanPattern || highSec !== 'none'
         });
     },
 
