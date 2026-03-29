@@ -23,21 +23,25 @@ const getBaseMediaUrl = (): string => {
         const hostUri = Constants.expoConfig?.hostUri ?? '';
         const host = hostUri.split(':')[0];
 
+        // Production Server URL for dev if needed
+        const PROD_IP = '72.62.195.63';
+        const PORT = '8001';
+
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
-            // Physical device on LAN — use the actual Metro host IP
-            return `http://${host}:8000`;
+            // Use the actual production server for media instead of local
+            return `http://${PROD_IP}:${PORT}`;
         }
 
-        // Android emulator: 10.0.2.2 maps to the host machine's localhost
+        // Android emulator: maps to host production server
         if (Platform.OS === 'android') {
-            return 'http://10.0.2.2:8000';
+            return `http://${PROD_IP}:${PORT}`;
         }
 
-        // iOS simulator — localhost works directly
-        return 'http://localhost:8000';
+        // iOS simulator
+        return `http://${PROD_IP}:${PORT}`;
     }
 
-    return PROD;
+    return 'http://72.62.195.63:8001';
 };
 
 const BASE_MEDIA_URL = getBaseMediaUrl().trim();

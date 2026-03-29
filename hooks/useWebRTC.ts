@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Platform, AppState, AppStateStatus } from "react-native";
 import { storage } from "@/lib/storage";
-import { BASE_URL } from "@/api/client";
+import { BASE_URL, default as apiClient } from "@/api/client";
 import Constants from "expo-constants";
 
 // ─── Platform-specific WebRTC & SFU imports ──────────────────────────────────
@@ -140,6 +140,10 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [qualityTier, setQualityTier] = useState<QualityTier>("high");
+  const [iceServers, setIceServers] = useState<any[]>([
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]);
 
   // -- Refs --
   const wsRef = useRef<WebSocket | null>(null);
@@ -153,19 +157,30 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const pcs = useRef<Map<number, any>>(new Map());
   const pendingCandidates = useRef<Map<number, any[]>>(new Map());
 
+  // ── ICE Servers Fetching ───────────────────────────────────────────────
+
+  const fetchIceServers = useCallback(async () => {
+    try {
+      console.log("[WebRTC] Fetching TURN credentials...");
+      const response = await apiClient.get("calls/turn-credentials/");
+      if (response.data?.iceServers) {
+        console.log("[WebRTC] SUCCESS: Received TURN credentials");
+        setIceServers(response.data.iceServers);
+        return response.data.iceServers;
+      }
+    } catch (err) {
+      console.warn("[WebRTC] WARNING: Failed to fetch TURN credentials. Using fallback STUN.", err);
+    }
+    return iceServers;
+  }, [iceServers]);
+
   // ── Peer Connection Helper ─────────────────────────────────────────────
 
   const createPeerConnection = useCallback((remoteId: number) => {
     if (pcs.current.has(remoteId)) return pcs.current.get(remoteId);
 
     console.log(`[WebRTC] Creating PC for user ${remoteId}`);
-    const iceServers = [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        // Add production TURN servers here
-        // { urls: "turn:your-turn-server.com:3478", username: "user", credential: "pwd" }
-    ];
-
+    
     const pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = (ev: any) => {
@@ -614,7 +629,10 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
             InCallManager?.setForceSpeakerphoneOn?.(false);
         }
 
-        console.log(`[WebRTC] Media stream obtained. Joining room: ${roomId}`);
+        console.log(`[WebRTC] Media stream obtained. Fetching TURN...`);
+        const latestIce = await fetchIceServers();
+        
+        console.log(`[WebRTC] Joining room: ${roomId}`);
         await connect(roomId);
 
       } catch (err) {

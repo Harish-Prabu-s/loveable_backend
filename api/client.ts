@@ -4,10 +4,10 @@ import { DeviceEventEmitter } from 'react-native';
 import { ensureHttps } from '@/utils/url';
 
 const getBaseUrl = () => {
-  // Local network IP address
-  const localUrl = 'http://10.67.114.184:8000/api/';
-  console.log(`[API] Using Base URL: ${localUrl}`);
-  return localUrl;
+  // Production server URL
+  const prodUrl = 'http://72.62.195.63:8001/api/';
+  console.log(`[API] Using Base URL: ${prodUrl}`);
+  return prodUrl;
 };
 
 export const BASE_URL = getBaseUrl().trim();

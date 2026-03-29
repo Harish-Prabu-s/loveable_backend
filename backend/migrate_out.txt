@@ -1,4 +1,0 @@
-﻿Operations to perform:
-  Apply all migrations: api
-Running migrations:
-  Applying api.0016_remove_storycomment_story_remove_storycomment_user_and_more...

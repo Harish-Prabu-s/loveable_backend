@@ -35,7 +35,7 @@ export default function GameRoomScreen() {
     useEffect(() => {
         if (!roomId) return;
         // In a real app, use the env WS_URL
-        const wsUrl = `ws://localhost:8000/ws/game/${roomId}/`;
+        const wsUrl = `ws://72.62.195.63:8001/ws/game/${roomId}/`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 

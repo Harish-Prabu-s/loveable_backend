@@ -26,7 +26,7 @@ export default function DeleteAccountRequestPage() {
         const token = makeToken();
         const expiresAt = Date.now() + 2 * 24 * 60 * 60 * 1000;
         await AsyncStorage.setItem('delete_request', JSON.stringify({ reason, token, expiresAt }));
-        const link = `http://localhost:8000/account/delete/confirm/${token}`;
+        const link = `http://72.62.195.63:8001/account/delete/confirm/${token}`;
         Alert.alert('Dev Mode', `Confirmation link simulated:\n${link}`);
         router.push('/profile');
       }

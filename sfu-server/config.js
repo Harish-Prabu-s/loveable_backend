@@ -64,7 +64,7 @@ module.exports = {
 			listenIps: [
 				{
 					ip: '0.0.0.0',
-					announcedIp: process.env.ANNOUNCED_IP || '127.0.0.1',
+					announcedIp: process.env.ANNOUNCED_IP || '72.62.195.63',
 				},
 			],
 			initialAvailableOutgoingBitrate: 1000000,
