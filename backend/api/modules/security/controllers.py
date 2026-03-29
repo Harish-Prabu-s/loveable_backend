@@ -3,10 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .services import (
+    get_user_settings,
     set_app_lock_service,
     verify_app_lock_service,
-    toggle_biometrics_service,
-    toggle_face_unlock_service,
     initiate_lock_reset_service,
     verify_reset_otp_service
 )

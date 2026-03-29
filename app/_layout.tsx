@@ -108,9 +108,10 @@ function RootLayoutNav() {
       if (nextAppState === 'background') {
         recordBackgroundTime();
       } else if (nextAppState === 'active') {
+        const currentPath = segments.join('/');
         const isRecoveryRoute = 
-          (segments.length > 1 && segments[0] === 'settings' && segments[1] === 'reset-app-lock') ||
-          (segments.length > 1 && segments[0] === 'security' && segments[1] === 'recovery');
+          currentPath === 'settings/reset-app-lock' || 
+          currentPath === 'security/recovery';
 
         if (checkLockNeeded() && !isRecoveryRoute) {
           setLocked(true);
