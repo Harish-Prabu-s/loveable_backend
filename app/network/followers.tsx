@@ -19,7 +19,6 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function FollowersScreen() {
     const { userId } = useLocalSearchParams<{ userId?: string }>();
-    const parsedUserId = userId ? parseInt(userId, 10) : undefined;
     const { user, isInitialized } = useAuthStore();
 
     const [users, setUsers] = useState<any[]>([]);
@@ -27,6 +26,7 @@ export default function FollowersScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     // If no userId is passed, show current authenticated user's followers
+    const parsedUserId = (userId && !isNaN(parseInt(userId, 10))) ? parseInt(userId, 10) : undefined;
     const targetId = parsedUserId || user?.id;
 
     const load = useCallback(async () => {
@@ -39,6 +39,7 @@ export default function FollowersScreen() {
 
         if (!targetId) {
             console.warn('[Followers] No targetId found yet.', { isInitialized, userId_param: userId, storeUserId: user?.id });
+            setLoading(false); // Stop showing loader if we can't proceed
             return;
         }
 

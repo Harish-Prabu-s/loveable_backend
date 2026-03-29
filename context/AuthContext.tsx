@@ -141,6 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const initialize = async () => {
             try {
+                // Sync Zustand store initialization
+                await useAuthStore.getState().initialize();
+                
                 const [token, userStr, tempToken] = await Promise.all([
                     storage.getItem('accessToken'),
                     storage.getItem('user'),

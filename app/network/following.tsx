@@ -20,7 +20,6 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function FollowingScreen() {
     const { userId } = useLocalSearchParams<{ userId?: string }>();
-    const parsedUserId = userId ? parseInt(userId, 10) : undefined;
     const { user, isInitialized } = useAuthStore();
 
     const [users, setUsers] = useState<any[]>([]);
@@ -28,17 +27,21 @@ export default function FollowingScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     // If no userId is passed, we show the current authenticated user's following list
+    const parsedUserId = (userId && !isNaN(parseInt(userId, 10))) ? parseInt(userId, 10) : undefined;
     const targetId = parsedUserId || user?.id;
 
     const load = useCallback(async () => {
         // Wait for store initialization
         if (!isInitialized) {
             console.log('[Following] Waiting for store initialization...');
+            // We don't set loading to false here because we WANT to show the loader 
+            // until the store is ready. Once it is ready, this hook re-runs and hits the fetch.
             return;
         }
 
         if (!targetId) {
             console.warn('[Following] No targetId found yet.', { isInitialized, userId_param: userId, storeUserId: user?.id });
+            setLoading(false); // Only stop loading if we are sure we have no target
             return;
         }
 
