@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { AppState, AppStateStatus } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useAuth } from './AuthContext';
+import { useSecurityStore } from '@/store/securityStore';
 
 interface SecurityContextType {
     isLocked: boolean;
@@ -63,9 +64,12 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
             return false;
         }
 
+        const { highSecurityType } = useSecurityStore.getState();
+        const method = highSecurityType === 'face' ? 'Face ID' : highSecurityType === 'fingerprint' ? 'Fingerprint' : 'Biometrics';
+
         try {
             const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Unlock Loveable',
+                promptMessage: `Unlock with ${method}`,
                 fallbackLabel: 'Use PIN',
                 disableDeviceFallback: false,
             });

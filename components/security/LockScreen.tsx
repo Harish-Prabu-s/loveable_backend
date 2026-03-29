@@ -22,11 +22,17 @@ const { width, height } = Dimensions.get('window');
  */
 export const LockScreen = () => {
     const { isLocked, setIsLocked, authenticateBiometrics, isBiometricsAvailable } = useSecurity();
-    const { highSecurityType } = useSecurityStore();
+    const { highSecurityType, pin, pattern } = useSecurityStore();
+    const [hideBiometricForNow, setHideBiometricForNow] = useState(false);
     const { user } = useAuth();
-    const [pin, setPin] = useState('');
+    const [enteredPin, setEnteredPin] = useState('');
     const [error, setError] = useState(false);
     const [shake, setShake] = useState(0);
+
+    // Reset fallback state when screen is locked
+    useEffect(() => {
+        if (isLocked) setHideBiometricForNow(false);
+    }, [isLocked]);
 
     // Filter PIN to only allowed length
     const PIN_LENGTH = 4;
@@ -42,9 +48,9 @@ export const LockScreen = () => {
     }, [isLocked, user?.biometrics_enabled, user?.face_unlock_enabled]);
 
     const handlePress = useCallback((num: string) => {
-        if (pin.length < PIN_LENGTH) {
-            const newPin = pin + num;
-            setPin(newPin);
+        if (enteredPin.length < PIN_LENGTH) {
+            const newPin = enteredPin + num;
+            setEnteredPin(newPin);
             
             if (newPin.length === PIN_LENGTH) {
                 // Verify against stored lock value (defaults to '1111' if not set for testing)
@@ -52,23 +58,23 @@ export const LockScreen = () => {
                 
                 if (newPin === storedPin) {
                     setIsLocked(false);
-                    setPin('');
+                    setEnteredPin('');
                 } else {
                     // Fail state: Shake and vibrate
                     setError(true);
                     setShake(prev => prev + 1);
                     Vibration.vibrate(500);
                     setTimeout(() => {
-                        setPin('');
+                        setEnteredPin('');
                         setError(false);
                     }, 400);
                 }
             }
         }
-    }, [pin, user?.app_lock_value, setIsLocked]);
+    }, [enteredPin, user?.app_lock_value, setIsLocked]);
 
     const handleBackspace = () => {
-        setPin(pin.slice(0, -1));
+        setEnteredPin(enteredPin.slice(0, -1));
     };
 
     if (!isLocked) return null;
@@ -122,8 +128,8 @@ export const LockScreen = () => {
                             <MotiView 
                                 key={i} 
                                 animate={{ 
-                                    scale: pin.length > i ? 1.2 : 1,
-                                    backgroundColor: pin.length > i 
+                                    scale: enteredPin.length > i ? 1.2 : 1,
+                                    backgroundColor: enteredPin.length > i 
                                         ? (error ? '#FF4444' : '#8B5CF6') 
                                         : 'rgba(255,255,255,0.2)'
                                 }}
@@ -134,7 +140,7 @@ export const LockScreen = () => {
 
                     {/* Biometric Fallback Trigger (Other Security Option) */}
                     <AnimatePresence>
-                        {highSecurityType !== 'none' && pin.length === 0 && !error && (
+                        {highSecurityType !== 'none' && enteredPin.length === 0 && !error && !hideBiometricForNow && (
                             <MotiView
                                 from={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -155,8 +161,15 @@ export const LockScreen = () => {
                                     </Text>
                                 </TouchableOpacity>
                                 
-                                <TouchableOpacity style={styles.otherOptionBtn}>
-                                    <Text style={styles.otherOptionText}>OR USE PIN TO UNLOCK</Text>
+                                <TouchableOpacity 
+                                    style={styles.otherOptionBtn}
+                                    onPress={() => setHideBiometricForNow(true)}
+                                >
+                                    <Text style={styles.otherOptionText}>
+                                        {pin ? 'OR USE PIN TO UNLOCK' : 
+                                         pattern ? 'OR USE PATTERN TO UNLOCK' : 
+                                         'USE KEYPAD TO UNLOCK'}
+                                    </Text>
                                 </TouchableOpacity>
                             </MotiView>
                         )}
