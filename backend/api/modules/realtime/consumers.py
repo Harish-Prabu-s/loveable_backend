@@ -235,6 +235,7 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({
                 'type': 'participant-joined',
                 'user_id': event['user_id'],
+                'from_user_id': event['user_id'],  # Robustness: align with from_user_id
                 'display_name': event['display_name'],
                 'photo': event['photo']
             }))
@@ -243,7 +244,8 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
         if event['user_id'] != self.user_id:
             await self.send(text_data=json.dumps({
                 'type': 'participant-left',
-                'user_id': event['user_id']
+                'user_id': event['user_id'],
+                'from_user_id': event['user_id']  # Added for consistency
             }))
 
     async def relay_signal(self, event):

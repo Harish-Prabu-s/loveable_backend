@@ -21,6 +21,8 @@ import Constants from "expo-constants";
 let RTCPeerConnection: any;
 let mediaDevices: any;
 let MediaStream: any;
+let RTCIceCandidate: any;
+let RTCSessionDescription: any;
 let InCallManager: any;
 
 if (Platform.OS !== "web") {
@@ -29,6 +31,8 @@ if (Platform.OS !== "web") {
     RTCPeerConnection = webrtc.RTCPeerConnection;
     mediaDevices = webrtc.mediaDevices;
     MediaStream = webrtc.MediaStream;
+    RTCIceCandidate = webrtc.RTCIceCandidate;
+    RTCSessionDescription = webrtc.RTCSessionDescription;
     const icm = require("@videosdk.live/react-native-incallmanager");
     InCallManager = icm.default ?? icm;
   } catch {
@@ -49,6 +53,8 @@ if (Platform.OS !== "web") {
       async addIceCandidate() {}
       getStats() { return Promise.resolve(new Map()); }
     };
+    RTCIceCandidate = class { constructor(obj: any) { Object.assign(this, obj); } };
+    RTCSessionDescription = class { constructor(obj: any) { Object.assign(this, obj); } };
     mediaDevices = { getUserMedia: async () => ({ getTracks: () => [], getAudioTracks: () => [], getVideoTracks: () => [] }) };
     MediaStream = class { getTracks() { return []; } getVideoTracks() { return []; } getAudioTracks() { return []; } release() {} };
     InCallManager = { start: () => {}, stop: () => {}, setKeepScreenOn: () => {}, setForceSpeakerphoneOn: () => {} };
@@ -58,6 +64,8 @@ if (Platform.OS !== "web") {
   RTCPeerConnection = (window as any).RTCPeerConnection;
   mediaDevices = (navigator as any).mediaDevices;
   MediaStream = (window as any).MediaStream;
+  RTCIceCandidate = (window as any).RTCIceCandidate;
+  RTCSessionDescription = (window as any).RTCSessionDescription;
   InCallManager = { start: () => {}, stop: () => {}, setKeepScreenOn: () => {}, setForceSpeakerphoneOn: () => {} };
 }
 
@@ -213,19 +221,50 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         }
     };
 
-    // Add local tracks
-    localStreamRef.current?.getTracks().forEach((track: any) => {
-        pc.addTrack(track, localStreamRef.current);
-    });
+    // Process local tracks
+    if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track: any) => {
+            console.log(`[WebRTC] Adding local track: ${track.kind} to PC ${remoteId}`);
+            pc.addTrack(track, localStreamRef.current);
+        });
+    } else {
+        console.warn(`[WebRTC] WARNING: No local stream available for PC ${remoteId}`);
+    }
 
     pcs.current.set(remoteId, pc);
     return pc;
   }, []);
 
+  /**
+   * Safe helper to add ICE candidates with state verification. 
+   * Prevents "Remote description not set" errors.
+   */
+  const safeAddIceCandidate = useCallback(async (remoteId: number, candidateData: any) => {
+    const pc = pcs.current.get(remoteId);
+    if (!pc) return;
+
+    try {
+        if (pc.remoteDescription && pc.remoteDescription.type) {
+            console.log(`[WebRTC] Applying ICE candidate for ${remoteId}`);
+            const candidate = new RTCIceCandidate(candidateData);
+            await pc.addIceCandidate(candidate);
+        } else {
+            console.log(`[WebRTC] Queuing ICE candidate for ${remoteId} (Remote description not ready)`);
+            if (!pendingCandidates.current.has(remoteId)) {
+                pendingCandidates.current.set(remoteId, []);
+            }
+            pendingCandidates.current.get(remoteId)?.push(candidateData);
+        }
+    } catch (err) {
+        console.warn(`[WebRTC] Failed to add ICE candidate for ${remoteId}:`, err);
+    }
+  }, []);
+
   // ── Signaling Handler ───────────────────────────────────────────────────
 
   const handleSignal = useCallback(async (data: any) => {
-    const { from_user_id: remoteId } = data;
+    // Robust extraction: Backend room events use 'user_id', relayed signals use 'from_user_id'
+    const remoteId = data.from_user_id || data.user_id;
 
     switch (data.type) {
       case "participant-joined":
@@ -285,23 +324,29 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         }
 
         try {
-            await pcOffer.setRemoteDescription(data.offer);
+            console.log(`[WebRTC] Signaling: Setting remote description (OFFER) for ${remoteId}`);
+            await pcOffer.setRemoteDescription(new RTCSessionDescription(data.offer));
+            
+            console.log(`[WebRTC] Signaling: Creating answer for ${remoteId}`);
             const answer = await pcOffer.createAnswer();
             await pcOffer.setLocalDescription(answer);
-            console.log(`[WebRTC] Sending answer to ${remoteId}`);
+            
+            console.log(`[WebRTC] Signaling: Sending answer to ${remoteId}`);
             wsRef.current?.send(JSON.stringify({
                 type: "call-answer",
                 target_user_id: remoteId,
                 answer
             }));
 
-            // Process queued candidates
+            // Drain candidate queue after description is set
             const queue = pendingCandidates.current.get(remoteId) || [];
-            console.log(`[WebRTC] Processing ${queue.length} queued candidates for ${remoteId}`);
-            for (const cand of queue) {
-                await pcOffer.addIceCandidate(cand).catch(e => console.warn("[WebRTC] Queued ICE Error:", e));
+            if (queue.length > 0) {
+                console.log(`[WebRTC] Signaling: Draining ${queue.length} queued candidates for ${remoteId}`);
+                for (const cand of queue) {
+                    await safeAddIceCandidate(remoteId, cand);
+                }
+                pendingCandidates.current.delete(remoteId);
             }
-            pendingCandidates.current.delete(remoteId);
         } catch (err) {
             console.error("[WebRTC] Offer handling failed:", err);
         }
@@ -312,15 +357,18 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         const pcAns = pcs.current.get(remoteId);
         if (pcAns) {
             try {
-                await pcAns.setRemoteDescription(data.answer);
+                console.log(`[WebRTC] Signaling: Setting remote description (ANSWER) for ${remoteId}`);
+                await pcAns.setRemoteDescription(new RTCSessionDescription(data.answer));
 
-                // Process queued candidates
+                // Drain candidate queue after description is set
                 const queue = pendingCandidates.current.get(remoteId) || [];
-                console.log(`[WebRTC] Processing ${queue.length} queued candidates for ${remoteId}`);
-                for (const cand of queue) {
-                    await pcAns.addIceCandidate(cand).catch(e => console.warn("[WebRTC] Queued ICE Error:", e));
+                if (queue.length > 0) {
+                    console.log(`[WebRTC] Signaling: Draining ${queue.length} queued candidates for ${remoteId}`);
+                    for (const cand of queue) {
+                        await safeAddIceCandidate(remoteId, cand);
+                    }
+                    pendingCandidates.current.delete(remoteId);
                 }
-                pendingCandidates.current.delete(remoteId);
             } catch (err) {
                 console.error("[WebRTC] Answer handling failed:", err);
             }
@@ -328,19 +376,8 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         break;
 
       case "ice-candidate":
-        const pcIce = pcs.current.get(remoteId);
-        if (pcIce && pcIce.remoteDescription) {
-            try {
-                await pcIce.addIceCandidate(data.candidate);
-            } catch (err) {
-                console.warn("[WebRTC] Add ICE candidate failed:", err);
-            }
-        } else {
-            console.log(`[WebRTC] Queuing ICE candidate from ${remoteId}`);
-            if (!pendingCandidates.current.has(remoteId)) {
-                pendingCandidates.current.set(remoteId, []);
-            }
-            pendingCandidates.current.get(remoteId)?.push(data.candidate);
+        if (data.candidate) {
+            await safeAddIceCandidate(remoteId, data.candidate);
         }
         break;
 
