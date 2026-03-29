@@ -45,8 +45,7 @@ export default function CallScreen() {
         hangup,
         reconnect: startCall
     } = useWebRTC({
-
-        roomId: roomId ? Number(roomId) : undefined,
+        roomId: roomId || undefined,
         enabled: !!roomId,
         kind: (params.callType === 'video' || params.callType === 'VIDEO') ? 'video' : 'audio',
     });

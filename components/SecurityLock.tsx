@@ -194,10 +194,12 @@ export const SecurityLock = () => {
                     <TouchableOpacity 
                         style={styles.forgotBtn} 
                         onPress={() => {
-                            setLocked(false); // Temporarily unlock to navigate
+                            setLocked(false);
+                            setEnteredPin('');
                             router.push('/security/recovery' as any);
                         }}
                     >
+                        <MaterialCommunityIcons name="help-circle-outline" size={16} color="#8B5CF6" />
                         <Text style={styles.forgotText}>Forgot PIN?</Text>
                     </TouchableOpacity>
                 </MotiView>

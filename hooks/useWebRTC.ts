@@ -64,7 +64,7 @@ export interface ChatMessage {
 }
 
 export interface UseWebRTCOptions {
-  roomId: number | undefined;
+  roomId: string | undefined;
   enabled: boolean;
   kind: "audio" | "video";
   token?: string;
@@ -149,6 +149,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     pc.ontrack = (ev: any) => {
         console.log(`[WebRTC] Got remote track from user ${remoteId}`);
+        setStatus('connected');
         setParticipants(prev => prev.map(p => 
             p.userId === remoteId ? { ...p, stream: ev.streams[0] } : p
         ));
@@ -312,19 +313,20 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
   // ── Signaling Connect ───────────────────────────────────────────────────
 
-  const connect = useCallback(async (rId: number) => {
+  const connect = useCallback(async (rId: string) => {
     if (isCancelled.current) return;
     const token = options.token || await storage.getItem("accessToken");
     const baseUrl = process.env.EXPO_PUBLIC_SIGNALING_WS_URL || "ws://localhost:8000";
     const wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${token}`;
 
     try {
+      console.log(`[WebRTC] Connecting to room: ${rId}`);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         reconCount.current = 0;
-        setStatus("connected");
+        // setStatus("connected"); // WS is open, but we wait for Peer Connection for full 'active'
       };
 
       ws.onmessage = (ev) => {
@@ -345,7 +347,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     }
   }, [options.token, handleSignal]);
 
-  const scheduleReconnect = useCallback((rId: number) => {
+  const scheduleReconnect = useCallback((rId: string) => {
     if (reconCount.current >= MAX_RECONNECT_ATTEMPTS) {
       setStatus("failed");
       return;

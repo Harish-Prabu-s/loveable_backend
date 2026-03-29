@@ -164,6 +164,7 @@ function RootLayoutNav() {
           <Stack.Screen name="settings/edit-profile" options={{ headerShown: false }} />
           <Stack.Screen name="settings/set-pin" options={{ headerShown: false }} />
           <Stack.Screen name="settings/set-pattern" options={{ headerShown: false }} />
+          <Stack.Screen name="settings/biometric-setup" options={{ headerShown: false }} />
           <Stack.Screen name="network/followers" options={{ headerShown: false }} />
           <Stack.Screen name="network/following" options={{ headerShown: false }} />
           <Stack.Screen name="user/[id]" options={{ headerShown: false }} />

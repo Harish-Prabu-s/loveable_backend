@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Switch,
-    TouchableOpacity, Alert, Platform,
+    TouchableOpacity, Alert, Platform, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +16,8 @@ import { useSecurityStore } from '@/store/securityStore';
 import { authApi } from '@/api/auth';
 import { useTheme } from '@/context/ThemeContext';
 import * as LocalAuthentication from 'expo-local-authentication';
+
+const { width } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,7 +284,7 @@ export default function SettingsScreen() {
                 )}
 
                 {/* ── Security ─────────────────────────────────────────── */}
-                <SectionHeader title="Security" icon="shield-lock" />
+                <SectionHeader title="Security & Authentication" icon="shield-lock" />
                 <View style={styles.card}>
                     <SettingRow
                         icon="lock"
@@ -298,6 +300,7 @@ export default function SettingsScreen() {
                             </View>
                         }
                     />
+                    
                     {settings.app_lock_type === 'pin' && (
                         <SettingRow
                             icon="lock-reset"
@@ -307,26 +310,53 @@ export default function SettingsScreen() {
                             right={<MaterialCommunityIcons name="chevron-right" size={20} color="#475569" />}
                         />
                     )}
-                    {Platform.OS === 'android' && biometricAvailable && (
+
+                    {biometricAvailable && (
                         <SettingRow
                             icon="fingerprint"
                             iconBg="#0F766E"
-                            label="Biometric Auth"
+                            label="Face ID / Biometric"
+                            onPress={() => {
+                                if (settings.app_lock_type === 'biometric') {
+                                    Alert.alert('Disable Biometric', 'Are you sure you want to disable biometric authentication?', [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Disable', style: 'destructive', onPress: () => {
+                                            update({ app_lock_type: 'none' });
+                                            toggleBiometrics(false);
+                                        }}
+                                    ]);
+                                } else {
+                                    router.push('/settings/biometric-setup' as any);
+                                }
+                            }}
                             right={
-                            <Switch
-                                value={settings.app_lock_type === 'biometric'}
-                                onValueChange={(v) => {
-                                    update({ app_lock_type: v ? 'biometric' : 'none' });
-                                    toggleBiometrics(v);
-                                    if(!v) setPin(null);
-                                }}
-                                trackColor={{ false: '#334155', true: '#8B5CF6' }}
-                                thumbColor="#FFF"
-                            />
+                                <View style={styles.valuePill}>
+                                    <Text style={styles.valuePillText}>
+                                        {settings.app_lock_type === 'biometric' ? 'Enabled' : 'Setup'}
+                                    </Text>
+                                    <MaterialCommunityIcons name="chevron-right" size={18} color="#8B5CF6" />
+                                </View>
                             }
                         />
                     )}
                 </View>
+
+                {/* ── Recovery ─────────────────────────────────────────── */}
+                <SectionHeader title="Account Recovery" icon="email-check" />
+                <View style={styles.card}>
+                    <View style={styles.infoBox}>
+                        <View style={styles.infoIcon}>
+                            <MaterialCommunityIcons name="email-outline" size={24} color="#8B5CF6" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.infoLabel}>Recovery Email</Text>
+                            <Text style={styles.infoValue}>{user?.email || authUser?.email || 'No email set'}</Text>
+                        </View>
+                    </View>
+                </View>
+                <Text style={styles.hint}>
+                    This email is used to send recovery codes if you forget your App Lock PIN or Pattern.
+                </Text>
 
                 {/* ── Privacy ──────────────────────────────────────────── */}
                 <SectionHeader title="Privacy" icon="eye-off" />
@@ -418,6 +448,17 @@ const styles = StyleSheet.create({
     valuePillText: { color: '#8B5CF6', fontSize: 12, fontWeight: '600' },
 
     hint: { color: '#475569', fontSize: 12, marginTop: 8, paddingLeft: 4, lineHeight: 18 },
+    
+    infoBox: {
+        flexDirection: 'row', alignItems: 'center', padding: 16, gap: 16,
+    },
+    infoIcon: {
+        width: 48, height: 48, borderRadius: 12,
+        backgroundColor: 'rgba(139,92,246,0.1)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    infoLabel: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 },
+    infoValue: { fontSize: 16, fontWeight: '600', color: '#F8FAFC' },
 
     logoutSection: { marginTop: 40, alignItems: 'center' },
     logoutBtn: {
