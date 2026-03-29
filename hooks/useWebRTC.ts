@@ -119,10 +119,159 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const typingTimer = useRef<any>(null);
   const isCancelled = useRef(false);
 
-  // SFU specific refs (Producers/Consumers)
-  const deviceRef = useRef<any>(null);
-  const sendTransport = useRef<any>(null);
-  const recvTransport = useRef<any>(null);
+  // Peer Connections (Mesh/P2P)
+  const pcs = useRef<Map<number, any>>(new Map());
+
+  // ── Peer Connection Helper ─────────────────────────────────────────────
+
+  const createPeerConnection = useCallback((remoteId: number) => {
+    if (pcs.current.has(remoteId)) return pcs.current.get(remoteId);
+
+    const pc = new RTCPeerConnection({
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+        ]
+    });
+
+    pc.onicecandidate = (ev: any) => {
+        if (ev.candidate) {
+            wsRef.current?.send(JSON.stringify({
+                type: "ice-candidate",
+                target_user_id: remoteId,
+                candidate: ev.candidate
+            }));
+        }
+    };
+
+    pc.ontrack = (ev: any) => {
+        console.log(`[WebRTC] Got track from user ${remoteId}`);
+        setParticipants(prev => prev.map(p => 
+            p.userId === remoteId ? { ...p, stream: ev.streams[0] } : p
+        ));
+    };
+
+    // Add local tracks
+    localStreamRef.current?.getTracks().forEach((track: any) => {
+        pc.addTrack(track, localStreamRef.current);
+    });
+
+    pcs.current.set(remoteId, pc);
+    return pc;
+  }, []);
+
+  // ── Signaling Handler ───────────────────────────────────────────────────
+
+  const handleSignal = useCallback(async (data: any) => {
+    const { from_user_id: remoteId } = data;
+
+    switch (data.type) {
+      case "participant-joined":
+        setParticipants(p => {
+          if (p.find(i => i.userId === remoteId)) return p;
+          return [...p, {
+            userId: remoteId,
+            displayName: data.display_name,
+            photo: data.photo,
+            stream: null,
+            audioEnabled: true,
+            videoEnabled: true,
+            isSpeaking: false
+          }];
+        });
+
+        // We are already in the room, so we initiate the offer (Initiator)
+        const pcJoined = createPeerConnection(remoteId);
+        try {
+          const offer = await pcJoined.createOffer();
+          await pcJoined.setLocalDescription(offer);
+          wsRef.current?.send(JSON.stringify({
+              type: "call-offer",
+              target_user_id: remoteId,
+              offer
+          }));
+        } catch (err) {
+          console.error("[WebRTC] Offer creation failed:", err);
+        }
+        break;
+
+      case "participant-left":
+        pcs.current.get(remoteId)?.close();
+        pcs.current.delete(remoteId);
+        setParticipants(p => p.filter(item => item.userId !== remoteId));
+        break;
+
+      case "call-offer":
+        console.log(`[WebRTC] Received offer from ${remoteId}`);
+        const pcOffer = createPeerConnection(remoteId);
+        try {
+            await pcOffer.setRemoteDescription(data.offer);
+            const answer = await pcOffer.createAnswer();
+            await pcOffer.setLocalDescription(answer);
+            wsRef.current?.send(JSON.stringify({
+                type: "call-answer",
+                target_user_id: remoteId,
+                answer
+            }));
+        } catch (err) {
+            console.error("[WebRTC] Answer creation failed:", err);
+        }
+        break;
+
+      case "call-answer":
+        console.log(`[WebRTC] Received answer from ${remoteId}`);
+        const pcAns = pcs.current.get(remoteId);
+        if (pcAns) {
+            try {
+                await pcAns.setRemoteDescription(data.answer);
+            } catch (err) {
+                console.error("[WebRTC] Set remote description failed:", err);
+            }
+        }
+        break;
+
+      case "ice-candidate":
+        const pcIce = pcs.current.get(remoteId);
+        if (pcIce) {
+            try {
+                await pcIce.addIceCandidate(data.candidate);
+            } catch (err) {
+                console.warn("[WebRTC] Add ICE candidate failed:", err);
+            }
+        }
+        break;
+
+      case "chat-message":
+        const newMsg: ChatMessage = {
+          id: data.id || Math.random().toString(),
+          senderId: remoteId,
+          text: data.text,
+          timestamp: new Date().toISOString(),
+          status: "delivered"
+        };
+        setChatMessages(prev => [...prev, newMsg]);
+        onNewMessage?.(newMsg);
+        break;
+
+      case "typing":
+        if (data.from_user_id !== options.roomId) {
+          setIsTyping(data.active);
+          clearTimeout(typingTimer.current);
+          if (data.active) {
+            typingTimer.current = setTimeout(() => setIsTyping(false), 3000);
+          }
+        }
+        break;
+
+      case "media-state":
+        setParticipants(prev => prev.map(p => 
+          p.userId === remoteId 
+            ? { ...p, audioEnabled: data.audio, videoEnabled: data.video } 
+            : p
+        ));
+        break;
+    }
+  }, [onNewMessage, createPeerConnection, options.roomId]);
 
   // ── Signaling Connect ───────────────────────────────────────────────────
 
@@ -157,9 +306,9 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       console.error("[WebRTC] Connect failed:", err);
       scheduleReconnect(rId);
     }
-  }, [options.token]);
+  }, [options.token, handleSignal]);
 
-  const scheduleReconnect = (rId: number) => {
+  const scheduleReconnect = useCallback((rId: number) => {
     if (reconCount.current >= MAX_RECONNECT_ATTEMPTS) {
       setStatus("failed");
       return;
@@ -168,62 +317,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     const delay = RECONNECT_DELAY * Math.pow(2, reconCount.current);
     reconCount.current++;
     setTimeout(() => connect(rId), delay);
-  };
-
-  // ── Signaling Handler ───────────────────────────────────────────────────
-
-  const handleSignal = useCallback((data: any) => {
-    switch (data.type) {
-      case "participant-joined":
-        setParticipants(p => {
-          if (p.find(i => i.userId === data.user_id)) return p;
-          return [...p, {
-            userId: data.user_id,
-            displayName: data.display_name,
-            photo: data.photo,
-            stream: null,
-            audioEnabled: true,
-            videoEnabled: true,
-            isSpeaking: false
-          }];
-        });
-        break;
-
-      case "participant-left":
-        setParticipants(p => p.filter(item => item.userId !== data.user_id));
-        break;
-
-      case "chat-message":
-        const newMsg: ChatMessage = {
-          id: data.id || Math.random().toString(),
-          senderId: data.from_user_id,
-          text: data.text,
-          timestamp: new Date().toISOString(),
-          status: "delivered"
-        };
-        setChatMessages(prev => [...prev, newMsg]);
-        onNewMessage?.(newMsg);
-        break;
-
-      case "typing":
-        if (data.from_user_id !== options.roomId) {
-          setIsTyping(data.active);
-          clearTimeout(typingTimer.current);
-          if (data.active) {
-            typingTimer.current = setTimeout(() => setIsTyping(false), 3000);
-          }
-        }
-        break;
-
-      case "media-state":
-        setParticipants(prev => prev.map(p => 
-          p.userId === data.from_user_id 
-            ? { ...p, audioEnabled: data.audio, videoEnabled: data.video } 
-            : p
-        ));
-        break;
-    }
-  }, [onNewMessage, options.roomId]);
+  }, [connect]);
 
   // ── Media Controls ──────────────────────────────────────────────────────
 
