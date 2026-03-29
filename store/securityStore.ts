@@ -11,6 +11,8 @@ interface SecurityState {
     fingerprintData: any | null;
     lastBackgroundTime: number | null;
     lockGracePeriod: number; // in milliseconds, default 30s
+    failCount: number;
+    lockoutUntil: number | null;
 
     initialize: () => Promise<void>;
     setLocked: (locked: boolean) => void;
@@ -21,6 +23,8 @@ interface SecurityState {
     clearAllSecurityData: () => Promise<void>;
     recordBackgroundTime: () => void;
     checkLockNeeded: () => boolean;
+    incrementFailCount: () => Promise<void>;
+    resetFailCount: () => Promise<void>;
 }
 
 export const useSecurityStore = create<SecurityState>()((set, get) => ({
@@ -32,6 +36,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     fingerprintData: null,
     lastBackgroundTime: null,
     lockGracePeriod: 0, // Instant lock
+    failCount: 0,
+    lockoutUntil: null,
 
     initialize: async () => {
         const pin = await storage.getItem('app_lock_pin');
@@ -39,6 +45,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         const highSec = await storage.getItem('high_security_type') as any || 'none';
         const faceData = await storage.getItem('face_registration_data');
         const fingerprintData = await storage.getItem('fingerprint_registration_data');
+        const failCount = await storage.getItem('app_lock_fail_count');
+        const lockoutUntil = await storage.getItem('app_lock_lockout_until');
         
         set({
             pin,
@@ -46,6 +54,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
             highSecurityType: highSec,
             faceData: faceData ? JSON.parse(faceData) : null,
             fingerprintData: fingerprintData ? JSON.parse(fingerprintData) : null,
+            failCount: failCount ? parseInt(failCount) : 0,
+            lockoutUntil: lockoutUntil ? parseInt(lockoutUntil) : null,
             isLocked: !!pin || !!pattern || highSec !== 'none'
         });
     },
@@ -143,5 +153,25 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         if (!pin && !pattern && highSecurityType === 'none') return false;
         // Requirement: "Even if the app is reopened within 1 second -> require authentication"
         return true; 
+    },
+
+    incrementFailCount: async () => {
+        const newCount = get().failCount + 1;
+        let lockoutUntil: number | null = null;
+        
+        if (newCount >= 5) {
+            // Lock for 30 seconds
+            lockoutUntil = Date.now() + 30000;
+            await storage.setItem('app_lock_lockout_until', lockoutUntil.toString());
+        }
+        
+        await storage.setItem('app_lock_fail_count', newCount.toString());
+        set({ failCount: newCount, lockoutUntil });
+    },
+
+    resetFailCount: async () => {
+        await storage.removeItem('app_lock_fail_count');
+        await storage.removeItem('app_lock_lockout_until');
+        set({ failCount: 0, lockoutUntil: null });
     },
 }));

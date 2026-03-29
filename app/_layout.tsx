@@ -88,10 +88,13 @@ import { SecurityLock } from '@/components/SecurityLock';
 import { useSecurityStore } from '@/store/securityStore';
 import { AppState, AppStateStatus } from 'react-native';
 
+import * as ScreenCapture from 'expo-screen-capture';
+import * as Linking from 'expo-linking';
+
 function RootLayoutNav() {
   const { colors, isDark } = useTheme();
   const { isLoading, token } = useAuth();
-  const { initialize: initSecurity, setLocked, recordBackgroundTime, checkLockNeeded } = useSecurityStore();
+  const { initialize: initSecurity, setLocked, recordBackgroundTime, checkLockNeeded, isLocked } = useSecurityStore();
 
   // Apply our route protection directly
   useProtectedRoute();
@@ -103,10 +106,14 @@ function RootLayoutNav() {
 
   // Handle AppState for security lock
   const segments = useSegments();
+  const router = useRouter();
+
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'background') {
         recordBackgroundTime();
+        // Enable screen capture protection to hide UI in switcher
+        ScreenCapture.preventScreenCaptureAsync();
       } else if (nextAppState === 'active') {
         const currentPath = segments.join('/');
         const isRecoveryRoute = 
@@ -115,6 +122,9 @@ function RootLayoutNav() {
 
         if (checkLockNeeded() && !isRecoveryRoute) {
           setLocked(true);
+        } else {
+          // Disable protection if not locked
+          ScreenCapture.allowScreenCaptureAsync();
         }
       }
     };
@@ -122,6 +132,19 @@ function RootLayoutNav() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
   }, [segments, checkLockNeeded, setLocked, recordBackgroundTime]);
+
+  // Deep Link Guard
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      if (isLocked) {
+        // Prevent navigation if locked
+        // We could store the URL to redirect after unlock
+        console.log('[Security] Deep link blocked due to active lock');
+      }
+    };
+    const sub = Linking.addEventListener('url', handleDeepLink);
+    return () => sub.remove();
+  }, [isLocked]);
 
   // Register Expo push token whenever the user logs in
   useEffect(() => {
@@ -141,46 +164,43 @@ function RootLayoutNav() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-        <Stack
-          screenOptions={{
-            animation: 'slide_from_right', // iOS-like slide transition as standard
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background }
-          }}
-        >
-          {/* Auth group — phone & otp */}
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-
-          {/* Main tabs (home + nested routes) */}
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-          {/* Onboarding flow */}
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-
-          {/* Deep screens */}
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
-          <Stack.Screen name="games" options={{ headerShown: false }} />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
-          <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="wallet/purchase" options={{ headerShown: false }} />
-          <Stack.Screen name="wallet/transactions" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/index" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/delete-account" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/edit-profile" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/set-pin" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/set-pattern" options={{ headerShown: false }} />
-          <Stack.Screen name="settings/biometric-setup" options={{ headerShown: false }} />
-          <Stack.Screen name="network/followers" options={{ headerShown: false }} />
-          <Stack.Screen name="network/following" options={{ headerShown: false }} />
-          <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="story/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="call/raw/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="test-nav" options={{ headerShown: false }} />
-          <Stack.Screen name="media-viewer" options={{ headerShown: false }} />
-        </Stack>
-        <SecurityLock />
+        {isLocked ? (
+          <SecurityLock />
+        ) : (
+          <Stack
+            screenOptions={{
+              animation: 'slide_from_right', 
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background }
+            }}
+          >
+            {/* Screen definitions remain same */}
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="leaderboard" />
+            <Stack.Screen name="games" />
+            <Stack.Screen name="admin" />
+            <Stack.Screen name="chat/[id]" />
+            <Stack.Screen name="wallet/purchase" />
+            <Stack.Screen name="wallet/transactions" />
+            <Stack.Screen name="settings/index" />
+            <Stack.Screen name="settings/delete-account" />
+            <Stack.Screen name="settings/edit-profile" />
+            <Stack.Screen name="settings/set-pin" />
+            <Stack.Screen name="settings/set-pattern" />
+            <Stack.Screen name="settings/biometric-setup" />
+            <Stack.Screen name="network/followers" />
+            <Stack.Screen name="network/following" />
+            <Stack.Screen name="user/[id]" />
+            <Stack.Screen name="story/[id]" />
+            <Stack.Screen name="call/[id]" />
+            <Stack.Screen name="call/raw/[id]" />
+            <Stack.Screen name="test-nav" />
+            <Stack.Screen name="media-viewer" />
+          </Stack>
+        )}
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>
     </GestureHandlerRootView>

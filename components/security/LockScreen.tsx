@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions, Platform, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions, Platform, Vibration, BackHandler } from 'react-native';
 import { MotiView, MotiText, AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSecurity } from '@/context/SecurityContext';
@@ -8,7 +8,12 @@ import { useAuth } from '@/context/AuthContext';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { CameraView } from 'expo-camera';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { toast } from '@/utils/toast';
 import { ScanningLaser } from './ScanningLaser';
+import PatternLock from '../lock/PatternLock';
+import { useTheme } from '@/context/ThemeContext';
+import { checkDeviceSecurity } from '@/utils/deviceSecurity';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,18 +29,68 @@ const { width, height } = Dimensions.get('window');
  */
 export const LockScreen = () => {
     const { isLocked, setIsLocked, authenticateBiometrics, isBiometricsAvailable } = useSecurity();
-    const { highSecurityType, pin, pattern, faceData } = useSecurityStore();
+    const { highSecurityType, pin, pattern, faceData, failCount, lockoutUntil, incrementFailCount, resetFailCount } = useSecurityStore();
+    const { isDark } = useTheme();
     const [hideBiometricForNow, setHideBiometricForNow] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
     const { user } = useAuth();
     const [enteredPin, setEnteredPin] = useState('');
     const [error, setError] = useState(false);
     const [shake, setShake] = useState(0);
+    const [securityAlert, setSecurityAlert] = useState<string | null>(null);
+
+    // Initial Security Check (Root/Jailbreak)
+    useEffect(() => {
+        const check = async () => {
+             const { isSecure, reason } = await checkDeviceSecurity();
+             if (!isSecure) {
+                 setSecurityAlert(reason || 'Device compromise detected. Risk of data theft.');
+             }
+        };
+        check();
+    }, []);
+
+    // Biometric Enrollment Check (Fail-Safe)
+    useEffect(() => {
+        const checkBiometrics = async () => {
+            if (highSecurityType !== 'none') {
+                const enrolled = await LocalAuthentication.isEnrolledAsync();
+                if (!enrolled) {
+                    toast.error('Registered biometrics were removed from system. Please use PIN to unlock.');
+                    setHideBiometricForNow(true);
+                }
+            }
+        };
+        checkBiometrics();
+    }, [highSecurityType]);
 
     // Reset fallback state when screen is locked
     useEffect(() => {
-        if (isLocked) setHideBiometricForNow(false);
+        if (isLocked) {
+            setHideBiometricForNow(false);
+            // Block Android back button
+            const backAction = () => {
+                if (isLocked) return true; // Consume event
+                return false;
+            };
+            const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+            return () => backHandler.remove();
+        }
     }, [isLocked]);
+
+    // Timer for lockout
+    const [lockoutTimeLeft, setLockoutTimeLeft] = useState(0);
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (lockoutUntil && lockoutUntil > Date.now()) {
+            interval = setInterval(() => {
+                const diff = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000));
+                setLockoutTimeLeft(diff);
+                if (diff === 0) resetFailCount();
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [lockoutUntil]);
 
     // Filter PIN to only allowed length
     const PIN_LENGTH = 4;
@@ -49,30 +104,40 @@ export const LockScreen = () => {
         }
     }, [isLocked, highSecurityType]);
 
+    // Determine if any fallback exists
+    const hasAppFallback = !!(user?.app_lock_value || pin || pattern);
+    const isBiometricOnly = highSecurityType !== 'none' && !hasAppFallback;
+
     const onAuthenticate = async () => {
         const success = await authenticateBiometrics();
         if (success) {
             setShowCamera(false);
+            resetFailCount();
+        } else {
+            incrementFailCount();
         }
     };
 
     const handlePress = useCallback((num: string) => {
+        if (lockoutTimeLeft > 0) return;
         if (enteredPin.length < PIN_LENGTH) {
             const newPin = enteredPin + num;
             setEnteredPin(newPin);
             
             if (newPin.length === PIN_LENGTH) {
-                // Verify against stored lock value (defaults to '1111' if not set for testing)
-                const storedPin = user?.app_lock_value || '1111';
+                // Verify against stored lock value
+                const storedPin = user?.app_lock_value || pin;
                 
-                if (newPin === storedPin) {
+                if (storedPin && newPin === storedPin) {
                     setIsLocked(false);
                     setEnteredPin('');
+                    resetFailCount();
                 } else {
                     // Fail state: Shake and vibrate
                     setError(true);
                     setShake(prev => prev + 1);
                     Vibration.vibrate(500);
+                    incrementFailCount();
                     setTimeout(() => {
                         setEnteredPin('');
                         setError(false);
@@ -80,16 +145,31 @@ export const LockScreen = () => {
                 }
             }
         }
-    }, [enteredPin, user?.app_lock_value, setIsLocked]);
+    }, [enteredPin, user?.app_lock_value, pin, setIsLocked, lockoutTimeLeft]);
 
     const handleBackspace = () => {
         setEnteredPin(enteredPin.slice(0, -1));
     };
 
+    const handlePatternComplete = (enteredPattern: number[]) => {
+        if (lockoutTimeLeft > 0) return;
+        const storedPattern = pattern;
+        if (storedPattern && enteredPattern.join(',') === storedPattern) {
+            setIsLocked(false);
+            resetFailCount();
+        } else {
+            setError(true);
+            setShake(prev => prev + 1);
+            Vibration.vibrate(500);
+            incrementFailCount();
+            setTimeout(() => setError(false), 800);
+        }
+    };
+
     if (!isLocked) return null;
 
     return (
-        <Modal visible={isLocked} animationType="fade" transparent statusBarTranslucent>
+        <View style={StyleSheet.absoluteFill}>
             <BlurView intensity={Platform.OS === 'ios' ? 40 : 100} tint="dark" style={styles.container}>
                 <MotiView 
                     from={{ opacity: 0, scale: 0.95 }}
@@ -123,29 +203,33 @@ export const LockScreen = () => {
                     </View>
 
                     <MotiText 
-                        key={error ? 'err' : 'ok'}
+                        key={error ? 'err' : lockoutTimeLeft > 0 ? 'locked' : securityAlert ? 'root' : 'ok'}
                         from={{ opacity: 0, translateY: -10 }}
                         animate={{ opacity: 1, translateY: 0 }}
-                        style={[styles.title, { color: error ? '#FF4444' : '#FFFFFF' }]}
+                        style={[styles.title, { color: error || lockoutTimeLeft > 0 || securityAlert ? '#FF4444' : '#FFFFFF' }]}
                     >
-                        {error ? 'Invalid PIN' : 'Enter Secret PIN'}
+                        {securityAlert || (lockoutTimeLeft > 0 ? `Too many tries. Wait ${lockoutTimeLeft}s` : 
+                         error ? 'Invalid Credential' : 
+                         (isBiometricOnly ? 'Verify Identity' : 'Enter Secret PIN'))}
                     </MotiText>
 
-                    {/* PIN Indicator (Dots) */}
-                    <View style={styles.dotsContainer}>
-                        {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-                            <MotiView 
-                                key={i} 
-                                animate={{ 
-                                    scale: enteredPin.length > i ? 1.2 : 1,
-                                    backgroundColor: enteredPin.length > i 
-                                        ? (error ? '#FF4444' : '#8B5CF6') 
-                                        : 'rgba(255,255,255,0.2)'
-                                }}
-                                style={styles.dot} 
-                            />
-                        ))}
-                    </View>
+                    {/* PIN Indicator (Dots) - Hide if biometric only and not fallback mode */}
+                    {!isBiometricOnly || hideBiometricForNow ? (
+                        <View style={styles.dotsContainer}>
+                            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+                                <MotiView 
+                                    key={i} 
+                                    animate={{ 
+                                        scale: enteredPin.length > i ? 1.2 : 1,
+                                        backgroundColor: enteredPin.length > i 
+                                            ? (error ? '#FF4444' : '#8B5CF6') 
+                                            : 'rgba(255,255,255,0.2)'
+                                    }}
+                                    style={styles.dot} 
+                                />
+                            ))}
+                        </View>
+                    ) : <View style={{ height: 50 }} />}
 
                     {/* Biometric Fallback Trigger (Other Security Option) */}
                     <AnimatePresence>
@@ -178,77 +262,92 @@ export const LockScreen = () => {
                                         <>
                                             <MaterialCommunityIcons 
                                                 name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
-                                                size={48} 
+                                                size={64} 
                                                 color="#8B5CF6" 
                                             />
                                             <Text style={styles.bioPromptText}>
-                                                Use {highSecurityType === 'face' ? 'Face ID' : 'Fingerprint'}
+                                                Unlock with {highSecurityType === 'face' ? 'Face ID' : 'Fingerprint'}
                                             </Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
                                 
-                                <TouchableOpacity 
-                                    style={styles.otherOptionBtn}
-                                    onPress={() => setHideBiometricForNow(true)}
-                                >
-                                    <Text style={styles.otherOptionText}>
-                                        {pin ? 'OR USE PIN TO UNLOCK' : 
-                                         pattern ? 'OR USE PATTERN TO UNLOCK' : 
-                                         'USE KEYPAD TO UNLOCK'}
-                                    </Text>
-                                </TouchableOpacity>
+                                {hasAppFallback && (
+                                    <TouchableOpacity 
+                                        style={styles.otherOptionBtn}
+                                        onPress={() => setHideBiometricForNow(true)}
+                                    >
+                                        <Text style={styles.otherOptionText}>
+                                            {pin ? 'OR USE PIN TO UNLOCK' : 
+                                             pattern ? 'OR USE PATTERN TO UNLOCK' : 
+                                             'USE KEYPAD TO UNLOCK'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
                             </MotiView>
                         )}
                     </AnimatePresence>
 
-                    {/* Custom Keypad */}
-                    <View style={styles.keypad}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                            <TouchableOpacity 
-                                key={num} 
-                                onPress={() => handlePress(num.toString())} 
-                                style={styles.key}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.keyText}>{num}</Text>
-                            </TouchableOpacity>
-                        ))}
-                        
-                        {/* Biometrics Toggle (Small Icon in Keypad) */}
-                        <TouchableOpacity 
-                            onPress={onAuthenticate} 
-                            style={[styles.key, highSecurityType === 'none' && { opacity: 0 }]}
-                            disabled={highSecurityType === 'none'}
-                        >
-                            <MaterialCommunityIcons 
-                                name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
-                                size={32} 
-                                color="rgba(255,255,255,0.8)" 
+                    {/* Auth Area: Pattern vs Keypad */}
+                    {pattern && !hideBiometricForNow ? (
+                        <View style={styles.patternArea}>
+                            <PatternLock 
+                                onComplete={handlePatternComplete} 
+                                error={error}
                             />
-                        </TouchableOpacity>
+                        </View>
+                    ) : (
+                        (!isBiometricOnly || hideBiometricForNow) && (
+                            <View style={styles.keypad}>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                    <TouchableOpacity 
+                                        key={num} 
+                                        onPress={() => handlePress(num.toString())} 
+                                        style={styles.key}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.keyText}>{num}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                                
+                                {/* Biometrics Toggle (Small Icon in Keypad) */}
+                                <TouchableOpacity 
+                                    onPress={onAuthenticate} 
+                                    style={[styles.key, highSecurityType === 'none' && { opacity: 0 }]}
+                                    disabled={highSecurityType === 'none'}
+                                >
+                                    <MaterialCommunityIcons 
+                                        name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
+                                        size={32} 
+                                        color="rgba(255,255,255,0.8)" 
+                                    />
+                                </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => handlePress('0')} style={styles.key}>
-                            <Text style={styles.keyText}>0</Text>
-                        </TouchableOpacity>
+                                <TouchableOpacity onPress={() => handlePress('0')} style={styles.key}>
+                                    <Text style={styles.keyText}>0</Text>
+                                </TouchableOpacity>
 
-                        <TouchableOpacity onPress={handleBackspace} style={styles.key}>
-                            <MaterialCommunityIcons name="backspace-outline" size={28} color="rgba(255,255,255,0.8)" />
-                        </TouchableOpacity>
-                    </View>
+                                <TouchableOpacity onPress={handleBackspace} style={styles.key}>
+                                    <MaterialCommunityIcons name="backspace-outline" size={28} color="rgba(255,255,255,0.8)" />
+                                </TouchableOpacity>
+                            </View>
+                        )
+                    )}
 
-                    <TouchableOpacity 
-                        style={styles.forgotBtn}
-                        onPress={() => {
-                            // Link to recovery screen
-                            router.push('/security/recovery' as any);
-                        }}
-                    >
-                        <Text style={styles.forgotText}>Forgot PIN?</Text>
-                    </TouchableOpacity>
+                    {hasAppFallback && (
+                         <TouchableOpacity 
+                            style={styles.forgotBtn}
+                            onPress={() => {
+                                // Link to recovery screen
+                                router.push('/security/recovery' as any);
+                            }}
+                        >
+                            <Text style={styles.forgotText}>Forgot Credentials?</Text>
+                        </TouchableOpacity>
+                    )}
                 </MotiView>
             </BlurView>
-        </Modal>
+        </View>
     );
 };
 
@@ -400,5 +499,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    patternArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 20,
     },
 });
