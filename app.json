@@ -45,7 +45,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "signalingUrl": "wss://berneice-untransmigrated-exotically.ngrok-free.dev",
+      "signalingUrl": "wss://loveable.sbs/api",
       "apiUrl": "https://loveable.sbs/api",
       "note": "Update apiUrl with your machine's local IP address for mobile testing",
       "eas": {

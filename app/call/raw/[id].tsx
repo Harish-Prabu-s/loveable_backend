@@ -110,8 +110,9 @@ export default function RawCallScreen() {
                 };
             }
 
-            // 6. Connect to Signaling Server
-            const SIGNALING_URL = `${Constants.expoConfig?.extra?.signalingUrl}/call/${id}` || `ws://localhost:9000/call/${id}`; 
+            // Construct signaled URL from extra.signalingUrl (e.g. wss://loveable.sbs/api)
+            const signalingBase = Constants.expoConfig?.extra?.signalingUrl || 'ws://localhost:8000/api';
+            const SIGNALING_URL = `${signalingBase}/ws/call/room/${id}/`; 
             ws.current = new WebSocket(SIGNALING_URL);
 
             ws.current.onopen = async () => {

@@ -29,15 +29,13 @@ function getSignalingUrl(): string {
     return String(process.env.VITE_SIGNALING_WS_URL).replace(/\/$/, "");
   }
   if (typeof window !== "undefined") {
-    let host = window.location.hostname || "localhost";
-    if (host === "localhost" || host === "127.0.0.1") {
-      const apiUrl = (typeof process !== "undefined" && process.env?.VITE_API_URL) ? process.env.VITE_API_URL : "";
-      const m = apiUrl.match(/^https?:\/\/([^/:]+)/);
-      if (m) host = m[1];
-    }
-    return `ws://${host}:9000`;
+    let host = window.location.hostname || "loveable.sbs";
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    
+    // Standardize for production path prefix
+    return `${protocol}://${host}/api/ws`;
   }
-  return "ws://localhost:9000";
+  return "wss://loveable.sbs/api/ws";
 }
 
 interface UseWebRTCOptions {
