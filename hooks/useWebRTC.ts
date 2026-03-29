@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Platform, AppState, AppStateStatus } from "react-native";
 import { storage } from "@/lib/storage";
+import { BASE_URL } from "@/api/client";
+import Constants from "expo-constants";
 
 // ─── Platform-specific WebRTC & SFU imports ──────────────────────────────────
 // We use dynamic imports/stubs so the app never crashes on unsupported platforms.
@@ -349,7 +351,15 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const connect = useCallback(async (rId: string) => {
     if (isCancelled.current) return;
     const token = options.token || await storage.getItem("accessToken");
-    const baseUrl = process.env.EXPO_PUBLIC_SIGNALING_WS_URL || "ws://localhost:8000";
+    
+    // Derive signaling URL from API BASE_URL or Expo Config
+    let baseUrl = process.env.EXPO_PUBLIC_SIGNALING_WS_URL || Constants.expoConfig?.extra?.signalingUrl;
+    
+    if (!baseUrl) {
+      // Fallback: Transform API BASE_URL (e.g., http://IP:8000/api -> ws://IP:8000)
+      baseUrl = BASE_URL.replace(/^http/, 'ws').replace(/\/api$/, '');
+    }
+    
     const wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${token}`;
 
     try {
