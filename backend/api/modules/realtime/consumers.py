@@ -146,6 +146,10 @@ class CallRoomConsumer(AsyncWebsocketConsumer):
             # Attach sender info
             data['from_user_id'] = self.user_id
 
+            if msg_type == 'ping':
+                await self.send(text_data=json.dumps({'type': 'pong', 'timestamp': data.get('timestamp')}))
+                return
+
             if msg_type in ['call-offer', 'call-answer', 'ice-candidate', 'call-accept', 'call-reject']:
                 if target_id:
                     # Targeted signal to a specific user

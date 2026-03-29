@@ -123,6 +123,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const localStreamRef = useRef<any | null>(null);
   const reconCount = useRef(0);
   const typingTimer = useRef<any>(null);
+  const heartbeatTimer = useRef<any>(null);
   const isCancelled = useRef(false);
 
   // Peer Connections (Mesh/P2P)
@@ -376,6 +377,14 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       ws.onopen = () => {
         console.log(`[WebRTC] WS OPEN: Room ${rId}`);
         reconCount.current = 0;
+        
+        // Start Heartbeat
+        clearInterval(heartbeatTimer.current);
+        heartbeatTimer.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            }
+        }, 30000);
       };
 
       ws.onmessage = (ev) => {
@@ -386,6 +395,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
       ws.onclose = (e) => {
         if (isCancelled.current) return;
+        clearInterval(heartbeatTimer.current);
         console.warn(`[WebRTC] WS CLOSED: Code ${e.code}, Reason: ${e.reason || 'None'}`);
         scheduleReconnect(rId);
       };
@@ -506,6 +516,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     return () => {
       isCancelled.current = true;
+      clearInterval(heartbeatTimer.current);
       InCallManager?.stop?.();
       wsRef.current?.close();
       localStreamRef.current?.getTracks?.().forEach((t: any) => t.stop());
