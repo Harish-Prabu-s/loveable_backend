@@ -9,6 +9,6 @@ websocket_urlpatterns = [
     re_path(r'^/?ws/chat/(?P<user_id>[\w\-_]+)/?$', consumers.ChatConsumer.as_asgi()),
     re_path(r'^/?ws/call/(?P<user_id>[\w\-_]+)/?$', consumers.CallConsumer.as_asgi()),
     
-    # Critical fix for WebRTC Signaling: Captures alphanumeric room IDs correctly with optional leading slash
-    re_path(r'^/?ws/call/room/(?P<room_id>[\w\-_]+)/?$', consumers.CallRoomConsumer.as_asgi()),
+    # Final fix for WebRTC Signaling: Captures any non-slash room ID sequence with optional leading slash
+    re_path(r'^/?ws/call/room/(?P<room_id>[^/]+)/?$', consumers.CallRoomConsumer.as_asgi()),
 ]

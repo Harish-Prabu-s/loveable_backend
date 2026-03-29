@@ -34,7 +34,9 @@ class JWTAuthMiddleware:
         
         # Deep Trace Logging for 404/Signaling Debugging
         path = scope.get('path', 'unknown')
-        logger.info(f"[WS Auth] New Connection Attempt | Path: {path}")
+        # Decode headers for tracing
+        headers = {k.decode(): v.decode() for k, v in scope.get('headers', [])}
+        logger.info(f"[WS Auth] New Connection Attempt | Path: {path} | Headers: {headers}")
 
         # Get the token from query string
         try:
