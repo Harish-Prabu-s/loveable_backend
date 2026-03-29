@@ -482,7 +482,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       isCancelled.current = true;
       InCallManager?.stop?.();
       wsRef.current?.close();
-      localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
+      localStreamRef.current?.getTracks?.().forEach((t: any) => t.stop());
       setLocalStream(null);
       setParticipants([]);
     };
@@ -495,7 +495,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
   const hangup = useCallback(() => {
     InCallManager?.stop?.();
     wsRef.current?.close();
-    localStreamRef.current?.getTracks().forEach((t: any) => t.stop());
+    localStreamRef.current?.getTracks?.().forEach((t: any) => t.stop());
     setLocalStream(null);
     setParticipants([]);
     setStatus("idle");
