@@ -121,12 +121,14 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
   // Peer Connections (Mesh/P2P)
   const pcs = useRef<Map<number, any>>(new Map());
+  const pendingCandidates = useRef<Map<number, any[]>>(new Map());
 
   // ── Peer Connection Helper ─────────────────────────────────────────────
 
   const createPeerConnection = useCallback((remoteId: number) => {
     if (pcs.current.has(remoteId)) return pcs.current.get(remoteId);
 
+    console.log(`[WebRTC] Creating PC for user ${remoteId}`);
     const pc = new RTCPeerConnection({
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
@@ -136,6 +138,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     pc.onicecandidate = (ev: any) => {
         if (ev.candidate) {
+            console.log(`[WebRTC] Local ICE candidate for ${remoteId}`);
             wsRef.current?.send(JSON.stringify({
                 type: "ice-candidate",
                 target_user_id: remoteId,
@@ -145,10 +148,17 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     };
 
     pc.ontrack = (ev: any) => {
-        console.log(`[WebRTC] Got track from user ${remoteId}`);
+        console.log(`[WebRTC] Got remote track from user ${remoteId}`);
         setParticipants(prev => prev.map(p => 
             p.userId === remoteId ? { ...p, stream: ev.streams[0] } : p
         ));
+    };
+
+    pc.onconnectionstatechange = () => {
+        console.log(`[WebRTC] PC State (${remoteId}): ${pc.connectionState}`);
+        if (pc.connectionState === 'connected') {
+            setStatus('connected');
+        }
     };
 
     // Add local tracks
@@ -167,6 +177,7 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
     switch (data.type) {
       case "participant-joined":
+        console.log(`[WebRTC] Participant joined: ${remoteId}`);
         setParticipants(p => {
           if (p.find(i => i.userId === remoteId)) return p;
           return [...p, {
@@ -180,11 +191,12 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
           }];
         });
 
-        // We are already in the room, so we initiate the offer (Initiator)
+        // Initiator: We send the offer
         const pcJoined = createPeerConnection(remoteId);
         try {
           const offer = await pcJoined.createOffer();
           await pcJoined.setLocalDescription(offer);
+          console.log(`[WebRTC] Sending offer to ${remoteId}`);
           wsRef.current?.send(JSON.stringify({
               type: "call-offer",
               target_user_id: remoteId,
@@ -196,8 +208,10 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         break;
 
       case "participant-left":
+        console.log(`[WebRTC] Participant left: ${remoteId}`);
         pcs.current.get(remoteId)?.close();
         pcs.current.delete(remoteId);
+        pendingCandidates.current.delete(remoteId);
         setParticipants(p => p.filter(item => item.userId !== remoteId));
         break;
 
@@ -208,13 +222,22 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
             await pcOffer.setRemoteDescription(data.offer);
             const answer = await pcOffer.createAnswer();
             await pcOffer.setLocalDescription(answer);
+            console.log(`[WebRTC] Sending answer to ${remoteId}`);
             wsRef.current?.send(JSON.stringify({
                 type: "call-answer",
                 target_user_id: remoteId,
                 answer
             }));
+
+            // Process queued candidates
+            const queue = pendingCandidates.current.get(remoteId) || [];
+            console.log(`[WebRTC] Processing ${queue.length} queued candidates for ${remoteId}`);
+            for (const cand of queue) {
+                await pcOffer.addIceCandidate(cand).catch(e => console.warn("[WebRTC] Queued ICE Error:", e));
+            }
+            pendingCandidates.current.delete(remoteId);
         } catch (err) {
-            console.error("[WebRTC] Answer creation failed:", err);
+            console.error("[WebRTC] Offer handling failed:", err);
         }
         break;
 
@@ -224,20 +247,34 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         if (pcAns) {
             try {
                 await pcAns.setRemoteDescription(data.answer);
+
+                // Process queued candidates
+                const queue = pendingCandidates.current.get(remoteId) || [];
+                console.log(`[WebRTC] Processing ${queue.length} queued candidates for ${remoteId}`);
+                for (const cand of queue) {
+                    await pcAns.addIceCandidate(cand).catch(e => console.warn("[WebRTC] Queued ICE Error:", e));
+                }
+                pendingCandidates.current.delete(remoteId);
             } catch (err) {
-                console.error("[WebRTC] Set remote description failed:", err);
+                console.error("[WebRTC] Answer handling failed:", err);
             }
         }
         break;
 
       case "ice-candidate":
         const pcIce = pcs.current.get(remoteId);
-        if (pcIce) {
+        if (pcIce && pcIce.remoteDescription) {
             try {
                 await pcIce.addIceCandidate(data.candidate);
             } catch (err) {
                 console.warn("[WebRTC] Add ICE candidate failed:", err);
             }
+        } else {
+            console.log(`[WebRTC] Queuing ICE candidate from ${remoteId}`);
+            if (!pendingCandidates.current.has(remoteId)) {
+                pendingCandidates.current.set(remoteId, []);
+            }
+            pendingCandidates.current.get(remoteId)?.push(data.candidate);
         }
         break;
 
