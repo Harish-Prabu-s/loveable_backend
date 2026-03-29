@@ -207,17 +207,46 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     };
 
     pc.ontrack = (ev: any) => {
-        console.log(`[WebRTC] SUCCESS: Got remote track from user ${remoteId}`);
+        const kind = ev.track.kind;
+        console.log(`[WebRTC] SUCCESS: Got remote track (${kind}) from user ${remoteId}`);
         setStatus('connected');
-        setParticipants(prev => prev.map(p => 
-            p.userId === remoteId ? { ...p, stream: ev.streams[0] } : p
-        ));
+        
+        setParticipants(prev => prev.map(p => {
+            if (p.userId !== remoteId) return p;
+            
+            let stream = p.stream;
+            if (!stream) {
+                // First track: create a new stream
+                stream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
+                console.log(`[WebRTC] Created new remote stream for ${remoteId} with ${kind} track`);
+            } else {
+                // Subsequent track: add to existing stream
+                const existingTracks = stream.getTracks();
+                const alreadyHasKind = existingTracks.some((t: any) => t.kind === kind);
+                if (!alreadyHasKind) {
+                    stream.addTrack(ev.track);
+                    console.log(`[WebRTC] Added ${kind} track to existing remote stream for ${remoteId}`);
+                } else {
+                    console.log(`[WebRTC] Stream already has ${kind} track for ${remoteId}. Skipping redundant track.`);
+                }
+            }
+            
+            // Explicitly enable audio track to force playback
+            if (kind === 'audio') {
+                ev.track.enabled = true;
+                console.log(`[WebRTC] Explicitly enabled remote audio track for ${remoteId}`);
+            }
+            
+            return { ...p, stream: stream };
+        }));
     };
 
     pc.onconnectionstatechange = () => {
         console.log(`[WebRTC] PC State (${remoteId}): ${pc.connectionState}`);
         if (pc.connectionState === 'connected') {
             setStatus('connected');
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            console.warn(`[WebRTC] Connection state ${pc.connectionState} for ${remoteId}`);
         }
     };
 
@@ -499,14 +528,20 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     const next = !isMuted;
     localStreamRef.current?.getAudioTracks?.().forEach((t: any) => t.enabled = !next);
     setIsMuted(next);
+    
+    // Relay state to signaling and local participant list
     wsRef.current?.send(JSON.stringify({ type: "media-state", audio: !next, video: !isVideoOff }));
+    setParticipants(prev => prev.map(p => p.userId === 0 ? { ...p, audioEnabled: !next } : p));
   }, [isMuted, isVideoOff]);
 
   const toggleVideo = useCallback(() => {
     const next = !isVideoOff;
     localStreamRef.current?.getVideoTracks?.().forEach((t: any) => t.enabled = !next);
     setIsVideoOff(next);
+    
+    // Relay state to signaling and local participant list
     wsRef.current?.send(JSON.stringify({ type: "media-state", audio: !isMuted, video: !next }));
+    setParticipants(prev => prev.map(p => p.userId === 0 ? { ...p, videoEnabled: !next } : p));
   }, [isMuted, isVideoOff]);
 
   const switchCamera = useCallback(() => {
@@ -569,6 +604,16 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
 
         localStreamRef.current = stream;
         setLocalStream(stream);
+
+        // Final Audio Routing Check
+        if (kind === 'video') {
+            InCallManager?.setSpeakerphoneOn?.(true);
+            InCallManager?.setForceSpeakerphoneOn?.(true);
+        } else {
+            InCallManager?.setSpeakerphoneOn?.(false);
+            InCallManager?.setForceSpeakerphoneOn?.(false);
+        }
+
         console.log(`[WebRTC] Media stream obtained. Joining room: ${roomId}`);
         await connect(roomId);
 
@@ -586,6 +631,16 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
       InCallManager?.stop?.();
       wsRef.current?.close();
       localStreamRef.current?.getTracks?.().forEach((t: any) => t.stop());
+      
+      // EXHAUSTIVE PeerConnection Cleanup (Prevents "Ghost Rooms")
+      pcs.current.forEach((pc) => {
+          pc.onicecandidate = null;
+          pc.ontrack = null;
+          pc.close();
+      });
+      pcs.current.clear();
+      pendingCandidates.current.clear();
+      
       setLocalStream(null);
       setParticipants([]);
     };
@@ -599,6 +654,16 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     InCallManager?.stop?.();
     wsRef.current?.close();
     localStreamRef.current?.getTracks?.().forEach((t: any) => t.stop());
+    
+    // EXHAUSTIVE PeerConnection Cleanup
+    pcs.current.forEach((pc) => {
+        pc.onicecandidate = null;
+        pc.ontrack = null;
+        pc.close();
+    });
+    pcs.current.clear();
+    pendingCandidates.current.clear();
+    
     setLocalStream(null);
     setParticipants([]);
     setStatus("idle");

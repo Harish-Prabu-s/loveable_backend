@@ -7,12 +7,16 @@ interface ParticipantViewProps {
   stream: any;
   displayName: string;
   isLocal?: boolean;
+  audioEnabled?: boolean;
+  videoEnabled?: boolean;
+  photo?: string | null;
 }
 
 import { RTCView } from "@/utils/webrtc.native";
 
-export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displayName, isLocal }) => {
-  const hasStream = !!stream && typeof stream.getVideoTracks === 'function' && (stream.getVideoTracks().length > 0 || stream.getAudioTracks().length > 0);
+export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displayName, isLocal, audioEnabled = true, videoEnabled = true, photo }) => {
+  const hasVideo = !!stream && videoEnabled && typeof stream.getVideoTracks === 'function' && stream.getVideoTracks().length > 0;
+  const hasStream = !!stream && typeof stream.getTracks === 'function' && stream.getTracks().length > 0;
 
   return (
     <MotiView
@@ -22,7 +26,7 @@ export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displa
       transition={{ type: "timing", duration: 400 }}
       style={[styles.container, isLocal && styles.localContainer]}
     >
-      {hasStream ? (
+      {hasVideo ? (
         <RTCView
           stream={stream}
           objectFit="cover"
@@ -31,8 +35,23 @@ export const ParticipantView: React.FC<ParticipantViewProps> = ({ stream, displa
         />
       ) : (
         <View style={styles.avatarPlaceholder}>
-          <MaterialCommunityIcons name="account" size={100} color="#6366F1" />
-          <Text style={styles.avatarText}>{displayName?.[0] || "?"}</Text>
+          <MotiView
+            from={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", damping: 15 }}
+          >
+            <View style={styles.avatarCircle}>
+                <MaterialCommunityIcons name="account" size={80} color="#6366F1" />
+                <Text style={styles.avatarInitial}>{displayName?.[0] || "?"}</Text>
+            </View>
+          </MotiView>
+        </View>
+      )}
+
+      {/* Mic Status Indicator */}
+      {!audioEnabled && (
+        <View style={styles.micOffIndicator}>
+          <MaterialCommunityIcons name="microphone-off" size={16} color="#EF4444" />
         </View>
       )}
 
@@ -69,11 +88,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: {
-    fontSize: 48,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginTop: 10,
+  avatarCircle: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: "rgba(99, 102, 241, 0.1)",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "rgba(99, 102, 241, 0.3)",
+  },
+  avatarInitial: {
+      position: "absolute",
+      fontSize: 40,
+      fontWeight: "bold",
+      color: "#FFFFFF",
+      opacity: 0.9,
   },
   micOffIndicator: {
     position: "absolute",

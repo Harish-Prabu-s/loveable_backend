@@ -148,6 +148,9 @@ export default function CallScreen() {
                                 key={p.userId || `p-${index}`}
                                 stream={p.stream} 
                                 displayName={p.displayName} 
+                                videoEnabled={p.videoEnabled}
+                                audioEnabled={p.audioEnabled}
+                                photo={p.photo}
                             />
                         ))}
                     </View>
@@ -178,6 +181,8 @@ export default function CallScreen() {
                             stream={localStream} 
                             displayName="Me" 
                             isLocal={true} 
+                            videoEnabled={!isVideoOff}
+                            audioEnabled={!isMuted}
                         />
                     </View>
                 )}
@@ -221,12 +226,15 @@ export default function CallScreen() {
             {/* Controls */}
             {!showChat && (
                 <MeetingControls 
-                    micOn={true} // Track these in local state if needed
-                    webcamOn={params.callType === 'video' || params.callType === 'VIDEO'}
+                    micOn={!isMuted}
+                    webcamOn={!isVideoOff}
                     onToggleMic={toggleMic}
                     onToggleWebcam={toggleCamera}
-                    onHangup={hangup}
-                    onSwitchCamera={() => {}} // Could be implemented in hook
+                    onHangup={() => {
+                        hangup();
+                        router.replace('/(tabs)/discover');
+                    }}
+                    onSwitchCamera={() => {}} 
                 />
             )}
         </View>
