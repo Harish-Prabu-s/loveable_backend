@@ -30,27 +30,36 @@ export default function FollowersScreen() {
     const targetId = parsedUserId || user?.id;
 
     const load = useCallback(async () => {
+        // We need either a specific userId or the current user from store
+        // But the store must be initialized if we are relying on user.id
+        if (!isInitialized) {
+            console.log('[Followers] Waiting for store initialization...');
+            return;
+        }
+
+        if (!targetId) {
+            console.warn('[Followers] No targetId found yet.', { isInitialized, userId_param: userId, storeUserId: user?.id });
+            return;
+        }
+
         try {
-            if (!isInitialized) return; // Wait for store to hydrate
-            if (!targetId) {
-                console.warn('[Followers] No targetId found. isInitialized:', isInitialized, 'user?.id:', user?.id, 'userId_param:', userId);
-                return;
-            }
-            console.log(`[Followers] Fetching followers for targetId: ${targetId}`);
+            setLoading(true);
+            console.log(`[Followers] Fetching followers for targetId: ${targetId} (Source: ${parsedUserId ? 'Param' : 'AuthStore'})`);
             const data = await profilesApi.getFollowers(targetId);
-            // Handle both paginated ({ results: [] }) and plain array responses
             const list = Array.isArray(data) ? data : (data as any)?.results ?? [];
-            console.log(`[Followers] Received ${list.length} followers`);
+            console.log(`[Followers] Success! Received ${list.length} followers`);
             setUsers(list);
         } catch (error) {
-            console.error('Failed to load followers:', error);
+            console.error('[Followers] API Error:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [targetId]);
+    }, [targetId, isInitialized]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const renderItem = ({ item: profile }: { item: any }) => {
         const photoUrl = profile.photo

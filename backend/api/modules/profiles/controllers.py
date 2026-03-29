@@ -87,16 +87,20 @@ def respond_friend_request_view(request, request_id: int):
 @permission_classes([IsAuthenticated])
 def get_followers_view(request, user_id: int):
     # Returns list of profiles that follow this user
-    from ...models import Follow
-    follows = Follow.objects.filter(following_id=user_id).select_related('follower__profile')
-    profiles = [f.follower.profile for f in follows]
+    from ...models import Follow, Profile
+    # Get IDs of all people who follow this user
+    follower_ids = Follow.objects.filter(following_id=user_id).values_list('follower_id', flat=True)
+    # Fetch profiles of those users
+    profiles = Profile.objects.filter(user_id__in=follower_ids).select_related('user')
     return Response(ProfileSerializer(profiles, many=True, context={'request': request}).data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_following_view(request, user_id: int):
     # Returns list of profiles this user follows
-    from ...models import Follow
-    follows = Follow.objects.filter(follower_id=user_id).select_related('following__profile')
-    profiles = [f.following.profile for f in follows]
+    from ...models import Follow, Profile
+    # Get IDs of all people this user follows
+    following_ids = Follow.objects.filter(follower_id=user_id).values_list('following_id', flat=True)
+    # Fetch profiles of those users
+    profiles = Profile.objects.filter(user_id__in=following_ids).select_related('user')
     return Response(ProfileSerializer(profiles, many=True, context={'request': request}).data)

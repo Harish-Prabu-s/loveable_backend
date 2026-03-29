@@ -31,27 +31,35 @@ export default function FollowingScreen() {
     const targetId = parsedUserId || user?.id;
 
     const load = useCallback(async () => {
+        // Wait for store initialization
+        if (!isInitialized) {
+            console.log('[Following] Waiting for store initialization...');
+            return;
+        }
+
+        if (!targetId) {
+            console.warn('[Following] No targetId found yet.', { isInitialized, userId_param: userId, storeUserId: user?.id });
+            return;
+        }
+
         try {
-            if (!isInitialized) return; // Wait for store to hydrate
-            if (!targetId) {
-                console.warn('[Following] No targetId found. isInitialized:', isInitialized, 'user?.id:', user?.id, 'userId_param:', userId);
-                return;
-            }
-            console.log(`[Following] Fetching following list for targetId: ${targetId}`);
+            setLoading(true);
+            console.log(`[Following] Fetching following list for targetId: ${targetId} (Source: ${parsedUserId ? 'Param' : 'AuthStore'})`);
             const data = await profilesApi.getFollowing(targetId);
-            // Handle both paginated ({ results: [] }) and plain array responses
             const list = Array.isArray(data) ? data : (data as any)?.results ?? [];
-            console.log(`[Following] Received ${list.length} users`);
+            console.log(`[Following] Success! Received ${list.length} users`);
             setUsers(list);
         } catch (error) {
-            console.error('Failed to load following list:', error);
+            console.error('[Following] API Error:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [targetId]);
+    }, [targetId, isInitialized]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const handleUnfollow = (profile: any) => {
         Alert.alert(
