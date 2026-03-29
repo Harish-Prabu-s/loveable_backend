@@ -39,12 +39,21 @@ def verify_app_lock(request):
 def update_security_settings(request):
     biometrics = request.data.get('biometrics_enabled')
     face = request.data.get('face_unlock_enabled')
+    face_data = request.data.get('face_registration_data')
+    fingerprint_data = request.data.get('fingerprint_registration_data')
+    
+    settings = get_user_settings(request.user)
     
     if biometrics is not None:
-        toggle_biometrics_service(request.user, biometrics)
+        settings.biometrics_enabled = biometrics
     if face is not None:
-        toggle_face_unlock_service(request.user, face)
+        settings.face_unlock_enabled = face
+    if face_data is not None:
+        settings.face_registration_data = face_data
+    if fingerprint_data is not None:
+        settings.fingerprint_registration_data = fingerprint_data
         
+    settings.save()
     return Response({'success': True, 'message': 'Security settings updated.'})
 
 @api_view(['POST'])

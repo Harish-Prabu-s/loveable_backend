@@ -38,24 +38,30 @@ export const FingerprintEnrollment = ({ onComplete, onCancel }: FingerprintEnrol
         
         try {
             const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'Confirm hardware registration',
-                fallbackLabel: 'Use PIN',
+                promptMessage: 'Confirm fingerprint registration',
+                fallbackLabel: 'Cancel',
+                disableDeviceFallback: true,
             });
 
             if (result.success) {
+                const profileData = {
+                    enrolledAt: new Date().toISOString(),
+                    device_id: Math.random().toString(36).substring(2, 12),
+                    version: '1.0.hw_backed',
+                    status: 'verified',
+                    type: 'fingerprint'
+                };
+
                 setStatus('success');
                 setTimeout(() => {
-                    onComplete({
-                        enrolledAt: Date.now(),
-                        type: 'fingerprint_v1_secure',
-                        hardwareVerified: true
-                    });
+                    onComplete(profileData);
                 }, 1000);
             } else {
                 setStatus('idle');
                 setProgress(0);
             }
         } catch (error) {
+            console.error('[FingerprintEnrollment] Auth Error:', error);
             setStatus('idle');
             setProgress(0);
         }

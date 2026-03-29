@@ -15,7 +15,7 @@ const SecurityContext = createContext<SecurityContextType | undefined>(undefined
 
 export function SecurityProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth();
-    const [isLocked, setIsLocked] = useState(false);
+    const { isLocked, setLocked: setIsLocked } = useSecurityStore();
     const [isBiometricsAvailable, setIsBiometricsAvailable] = useState(false);
     const [supportedTypes, setSupportedTypes] = useState<LocalAuthentication.AuthenticationType[]>([]);
 
@@ -30,31 +30,8 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
         })();
     }, []);
 
-    // Handle App Lock Logic
-    useEffect(() => {
-        // If user is not logged in or app lock is not enabled, ensure it's unlocked
-        if (!isAuthenticated || !user?.app_lock_enabled) {
-            setIsLocked(false);
-            return;
-        }
+    // App state logic has been moved to RootLayout to handle route-based bypassing
 
-        const handleAppStateChange = (nextAppState: AppStateStatus) => {
-            // Logic: Lock the app whenever it comes from background to foreground
-            if (nextAppState === 'active') {
-                console.log('[SecurityContext] App foregrounded, triggering lock');
-                setIsLocked(true);
-            }
-        };
-
-        const subscription = AppState.addEventListener('change', handleAppStateChange);
-        
-        // Initial lock on app start if enabled
-        setIsLocked(true);
-
-        return () => {
-            subscription.remove();
-        };
-    }, [isAuthenticated, user?.app_lock_enabled, user?.id]);
 
     const authenticateBiometrics = async () => {
         if (!isBiometricsAvailable) return false;

@@ -41,19 +41,41 @@ export const FaceEnrollment = ({ onComplete, onCancel }: FaceEnrollmentProps) =>
         setStatus('capturing');
         
         try {
-            // Capture a light-weight "Profile Token" (Simulation of Biometric Data)
-            // In a real high-security app, this would generate a public key hash
-            const profileData = {
-                enrolledAt: Date.now(),
-                hardwareToken: Math.random().toString(36).substring(7),
-                type: 'face_v1_secure'
-            };
+            const { authenticateAsync, hasHardwareAsync, isEnrolledAsync } = await import('expo-local-authentication');
+            
+            const hasHardware = await hasHardwareAsync();
+            const isEnrolled = await isEnrolledAsync();
 
-            setStatus('success');
-            setTimeout(() => {
-                onComplete(profileData);
-            }, 1000);
+            if (!hasHardware || !isEnrolled) {
+                Alert.alert("Hardware Error", "Your device does not support Face ID or it's not set up in system settings.");
+                setStatus('idle');
+                return;
+            }
+
+            const result = await authenticateAsync({
+                promptMessage: 'Verify your face to register',
+                fallbackLabel: 'Cancel',
+                disableDeviceFallback: true,
+            });
+
+            if (result.success) {
+                const profileData = {
+                    enrolledAt: new Date().toISOString(),
+                    device_id: Math.random().toString(36).substring(2, 12),
+                    version: '1.0.hw_backed',
+                    status: 'verified'
+                };
+
+                setStatus('success');
+                setTimeout(() => {
+                    onComplete(profileData);
+                }, 1000);
+            } else {
+                Alert.alert("Authentication Failed", "We could not verify your identity. Please try again.");
+                setStatus('idle');
+            }
         } catch (error) {
+            console.error('[FaceEnrollment] Scan Error:', error);
             Alert.alert("Hardware Error", "Could not initialize secure face hardware.");
             setStatus('idle');
         }

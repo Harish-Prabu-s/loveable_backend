@@ -102,12 +102,17 @@ function RootLayoutNav() {
   }, []);
 
   // Handle AppState for security lock
+  const segments = useSegments();
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'background') {
         recordBackgroundTime();
       } else if (nextAppState === 'active') {
-        if (checkLockNeeded()) {
+        const isRecoveryRoute = 
+          (segments.length > 1 && segments[0] === 'settings' && segments[1] === 'reset-app-lock') ||
+          (segments.length > 1 && segments[0] === 'security' && segments[1] === 'recovery');
+
+        if (checkLockNeeded() && !isRecoveryRoute) {
           setLocked(true);
         }
       }
@@ -115,7 +120,7 @@ function RootLayoutNav() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, []);
+  }, [segments, checkLockNeeded, setLocked, recordBackgroundTime]);
 
   // Register Expo push token whenever the user logs in
   useEffect(() => {
