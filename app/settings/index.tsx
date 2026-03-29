@@ -339,6 +339,30 @@ export default function SettingsScreen() {
                             }
                         />
                     )}
+
+                    <View style={styles.divider} />
+                    
+                    <SettingRow
+                        icon="shield-off"
+                        iconBg="#DC2626"
+                        label="Reset Security Settings"
+                        onPress={() => {
+                            Alert.alert(
+                                'Reset Security',
+                                'This will remove your PIN, Pattern, and Biometric lock settings. Are you sure?',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: 'Reset All', style: 'destructive', onPress: () => {
+                                        update({ app_lock_type: 'none' });
+                                        toggleBiometrics(false);
+                                        setPin(null);
+                                        Alert.alert('Security Reset', 'All security locks have been cleared.');
+                                    }}
+                                ]
+                            );
+                        }}
+                        right={<MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />}
+                    />
                 </View>
 
                 {/* ── Recovery ─────────────────────────────────────────── */}
@@ -447,6 +471,7 @@ const styles = StyleSheet.create({
     },
     valuePillText: { color: '#8B5CF6', fontSize: 12, fontWeight: '600' },
 
+    divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 8, marginHorizontal: 16 },
     hint: { color: '#475569', fontSize: 12, marginTop: 8, paddingLeft: 4, lineHeight: 18 },
     
     infoBox: {
