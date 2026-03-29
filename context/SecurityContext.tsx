@@ -59,13 +59,14 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     const authenticateBiometrics = async () => {
         if (!isBiometricsAvailable) return false;
         
-        // Only attempt if user has biometrics enabled in their settings
-        if (!user?.biometrics_enabled && !user?.face_unlock_enabled) {
+        const { highSecurityType } = useSecurityStore.getState();
+        
+        // Only attempt if user has biometrics enabled
+        if (highSecurityType === 'none') {
             return false;
         }
 
-        const { highSecurityType } = useSecurityStore.getState();
-        const method = highSecurityType === 'face' ? 'Face ID' : highSecurityType === 'fingerprint' ? 'Fingerprint' : 'Biometrics';
+        const method = highSecurityType === 'face' ? 'Face ID' : 'Fingerprint';
 
         try {
             const result = await LocalAuthentication.authenticateAsync({

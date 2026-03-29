@@ -7,6 +7,8 @@ import { useSecurityStore } from '@/store/securityStore';
 import { useAuth } from '@/context/AuthContext';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
+import { CameraView } from 'expo-camera';
+import { ScanningLaser } from './ScanningLaser';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,8 +24,9 @@ const { width, height } = Dimensions.get('window');
  */
 export const LockScreen = () => {
     const { isLocked, setIsLocked, authenticateBiometrics, isBiometricsAvailable } = useSecurity();
-    const { highSecurityType, pin, pattern } = useSecurityStore();
+    const { highSecurityType, pin, pattern, faceData } = useSecurityStore();
     const [hideBiometricForNow, setHideBiometricForNow] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
     const { user } = useAuth();
     const [enteredPin, setEnteredPin] = useState('');
     const [error, setError] = useState(false);
@@ -39,13 +42,21 @@ export const LockScreen = () => {
 
     // Attempt Biometric Auth on mount if allowed
     useEffect(() => {
-        if (isLocked && (user?.biometrics_enabled || user?.face_unlock_enabled)) {
+        if (isLocked && highSecurityType !== 'none') {
+            if (highSecurityType === 'face') setShowCamera(true);
             const timer = setTimeout(() => {
                 authenticateBiometrics();
-            }, 500);
+            }, 800);
             return () => clearTimeout(timer);
         }
-    }, [isLocked, user?.biometrics_enabled, user?.face_unlock_enabled]);
+    }, [isLocked, highSecurityType]);
+
+    const onAuthenticate = async () => {
+        const success = await authenticateBiometrics();
+        if (success) {
+            setShowCamera(false);
+        }
+    };
 
     const handlePress = useCallback((num: string) => {
         if (enteredPin.length < PIN_LENGTH) {
@@ -148,17 +159,35 @@ export const LockScreen = () => {
                                 style={styles.biometricFallback}
                             >
                                 <TouchableOpacity 
-                                    onPress={authenticateBiometrics}
+                                    onPress={onAuthenticate}
                                     style={styles.bioPromptBtn}
                                 >
-                                    <MaterialCommunityIcons 
-                                        name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
-                                        size={48} 
-                                        color="#8B5CF6" 
-                                    />
-                                    <Text style={styles.bioPromptText}>
-                                        Use {highSecurityType === 'face' ? 'Face ID' : 'Fingerprint'}
-                                    </Text>
+                                    {showCamera && highSecurityType === 'face' ? (
+                                        <View style={styles.cameraContainer}>
+                                            <CameraView 
+                                                style={styles.cameraMini}
+                                                facing="front"
+                                            />
+                                            <ScanningLaser active={true} color="#8B5CF6" />
+                                            <TouchableOpacity 
+                                                style={styles.cameraCloseBtn}
+                                                onPress={() => setShowCamera(false)}
+                                            >
+                                                <MaterialCommunityIcons name="close" size={16} color="#FFF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <MaterialCommunityIcons 
+                                                name={highSecurityType === 'face' ? "face-recognition" : "fingerprint"} 
+                                                size={48} 
+                                                color="#8B5CF6" 
+                                            />
+                                            <Text style={styles.bioPromptText}>
+                                                Use {highSecurityType === 'face' ? 'Face ID' : 'Fingerprint'}
+                                            </Text>
+                                        </>
+                                    )}
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity 
@@ -190,7 +219,7 @@ export const LockScreen = () => {
                         
                         {/* Biometrics Toggle (Small Icon in Keypad) */}
                         <TouchableOpacity 
-                            onPress={authenticateBiometrics} 
+                            onPress={onAuthenticate} 
                             style={[styles.key, highSecurityType === 'none' && { opacity: 0 }]}
                             disabled={highSecurityType === 'none'}
                         >
@@ -350,5 +379,28 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '800',
         letterSpacing: 1,
+    },
+    cameraContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: '#8B5CF6',
+        backgroundColor: '#000',
+    },
+    cameraMini: {
+        flex: 1,
+    },
+    cameraCloseBtn: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

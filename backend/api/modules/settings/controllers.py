@@ -14,6 +14,8 @@ def get_settings(request):
         'call_preference': settings_obj.call_preference,
         'app_lock_type': settings_obj.app_lock_type,
         'notifications_enabled': settings_obj.notifications_enabled,
+        'face_registration_data': settings_obj.face_registration_data,
+        'fingerprint_registration_data': settings_obj.fingerprint_registration_data,
     })
 
 
@@ -24,7 +26,11 @@ def update_settings(request):
     settings_obj, _ = UserSetting.objects.get_or_create(user=request.user)
     data = request.data
 
-    ALLOWED_FIELDS = ['theme', 'call_preference', 'app_lock_type', 'notifications_enabled']
+    ALLOWED_FIELDS = [
+        'theme', 'call_preference', 'app_lock_type', 
+        'notifications_enabled', 'face_registration_data', 
+        'fingerprint_registration_data'
+    ]
     for field in ALLOWED_FIELDS:
         if field in data:
             setattr(settings_obj, field, data[field])
@@ -41,6 +47,8 @@ def update_settings(request):
         'call_preference': settings_obj.call_preference,
         'app_lock_type': settings_obj.app_lock_type,
         'notifications_enabled': settings_obj.notifications_enabled,
+        'face_registration_data': settings_obj.face_registration_data,
+        'fingerprint_registration_data': settings_obj.fingerprint_registration_data,
     })
 
 

@@ -99,6 +99,8 @@ class UserSetting(models.Model):
     notifications_enabled = models.BooleanField(default=True)
     biometrics_enabled = models.BooleanField(default=False)
     face_unlock_enabled = models.BooleanField(default=False)
+    face_registration_data = models.JSONField(null=True, blank=True)
+    fingerprint_registration_data = models.JSONField(null=True, blank=True)
 
 class Notification(models.Model):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

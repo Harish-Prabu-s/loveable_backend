@@ -7,6 +7,8 @@ interface SecurityState {
     pin: string | null;
     pattern: string | null;
     highSecurityType: 'none' | 'fingerprint' | 'face';
+    faceData: any | null;
+    fingerprintData: any | null;
     lastBackgroundTime: number | null;
     lockGracePeriod: number; // in milliseconds, default 30s
 
@@ -15,6 +17,7 @@ interface SecurityState {
     setPin: (pin: string | null) => Promise<void>;
     setPattern: (pattern: string | null) => Promise<void>;
     setHighSecurity: (type: 'none' | 'fingerprint' | 'face') => Promise<void>;
+    enrollBiometrics: (type: 'face' | 'fingerprint', data: any) => Promise<void>;
     recordBackgroundTime: () => void;
     checkLockNeeded: () => boolean;
 }
@@ -24,6 +27,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     pin: null,
     pattern: null,
     highSecurityType: 'none',
+    faceData: null,
+    fingerprintData: null,
     lastBackgroundTime: null,
     lockGracePeriod: 0, // Instant lock
 
@@ -31,11 +36,15 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
         const pin = await storage.getItem('app_lock_pin');
         const pattern = await storage.getItem('app_lock_pattern');
         const highSec = await storage.getItem('high_security_type') as any || 'none';
+        const faceData = await storage.getItem('face_registration_data');
+        const fingerprintData = await storage.getItem('fingerprint_registration_data');
         
         set({
             pin,
             pattern,
             highSecurityType: highSec,
+            faceData: faceData ? JSON.parse(faceData) : null,
+            fingerprintData: fingerprintData ? JSON.parse(fingerprintData) : null,
             isLocked: !!pin || !!pattern || highSec !== 'none'
         });
     },
@@ -75,6 +84,24 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
 
         await storage.setItem('high_security_type', type);
         set({ highSecurityType: type });
+    },
+
+    enrollBiometrics: async (type: 'face' | 'fingerprint', data: any) => {
+        const { securityApi } = await import('@/api/security');
+        
+        const payload: any = {};
+        if (type === 'face') {
+            payload.face_registration_data = data;
+            await storage.setItem('face_registration_data', JSON.stringify(data));
+            set({ faceData: data });
+        } else {
+            payload.fingerprint_registration_data = data;
+            await storage.setItem('fingerprint_registration_data', JSON.stringify(data));
+            set({ fingerprintData: data });
+        }
+
+        await securityApi.updateSettings(payload);
+        await get().setHighSecurity(type);
     },
 
     recordBackgroundTime: () => set({ lastBackgroundTime: Date.now() }),

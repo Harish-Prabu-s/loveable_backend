@@ -10,9 +10,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSecurityStore } from '@/store/securityStore';
 import { useTheme } from '@/context/ThemeContext';
 import { MotiView, AnimatePresence } from 'moti';
-import { BiometricScanner } from '@/components/security/BiometricScanner';
-
-const { width } = Dimensions.get('window');
+import { FaceEnrollment } from '@/components/security/FaceEnrollment';
+import { FingerprintEnrollment } from '@/components/security/FingerprintEnrollment';
 
 /**
  * BiometricSetupScreen
@@ -24,12 +23,12 @@ const { width } = Dimensions.get('window');
  */
 export default function BiometricSetupScreen() {
     const { isDark } = useTheme();
-    const { setHighSecurity, highSecurityType } = useSecurityStore();
+    const { setHighSecurity, enrollBiometrics, highSecurityType } = useSecurityStore();
     
     // UI State
     const [selectedType, setSelectedType] = useState<'fingerprint' | 'face'>('fingerprint');
     const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'failed'>('idle');
-    const [isScanning, setIsScanning] = useState(false);
+    const [showPortal, setShowPortal] = useState(false);
     
     // Hardware State
     const [supportedTypes, setSupportedTypes] = useState<LocalAuthentication.AuthenticationType[]>([]);
@@ -49,56 +48,35 @@ export default function BiometricSetupScreen() {
             // Default to Face ID if it's the primary/only type
             if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
                 setSelectedType('face');
+            } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+                setSelectedType('fingerprint');
             }
         };
         check();
     }, []);
 
-    const handleRegister = async () => {
+    const onEnrollComplete = async (data: any) => {
+        setShowPortal(false);
+        setStatus('scanning');
+        
+        try {
+            await enrollBiometrics(selectedType, data);
+            setStatus('success');
+            Alert.alert('Registration Verified', `Your ${selectedType} is now securely registered as your primary App Lock method.`, [
+                { text: 'Finish Setup', onPress: () => router.back() }
+            ]);
+        } catch (error) {
+            setStatus('failed');
+            Alert.alert('System Error', 'Could not persist biometric profile.');
+        }
+    };
+
+    const handleRegister = () => {
         if (!hasHardware) {
             Alert.alert('Incompatible Device', 'Your device does not support biometric security.');
             return;
         }
-
-        if (!isEnrolled) {
-            Alert.alert('Not Enrolled', 'No face or fingerprint is enrolled in your device settings. Please set them up in your OS settings first.');
-            return;
-        }
-
-        setStatus('scanning');
-        setIsScanning(true);
-
-        try {
-            // High-End Authentication Simulation + Reality
-            const result = await LocalAuthentication.authenticateAsync({
-                promptMessage: `Register your ${selectedType === 'face' ? 'Face ID' : 'Fingerprint'} for App Lock`,
-                cancelLabel: 'Cancel Registration',
-                disableDeviceFallback: true,
-            });
-
-            if (result.success) {
-                // Success: Add extra delay for "Professional Feel"
-                setTimeout(async () => {
-                    setIsScanning(false);
-                    setStatus('success');
-                    await setHighSecurity(selectedType);
-                    
-                    setTimeout(() => {
-                        Alert.alert('Registration Verified', `Your ${selectedType} is now securely registered as your primary App Lock method.`, [
-                            { text: 'Finish Setup', onPress: () => router.back() }
-                        ]);
-                    }, 800);
-                }, 1500);
-            } else {
-                setStatus('failed');
-                setIsScanning(false);
-                Alert.alert('Access Denied', 'Authentication failed. Please try again or verify your device settings.');
-            }
-        } catch (error) {
-            setStatus('failed');
-            setIsScanning(false);
-            Alert.alert('System Error', 'An error occurred during the secure scanning process.');
-        }
+        setShowPortal(true);
     };
 
     const hasFace = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
@@ -140,14 +118,45 @@ export default function BiometricSetupScreen() {
                     </MotiView>
                 )}
 
-                {/* 2. Professional Scanner UI */}
+                {/* 2. Professional Scanner UI / Enrollment Portals */}
                 <View style={styles.scannerWrapper}>
-                    <BiometricScanner 
-                        type={selectedType} 
-                        isScanning={isScanning} 
-                        status={status === 'scanning' ? 'idle' : status} 
-                    />
+                    <MotiView
+                        animate={{
+                            scale: status === 'scanning' ? 1.1 : 1,
+                            opacity: status === 'scanning' ? 0.7 : 1,
+                        }}
+                    >
+                        <MaterialCommunityIcons 
+                            name={selectedType === 'face' ? "face-recognition" : "fingerprint"} 
+                            size={120} 
+                            color="#8B5CF6" 
+                        />
+                    </MotiView>
                 </View>
+
+                {/* Enrollment Portals Overlay */}
+                <AnimatePresence>
+                    {showPortal && (
+                        <MotiView
+                            from={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            style={StyleSheet.absoluteFill}
+                        >
+                            {selectedType === 'face' ? (
+                                <FaceEnrollment 
+                                    onComplete={onEnrollComplete}
+                                    onCancel={() => setShowPortal(false)}
+                                />
+                            ) : (
+                                <FingerprintEnrollment 
+                                    onComplete={onEnrollComplete}
+                                    onCancel={() => setShowPortal(false)}
+                                />
+                            )}
+                        </MotiView>
+                    )}
+                </AnimatePresence>
 
                 {/* 3. Text Descriptions */}
                 <Text style={[styles.statusTitle, { color: isDark ? "#FFF" : "#000" }]}>
