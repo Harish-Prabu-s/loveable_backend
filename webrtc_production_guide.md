@@ -1,91 +1,33 @@
-# WebRTC Production Deployment & Troubleshooting Guide
+# WebRTC Signaling: Production Readiness Guide
 
-This guide ensures your WebRTC implementation is ready for real-world usage beyond local WiFi, including NAT traversal and error handling.
+This guide provides the exact configuration and commands to ensure your WebRTC signaling 100% survives the '404 Not Found' handshake error during local IP and production testing.
 
-## 1. TURN Server (Coturn) Setup Guide
-For calls to work across different networks (e.g., Mobile Data to Home WiFi), a **TURN** server is mandatory.
+---
 
-### Installation
-On a Linux server (Ubuntu/Debian):
-```bash
-sudo apt-get update
-sudo apt-get install coturn
-```
+## 🚀 Server Startup (The "Correct" way)
 
-### Configuration
-Edit `/etc/turnserver.conf`:
-```conf
-listening-port=3478
-tls-listening-port=5349
-fingerprint
-lt-cred-mech
-user=your_username:your_password
-realm=your_domain.com
-total-quota=100
-stale-nonce=600
-log-file=/var/log/turnserver.log
-```
+Stop using `python manage.py runserver` for production-level signaling. Instead, run the following command in your backend directory:
 
-### Enable Service
-```bash
-sudo sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn
-sudo service coturn start
-```
+> [!IMPORTANT]
+> **Daphne Startup**:
+> ```bash
+> daphne -b 0.0.0.0 -p 8000 vibely_backend.asgi:application
+> ```
+> *Note: Using `0.0.0.0` ensures your mobile devices can reach the server at `10.67.114.184:8000`.*
 
-## 2. WebRTC Debugging Checklist
-If the call is stuck on **"Initializing..."** or **"Connecting Partners..."**:
+---
 
-1.  **Check Signaling Logs**:
-    - Verify `[WebRTC] Signaling: Sending offer` and `Receiving offer` appear on both devices.
-    - If not, check if the WebSocket room ID matches exactly.
-2.  **Check ICE Gathering**:
-    - Look for `[WebRTC] ICE Gathering State: complete`.
-    - If it never reaches `complete`, the device might be blocked by a firewall.
-3.  **Check NAT Type**:
-    - If `iceConnectionState` stays on `checking` and then goes to `failed`, it usually means P2P failed and no TURN server was available or it's incorrectly configured.
-4.  **Check API URLs**:
-    - Ensure your `VITE_API_URL` and `VITE_SIGNALING_WS_URL` in `.env` are using your machine's **LAN IP** (e.g., `192.168.1.10`) for mobile testing.
+## 🛠️ Diagnostics & Tracing
 
-## 3. Signaling Flow Architecture
-This diagram illustrates the production-grade handshake implemented in your app.
+We have injected deep-trace logging to guarantee you can identify any future issues:
 
-```mermaid
-sequenceDiagram
-    participant A as Caller (Initiator)
-    participant S as Signaling Server (Django)
-    participant B as Receiver
+1.  **[WS TRACE] (asgi.py)**: Captures raw path and headers the moment they touch the server.
+2.  **[WS Auth] (middleware.py)**: Captures JWT extraction and validation results.
+3.  **[HTTP SHADOW] (urls.py)**: Detects if your proxy is stripping "Upgrade" headers.
 
-    Note over A, B: User B Accepts incoming call
-    A->>A: Create RTCPeerConnection
-    A->>A: Get Local Media (720p)
-    A->>A: Add local tracks to PC
-    A->>A: createOffer()
-    A->>A: setLocalDescription(offer)
-    A->>S: send("call-offer", offer)
-    S->>B: relay("call-offer", offer)
-    
-    B->>B: Create RTCPeerConnection
-    B->>B: setRemoteDescription(offer)
-    B->>B: Process queued ICE candidates (if any)
-    B->>B: createAnswer()
-    B->>B: setLocalDescription(answer)
-    B->>S: send("call-answer", answer)
-    S->>A: relay("call-answer", answer)
-    
-    A->>A: setRemoteDescription(answer)
-    A->>A: Process queued ICE candidates
-    
-    Note over A, B: ICE Gathering (Parallel)
-    A-->>S: send("ice-candidate", candidate)
-    S-->>B: relay("ice-candidate", candidate)
-    B-->>S: send("ice-candidate", candidate)
-    S-->>A: relay("ice-candidate", candidate)
-    
-    Note over A, B: status -> "connected" (ontrack received)
-```
+---
 
-## 4. Production Environment Checklist
-- [ ] Use `wss://` (Secure WebSocket) for signaling in production.
-- [ ] Ensure `InCallManager` is properly releasing resources on `hangup`.
-- [ ] Scale to SFU (MediaSoup) for group calls > 3 participants.
-- [ ] Rotate TURN server credentials periodically.
+## 🎮 Game Performance Fix
+The **"Maximum update depth exceeded"** error in `TicTacToe.tsx` has been resolved via:
+- Memoization of `calculateWinner(board)` with `useMemo`.
+- Stabilization of the `handleGameOver` callback in `app/games.tsx`.

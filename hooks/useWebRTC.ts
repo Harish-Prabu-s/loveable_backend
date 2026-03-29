@@ -353,33 +353,22 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
     if (isCancelled.current) return;
     const token = options.token || await storage.getItem("accessToken");
     
-    // Derive signaling URL from API BASE_URL or Expo Config
-    let baseUrl = process.env.EXPO_PUBLIC_SIGNALING_WS_URL || Constants.expoConfig?.extra?.signalingUrl;
-    
-    if (!baseUrl) {
-      // Fallback: Transform API BASE_URL (e.g., http://IP:8000/api -> ws://IP:8000)
-      baseUrl = BASE_URL.replace(/^http/, 'ws').replace(/\/api$/, '');
+    // 1. Protocol Auto-Detection (IPs = ws, HTTPS/ngrok = wss)
+    let protocol = 'ws';
+    if (BASE_URL.startsWith('https')) {
+        protocol = 'wss';
     }
     
-    // Production Hardening: Force WSS if the BASE_URL is HTTPS (e.g. ngrok)
-    if (BASE_URL.startsWith('https') && baseUrl.startsWith('ws:')) {
-      baseUrl = baseUrl.replace('ws:', 'wss:');
-    }
+    // 2. Base URL clean-up
+    let baseUrl = BASE_URL.replace(/^http(s)?:\/\//, '').replace(/\/api$/, '');
     
-    let wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
-    if (!wsUrl.includes('/ws/call/room/')) {
-        // Fallback for custom or missing base paths
-        wsUrl = `${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
-    }
-    
-    // Ensure the path structure is strictly ws/call/room/<id>/ (with trailing slash)
-    const urlParts = wsUrl.split('?');
-    if (!urlParts[0].endsWith('/')) {
-        wsUrl = `${urlParts[0]}/${urlParts[1] ? '?' + urlParts[1] : ''}`;
-    }
+    // 3. Construct Final Signaling URL with strict path structure
+    // We ensure the path is exactly /ws/call/room/<id>/
+    const wsUrl = `${protocol}://${baseUrl}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
 
     try {
-      console.log(`[WebRTC] Protocol: ${baseUrl.startsWith('wss') ? 'SECURE (WSS)' : 'STANDARD (WS)'}`);
+      console.log(`[WebRTC] Protocol: ${protocol.toUpperCase()}`);
+      console.log(`[WebRTC] Full WS URL: ${wsUrl}`);
       console.log(`[WebRTC] Connecting to room: ${rId}`);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
