@@ -1,172 +1,34 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    StatusBar, Alert, Platform, ActivityIndicator, Dimensions, ScrollView, TextInput
+    StatusBar, ActivityIndicator, Dimensions, ScrollView, TextInput
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-    RTCPeerConnection,
-    RTCIceCandidate,
-    RTCSessionDescription,
-    RTCView,
-    MediaStream,
-    mediaDevices
-} from '@/utils/webrtc.native';
+import { RTCView } from '@/utils/webrtc.native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView, AnimatePresence } from 'moti';
-import Constants from 'expo-constants';
+import { useEnterpriseCall } from '@/hooks/useEnterpriseCall';
 
 const { width } = Dimensions.get('window');
 
-const configuration = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-    ]
-};
-
-export default function RawCallScreen() {
+export default function SFUCallScreen() {
     const { id, calleeName } = useLocalSearchParams<{ id: string; calleeName: string }>();
-    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-    const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'ended'>('connecting');
-    const [messages, setMessages] = useState<{ id: string; text: string; sender: 'me' | 'peer' }[]>([]);
-    const [inputText, setInputText] = useState('');
-    const [showChat, setShowChat] = useState(false);
+    const { status, localStream, participants, messages, sendMessage, endCall } = useEnterpriseCall(id);
+    
+    const [inputText, setInputText] = React.useState('');
+    const [showChat, setShowChat] = React.useState(false);
 
-    const pc = useRef<RTCPeerConnection | null>(null);
-    const ws = useRef<WebSocket | null>(null);
-    const dataChannel = useRef<any>(null);
-
-    const setupMedia = useCallback(async () => {
-        try {
-            const stream = await mediaDevices.getUserMedia({
-                audio: true,
-                video: {
-                    facingMode: 'user',
-                    width: 640,
-                    height: 480,
-                    frameRate: 30
-                }
-            }) as MediaStream;
-            setLocalStream(stream);
-            return stream;
-        } catch (e) {
-            console.error('Failed to get media', e);
-            Alert.alert('Permission Error', 'Cannot access camera or microphone');
-            return null;
-        }
-    }, []);
-
-    const sendMessage = () => {
-        if (inputText.trim() && dataChannel.current?.readyState === 'open') {
-            const msg = { id: Date.now().toString(), text: inputText, sender: 'me' as const };
-            dataChannel.current.send(inputText);
-            setMessages(prev => [...prev, msg]);
+    const handleSendMessage = () => {
+        if (inputText.trim()) {
+            sendMessage(inputText);
             setInputText('');
         }
     };
 
-    useEffect(() => {
-        let isCancelled = false;
-
-        async function init() {
-            const stream = await setupMedia();
-            if (!stream || isCancelled) return;
-
-            // 1. Initialize PeerConnection
-            pc.current = new RTCPeerConnection(configuration);
-
-            // 2. Add local tracks
-            stream.getTracks().forEach(track => {
-                pc.current?.addTrack(track, stream);
-            });
-
-            // 3. Handle incoming tracks
-            (pc.current as any).ontrack = (event: any) => {
-                if (event.streams && event.streams[0]) {
-                    setRemoteStream(event.streams[0]);
-                    setStatus('connected');
-                }
-            };
-
-            // 4. Setup Data Channel (for chat)
-            dataChannel.current = pc.current.createDataChannel('chat');
-            setupDataChannel(dataChannel.current);
-
-            (pc.current as any).ondatachannel = (event: any) => {
-                setupDataChannel(event.channel);
-            };
-
-            // 5. Handle ICE Candidates
-            if (pc.current) {
-                (pc.current as any).onicecandidate = (event: any) => {
-                    if (event.candidate) {
-                        sendSignal({ type: 'candidate', candidate: event.candidate });
-                    }
-                };
-            }
-
-            // Construct signaled URL from extra.signalingUrl (e.g. wss://loveable.sbs/api)
-            const signalingBase = Constants.expoConfig?.extra?.signalingUrl || 'ws://localhost:8000/api';
-            const SIGNALING_URL = `${signalingBase}/ws/call/room/${id}/`; 
-            ws.current = new WebSocket(SIGNALING_URL);
-
-            ws.current.onopen = async () => {
-                console.log('[RTC] Signaling connected');
-                // Trigger negotiation
-                const offer = await pc.current?.createOffer({});
-                await pc.current?.setLocalDescription(offer);
-                sendSignal({ type: 'offer', sdp: offer });
-            };
-
-            ws.current.onmessage = async (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[RTC] Received signal:', data.type);
-
-                if (data.type === 'offer') {
-                    await pc.current?.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                    const answer = await pc.current?.createAnswer();
-                    await pc.current?.setLocalDescription(answer);
-                    sendSignal({ type: 'answer', sdp: answer });
-                } else if (data.type === 'answer') {
-                    await pc.current?.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                } else if (data.type === 'candidate') {
-                    await pc.current?.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
-        }
-
-        function setupDataChannel(channel: any) {
-            channel.onopen = () => console.log('[RTC] Data channel open');
-            channel.onmessage = (e: any) => {
-                const msg = { id: Date.now().toString(), text: e.data, sender: 'peer' as const };
-                setMessages(prev => [...prev, msg]);
-            };
-        }
-
-        function sendSignal(data: any) {
-            if (ws.current?.readyState === WebSocket.OPEN) {
-                ws.current.send(JSON.stringify(data));
-            }
-        }
-
-        init();
-
-        return () => {
-            isCancelled = true;
-            (localStream as any)?.release();
-            pc.current?.close();
-            ws.current?.close();
-        };
-    }, [id]);
-
-    const endCall = () => {
-        pc.current?.close();
-        ws.current?.close();
+    const handleEndCall = () => {
+        endCall();
         router.back();
     };
 
@@ -174,38 +36,55 @@ export default function RawCallScreen() {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent />
             
-            {/* Remote Video (Background) */}
+            {/* Grid for Participants */}
             <View style={styles.remoteContainer}>
-                {remoteStream ? (
-                    <RTCView
-                        stream={remoteStream}
-                        style={styles.fullVideo}
-                        objectFit="cover"
-                    />
+                {participants.length > 0 ? (
+                    <View style={styles.grid}>
+                        {participants.map(p => (
+                           <View key={p.userId} style={styles.gridItem}>
+                               {p.videoTrack ? (
+                                   <RTCView
+                                      streamURL={p.videoTrack.toURL?.() || ''}
+                                      style={styles.fullVideo}
+                                      objectFit="cover"
+                                   />
+                               ) : (
+                                   <View style={styles.noVideo}>
+                                      <MaterialCommunityIcons name="account" size={60} color="#475569" />
+                                      <Text style={styles.nameOverlay}>{p.displayName || `User ${p.userId}`}</Text>
+                                   </View>
+                               )}
+                           </View>
+                        ))}
+                    </View>
                 ) : (
                     <LinearGradient colors={['#0F172A', '#020617']} style={styles.fullVideo}>
                         <ActivityIndicator color="#6366F1" size="large" />
-                        <Text style={styles.waitingText}>Connecting to {calleeName}...</Text>
+                        <Text style={styles.waitingText}>Connecting SFU Media for {calleeName}...</Text>
                     </LinearGradient>
                 )}
             </View>
 
             {/* Local Video (PiP) */}
             <View style={styles.localContainer}>
-                {localStream && (
+                {localStream ? (
                     <RTCView
-                        stream={localStream}
+                        streamURL={localStream.toURL?.() || ''}
                         style={styles.localVideo}
                         objectFit="cover"
                         zOrder={1}
                     />
+                ) : (
+                    <View style={[styles.localVideo, { backgroundColor: '#334155', justifyContent: 'center', alignItems: 'center' }]}>
+                        <MaterialCommunityIcons name="video-off" size={24} color="#94A3B8" />
+                    </View>
                 )}
             </View>
 
             {/* Controls */}
             <SafeAreaView style={styles.controls}>
                 <View style={styles.bottomBar}>
-                    <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={endCall}>
+                    <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleEndCall}>
                         <MaterialCommunityIcons name="phone-hangup" size={28} color="#FFF" />
                     </TouchableOpacity>
                     
@@ -228,18 +107,20 @@ export default function RawCallScreen() {
                         style={styles.chatSheet}
                     >
                         <View style={styles.chatHeader}>
-                            <Text style={styles.chatTitle}>In-Call Chat</Text>
+                            <Text style={styles.chatTitle}>Room Chat</Text>
                             <TouchableOpacity onPress={() => setShowChat(false)}>
                                 <MaterialCommunityIcons name="close" size={24} color="#94A3B8" />
                             </TouchableOpacity>
                         </View>
                         
                         <ScrollView style={styles.messageScroll}>
-                            {messages.map(m => (
-                                <View key={m.id} style={[styles.bubble, m.sender === 'me' ? styles.myBubble : styles.peerBubble]}>
+                            {messages.map(m => {
+                                const isMe = participants.find(p => p.userId === m.userId) == null;
+                                return (
+                                <View key={m.id} style={[styles.bubble, isMe ? styles.myBubble : styles.peerBubble]}>
                                     <Text style={styles.bubbleText}>{m.text}</Text>
                                 </View>
-                            ))}
+                            )})}
                         </ScrollView>
 
                         <View style={styles.inputArea}>
@@ -250,7 +131,7 @@ export default function RawCallScreen() {
                                 placeholder="Type a message..."
                                 placeholderTextColor="#64748B"
                             />
-                            <TouchableOpacity onPress={sendMessage}>
+                            <TouchableOpacity onPress={handleSendMessage}>
                                 <MaterialCommunityIcons name="send" size={24} color="#6366F1" />
                             </TouchableOpacity>
                         </View>
@@ -264,6 +145,10 @@ export default function RawCallScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     remoteContainer: { ...StyleSheet.absoluteFillObject },
+    grid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap' },
+    gridItem: { flex: 1, minWidth: '50%', minHeight: '50%', position: 'relative' },
+    noVideo: { flex: 1, backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center', borderColor: '#000', borderWidth: 1 },
+    nameOverlay: { color: '#FFF', position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 5, borderRadius: 5 },
     fullVideo: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     waitingText: { color: '#94A3B8', marginTop: 12 },
     localContainer: {

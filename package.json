@@ -94,6 +94,7 @@
     "framer-motion": "^12.33.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
+    "mediasoup-client": "^3.18.7",
     "moti": "^0.30.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
