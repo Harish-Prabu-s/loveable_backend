@@ -8,7 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView, AnimatePresence } from 'moti';
-import { useWebRTC } from '@/hooks/useWebRTC';
+import { useEnterpriseCall } from '@/hooks/useEnterpriseCall';
 import { callsApi } from '@/api/vibely';
 import { useTheme } from '@/context/ThemeContext';
 import { ParticipantView } from '@/components/video/ParticipantView';
@@ -30,38 +30,43 @@ export default function CallScreen() {
     const [roomId, setRoomId] = useState<string | null>(params.roomId || null);
     const [showChat, setShowChat] = useState(false);
     const [elapsed, setElapsed] = useState(0);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+
     const { 
         localStream, 
         participants, 
         status: connectionStatus, 
-        isMuted,
-        isVideoOff,
-        chatMessages: messages, 
-        isTyping,
+        messages, 
         sendMessage, 
-        sendTyping,
-        toggleMute: toggleMic, 
-        toggleVideo: toggleCamera,
-        hangup,
-        reconnect: startCall
-    } = useWebRTC({
-        roomId: roomId || undefined,
-        enabled: !!roomId,
-        kind: (params.callType === 'video' || params.callType === 'VIDEO') ? 'video' : 'audio',
-    });
+        endCall
+    } = useEnterpriseCall(roomId || '');
 
     const [status, setStatus] = useState<'connecting' | 'active' | 'ended'>('connecting');
+
+    const toggleMic = () => {
+        if (localStream) {
+            localStream.getAudioTracks().forEach((t: any) => t.enabled = !t.enabled);
+            setIsMuted(!isMuted);
+        }
+    };
+
+    const toggleCamera = () => {
+        if (localStream) {
+            localStream.getVideoTracks().forEach((t: any) => t.enabled = !t.enabled);
+            setIsVideoOff(!isVideoOff);
+        }
+    };
 
     useEffect(() => {
         console.log(`[CallScreen] Connection Status Update: ${connectionStatus}`);
         if (connectionStatus === 'connected') {
             setStatus('active');
-        } else if (connectionStatus === 'failed') {
+        } else if (connectionStatus === 'failed' || connectionStatus === 'ended') {
             setStatus('ended');
             setTimeout(() => router.replace('/(tabs)/discover'), 2000);
         }
     }, [connectionStatus]);
-
 
     useEffect(() => {
         let timer: any;
@@ -97,7 +102,7 @@ export default function CallScreen() {
                     
                     // We'll wait a bit for the other party to join before starting call
                     // In a production app, we'd wait for a 'ready' signal from the server
-                    setTimeout(() => startCall(), 2000); 
+                    // setTimeout(() => startCall(), 2000); // Removed as useEnterpriseCall connects automatically
                 } catch (error: any) {
                     Alert.alert('Call Failed', error?.response?.data?.detail || 'Could not start call');
                     router.back();
@@ -146,10 +151,10 @@ export default function CallScreen() {
                         {participants.map((p, index) => (
                             <ParticipantView 
                                 key={p.userId || `p-${index}`}
-                                stream={p.stream} 
+                                stream={(p as any).stream}  // type assertion for custom stream property
                                 displayName={p.displayName} 
-                                videoEnabled={p.videoEnabled}
-                                audioEnabled={p.audioEnabled}
+                                videoEnabled={!!p.videoTrack}
+                                audioEnabled={!!p.audioTrack}
                                 photo={p.photo}
                             />
                         ))}
@@ -192,7 +197,7 @@ export default function CallScreen() {
             {/* Header */}
             <SafeAreaView style={styles.headerOverlay}>
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.backBtn} onPress={hangup}>
+                    <TouchableOpacity style={styles.backBtn} onPress={endCall}>
                         <MaterialCommunityIcons name="chevron-down" size={30} color="#FFFFFF" />
                     </TouchableOpacity>
 
@@ -203,9 +208,7 @@ export default function CallScreen() {
                                 ? formatTime(elapsed) 
                                 : connectionStatus === 'connecting' 
                                     ? 'Connecting Partners...' 
-                                    : connectionStatus === 'reconnecting'
-                                        ? 'Reconnecting...'
-                                        : 'Waiting for response...'}
+                                    : 'Waiting for response...'}
                         </Text>
                     </View>
                     
@@ -219,7 +222,7 @@ export default function CallScreen() {
             {/* Chat Overlay */}
             {showChat && (
                 <View style={styles.chatOverlay}>
-                    <CallChat messages={messages} onSendMessage={sendMessage} />
+                    <CallChat messages={messages as any} onSendMessage={sendMessage} />
                 </View>
             )}
 
@@ -231,7 +234,7 @@ export default function CallScreen() {
                     onToggleMic={toggleMic}
                     onToggleWebcam={toggleCamera}
                     onHangup={() => {
-                        hangup();
+                        endCall();
                         router.replace('/(tabs)/discover');
                     }}
                     onSwitchCamera={() => {}} 

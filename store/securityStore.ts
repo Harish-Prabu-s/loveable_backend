@@ -25,6 +25,8 @@ interface SecurityState {
     checkLockNeeded: () => boolean;
     incrementFailCount: () => Promise<void>;
     resetFailCount: () => Promise<void>;
+    isBypassed: boolean;
+    setBypassLock: (bypass: boolean) => void;
 }
 
 export const useSecurityStore = create<SecurityState>()((set, get) => ({
@@ -37,7 +39,10 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     lastBackgroundTime: null,
     lockGracePeriod: 0, // Instant lock
     failCount: 0,
+    isBypassed: false,
     lockoutUntil: null,
+
+    setBypassLock: (bypass: boolean) => set({ isBypassed: bypass }),
 
     initialize: async () => {
         const pin = await storage.getItem('app_lock_pin');
@@ -153,7 +158,8 @@ export const useSecurityStore = create<SecurityState>()((set, get) => ({
     recordBackgroundTime: () => set({ lastBackgroundTime: Date.now() }),
 
     checkLockNeeded: () => {
-        const { pin, pattern, highSecurityType } = get();
+        const { pin, pattern, highSecurityType, isBypassed } = get();
+        if (isBypassed) return false;
         if (!pin && !pattern && highSecurityType === 'none') return false;
         // Requirement: "Even if the app is reopened within 1 second -> require authentication"
         return true; 

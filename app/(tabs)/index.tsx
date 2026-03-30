@@ -46,6 +46,7 @@ const { width } = Dimensions.get('window');
 import { PostCard } from '@/components/PostCard';
 import { toast } from '@/utils/toast';
 import { getAvatarUri, timeAgo } from '@/utils/avatar';
+import { useSecurityStore } from '@/store/securityStore';
 
 // ─── Post Creation Modal ──────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
   const [showMentionResults, setShowMentionResults] = useState(false);
   const [foundUsers, setFoundUsers] = useState<any[]>([]);
   const { colors } = useTheme();
+  const { setBypassLock } = useSecurityStore();
 
   const resetForm = () => {
     setCaption('');
@@ -83,14 +85,19 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
       Alert.alert('Permission Required', 'Please allow access to your photo library to upload images.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+    setBypassLock(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+      }
+    } finally {
+      setTimeout(() => setBypassLock(false), 1000);
     }
   };
 
@@ -100,13 +107,18 @@ function CreatePostModal({ visible, myAvatar, onClose, onPosted }: CreatePostMod
       Alert.alert('Permission Required', 'Please allow camera access to take photos.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+    setBypassLock(true);
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+      }
+    } finally {
+      setTimeout(() => setBypassLock(false), 1000);
     }
   };
 

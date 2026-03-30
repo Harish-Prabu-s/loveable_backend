@@ -8,11 +8,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { storiesApi } from '@/api/stories';
+import { useSecurityStore } from '@/store/securityStore';
 
 export default function CreateStoryScreen() {
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [visibility, setVisibility] = useState('all');
     const [uploading, setUploading] = useState(false);
+    const { setBypassLock } = useSecurityStore();
 
     const pickImage = async () => {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -20,14 +22,19 @@ export default function CreateStoryScreen() {
             Alert.alert('Permission required', 'Please allow access to your photo library.');
             return;
         }
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.8,
-            allowsEditing: true,
-            aspect: [9, 16],
-        });
-        if (!result.canceled && result.assets[0]) {
-            setImageUri(result.assets[0].uri);
+        setBypassLock(true);
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.8,
+                allowsEditing: true,
+                aspect: [9, 16],
+            });
+            if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+            }
+        } finally {
+            setTimeout(() => setBypassLock(false), 1000);
         }
     };
 
@@ -37,13 +44,18 @@ export default function CreateStoryScreen() {
             Alert.alert('Permission required', 'Please allow camera access.');
             return;
         }
-        const result = await ImagePicker.launchCameraAsync({
-            quality: 0.8,
-            allowsEditing: true,
-            aspect: [9, 16],
-        });
-        if (!result.canceled && result.assets[0]) {
-            setImageUri(result.assets[0].uri);
+        setBypassLock(true);
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                quality: 0.8,
+                allowsEditing: true,
+                aspect: [9, 16],
+            });
+            if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+            }
+        } finally {
+            setTimeout(() => setBypassLock(false), 1000);
         }
     };
 

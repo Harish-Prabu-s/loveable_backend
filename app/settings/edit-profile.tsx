@@ -16,10 +16,12 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '@/store/authStore';
+import { useSecurityStore } from '@/store/securityStore';
 import { toast } from '@/utils/toast';
 
 export default function EditProfileScreen() {
     const { user, updateProfile, uploadAvatar, isLoading } = useAuthStore();
+    const { setBypassLock } = useSecurityStore();
 
     const [displayName, setDisplayName] = useState(user?.display_name || '');
     const [username, setUsername] = useState(user?.username || '');
@@ -40,12 +42,18 @@ export default function EditProfileScreen() {
                 return;
             }
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-            });
+            setBypassLock(true);
+            let result;
+            try {
+                result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                    allowsEditing: true,
+                    aspect: [1, 1],
+                    quality: 0.8,
+                });
+            } finally {
+                setTimeout(() => setBypassLock(false), 1000);
+            }
 
             if (!result.canceled && result.assets[0]) {
                 const uri = result.assets[0].uri;

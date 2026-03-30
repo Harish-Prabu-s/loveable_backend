@@ -20,7 +20,7 @@ import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { walletApi } from '@/api/wallet';
 import { giftsApi } from '@/api/gifts';
-
+import { useSecurityStore } from '@/store/securityStore';
 
 type UiMessage = {
     id: string;
@@ -345,22 +345,31 @@ export default function ChatScreen() {
         setRecording(null);
     };
 
-    const pickMedia = async (type: 'image' | 'video', useCamera: boolean) => {
-        const result = useCamera 
-            ? await ImagePicker.launchCameraAsync({
-                mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
-                quality: 0.8,
-                videoMaxDuration: 15, // 15s limit
-            })
-            : await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
-                quality: 0.8,
-                videoMaxDuration: 15,
-            });
+    const { setBypassLock } = useSecurityStore();
 
-        if (!result.canceled && result.assets && result.assets[0]) {
+    const pickMedia = async (type: 'image' | 'video', useCamera: boolean) => {
+        setBypassLock(true);
+        let result = null;
+        try {
+            result = useCamera 
+                ? await ImagePicker.launchCameraAsync({
+                    mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+                    allowsEditing: true,
+                    quality: 0.8,
+                    videoMaxDuration: 15, // 15s limit
+                })
+                : await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+                    allowsEditing: true,
+                    quality: 0.8,
+                    videoMaxDuration: 15,
+                });
+        } finally {
+            // Slight delay to ensure AppState logic has resolved before un-bypassing
+            setTimeout(() => setBypassLock(false), 1000);
+        }
+
+        if (result && !result.canceled && result.assets && result.assets[0]) {
             const asset = result.assets[0];
             
             // Check video duration specifically for library picks that might bypass editing
