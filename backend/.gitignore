@@ -2,18 +2,24 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
 # Django
 *.log
 local_settings.py
 db.sqlite3
 media/
+static/
 
-# Virtual Env
-.venv/
-venv/
+# Environment
+.env
 env/
+venv/
+ENV/
+.venv/
 
 # IDE
 .idea/
 .vscode/
+*.swp
+*.swo
