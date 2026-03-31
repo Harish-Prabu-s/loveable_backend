@@ -1,7 +1,7 @@
-from django.urls import path
-from . import consumers
-
-websocket_urlpatterns = [
-    path('ws/call/<int:room_id>/', consumers.CallConsumer.as_asgi()),
-    path('ws/user/<int:user_id>/', consumers.UserConsumer.as_asgi()),
-]
+# WebSocket routing for calls is handled by api.modules.realtime.routing
+# which registers:
+#   /ws/call/{user_id}/       → CallConsumer  (incoming call notifications)
+#   /ws/call/room/{room_id}/  → CallRoomConsumer (P2P WebRTC signaling)
+#
+# This file is kept for import compatibility only.
+websocket_urlpatterns = []

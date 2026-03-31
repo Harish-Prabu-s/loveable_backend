@@ -7,17 +7,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MotiView, AnimatePresence } from 'moti';
-import { useEnterpriseCall } from '@/hooks/useEnterpriseCall';
+import { MotiView } from 'moti';
+import { useWebRTC } from '@/hooks/useWebRTC';
 import { callsApi } from '@/api/vibely';
 import { useTheme } from '@/context/ThemeContext';
 import { ParticipantView } from '@/components/video/ParticipantView';
 import { MeetingControls } from '@/components/video/MeetingControls';
 import { CallChat } from '@/components/video/CallChat';
+import { storage } from '@/lib/storage';
 
 export default function CallScreen() {
     const params = useLocalSearchParams<{
-        id: string; // User ID of the other person
+        id: string;          // User ID of the other person
         sessionId?: string;
         roomId?: string;
         isIncoming?: string;
@@ -25,95 +26,120 @@ export default function CallScreen() {
         calleeName?: string;
         calleePhoto?: string;
     }>();
-    
+
     const isIncoming = params.isIncoming === 'true';
+    const callKind: 'audio' | 'video' = ((params.callType || 'VOICE').toUpperCase() === 'VIDEO') ? 'video' : 'audio';
+
+    // ── Room ID state ──────────────────────────────────────────────────────────
+    // For callers: starts null, gets set after callsApi.initiate()
+    // For receivers: immediately available from params
     const [roomId, setRoomId] = useState<string | null>(params.roomId || null);
+    const [sessionId, setSessionId] = useState<number | null>(
+        params.sessionId ? Number(params.sessionId) : null
+    );
+    const [permissionsGranted, setPermissionsGranted] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [elapsed, setElapsed] = useState(0);
-    const [isMuted, setIsMuted] = useState(false);
-    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [screenStatus, setScreenStatus] = useState<'requesting' | 'calling' | 'active' | 'ended'>('requesting');
 
-    const { 
-        localStream, 
-        participants, 
-        status: connectionStatus, 
-        messages, 
-        sendMessage, 
-        endCall
-    } = useEnterpriseCall(roomId || '');
+    // ── WebRTC hook — only enabled once we have permissions + roomId ──────────
+    const {
+        localStream,
+        participants,
+        status: rtcStatus,
+        isMuted,
+        isVideoOff,
+        chatMessages,
+        toggleMute,
+        toggleVideo,
+        switchCamera,
+        sendMessage,
+        hangup,
+    } = useWebRTC({
+        roomId: roomId ?? undefined,
+        enabled: permissionsGranted && !!roomId,
+        kind: callKind,
+    });
 
-    const [status, setStatus] = useState<'connecting' | 'active' | 'ended'>('connecting');
-
-    const toggleMic = () => {
-        if (localStream) {
-            localStream.getAudioTracks().forEach((t: any) => t.enabled = !t.enabled);
-            setIsMuted(!isMuted);
-        }
-    };
-
-    const toggleCamera = () => {
-        if (localStream) {
-            localStream.getVideoTracks().forEach((t: any) => t.enabled = !t.enabled);
-            setIsVideoOff(!isVideoOff);
-        }
-    };
-
+    // ── Map RTC status → screen status ────────────────────────────────────────
     useEffect(() => {
-        console.log(`[CallScreen] Connection Status Update: ${connectionStatus}`);
-        if (connectionStatus === 'connected') {
-            setStatus('active');
-        } else if (connectionStatus === 'failed' || connectionStatus === 'ended') {
-            setStatus('ended');
-            setTimeout(() => router.replace('/(tabs)/discover'), 2000);
+        console.log(`[CallScreen] RTC status: ${rtcStatus} | roomId: ${roomId}`);
+        if (rtcStatus === 'connected') {
+            setScreenStatus('active');
+        } else if (rtcStatus === 'failed') {
+            setScreenStatus('ended');
+            setTimeout(() => router.replace('/(tabs)/discover'), 2500);
         }
-    }, [connectionStatus]);
+    }, [rtcStatus]);
 
+    // ── Call timer ────────────────────────────────────────────────────────────
     useEffect(() => {
         let timer: any;
-        if (status === 'active') {
+        if (screenStatus === 'active') {
             timer = setInterval(() => setElapsed(e => e + 1), 1000);
         }
         return () => clearInterval(timer);
-    }, [status]);
+    }, [screenStatus]);
 
+    // ── Permissions + Room Setup ───────────────────────────────────────────────
     useEffect(() => {
         async function setupCall() {
+            // 1. Request permissions
             if (Platform.OS === 'android') {
-                const granted = await PermissionsAndroid.requestMultiple([
-                    PermissionsAndroid.PERMISSIONS.CAMERA,
-                    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-                ]);
-                if (granted[PermissionsAndroid.PERMISSIONS.CAMERA] !== PermissionsAndroid.RESULTS.GRANTED ||
-                    granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED) {
-                    Alert.alert('Permissions Required', 'Camera and mic permissions are required.');
+                const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+                if (callKind === 'video') {
+                    permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+                }
+                const grants = await PermissionsAndroid.requestMultiple(permissions);
+                const audioOk = grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+                const cameraOk = callKind === 'audio' || grants[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
+
+                if (!audioOk || !cameraOk) {
+                    Alert.alert('Permissions Required', 'Camera and microphone permissions are required for calls.');
                     router.back();
                     return;
                 }
             }
+            setPermissionsGranted(true);
 
+            // 2. CALLER: create the call session and get a roomId from the backend
             if (!isIncoming && !roomId) {
+                setScreenStatus('calling');
                 try {
-                    const generatedRoomId = Math.random().toString(36).substring(7);
+                    // Generate a unique room ID (same logic as before, but now we
+                    // properly wait for it before enabling the WebRTC hook)
+                    const generatedRoomId = Math.random().toString(36).substring(2, 9);
                     const rawType = (params.callType || 'VOICE').toUpperCase();
                     const type = (rawType === 'AUDIO' ? 'VOICE' : rawType) as 'VOICE' | 'VIDEO';
-                    
-                    await callsApi.initiate(Number(params.id), type, generatedRoomId);
+
+                    const session = await callsApi.initiate(Number(params.id), type, generatedRoomId);
+                    setSessionId(session.id);
+                    // Only NOW do we set the roomId — this triggers useWebRTC to connect
                     setRoomId(generatedRoomId);
-                    
-                    // We'll wait a bit for the other party to join before starting call
-                    // In a production app, we'd wait for a 'ready' signal from the server
-                    // setTimeout(() => startCall(), 2000); // Removed as useEnterpriseCall connects automatically
+                    console.log(`[CallScreen] Outgoing call initiated. Session: ${session.id}, Room: ${generatedRoomId}`);
                 } catch (error: any) {
-                    Alert.alert('Call Failed', error?.response?.data?.detail || 'Could not start call');
+                    const msg = error?.response?.data?.detail || 'Could not start call. Please try again.';
+                    Alert.alert('Call Failed', msg);
                     router.back();
                 }
             } else if (isIncoming && roomId) {
-                // For incoming, we just join. The caller will send the offer.
-                console.log('[CallScreen] Incoming call, joined room:', roomId);
+                // RECEIVER: roomId already set from params, just start connecting
+                setScreenStatus('calling');
+                console.log(`[CallScreen] Incoming call accepted. Joining room: ${roomId}`);
             }
         }
+
         setupCall();
-    }, [isIncoming, params.id]);
+    }, []); // Run once on mount
+
+    // ── Hangup handler ────────────────────────────────────────────────────────
+    const handleHangup = async () => {
+        hangup();
+        if (sessionId) {
+            callsApi.end(sessionId).catch(() => {});
+        }
+        router.replace('/(tabs)/discover');
+    };
 
     const formatTime = (s: number) => {
         const m = Math.floor(s / 60);
@@ -121,71 +147,88 @@ export default function CallScreen() {
         return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     };
 
-    if (!roomId) {
+    // ── Loading States ────────────────────────────────────────────────────────
+    if (screenStatus === 'requesting') {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#6366F1" />
-                <Text style={styles.loadingText}>Creating Room...</Text>
+                <Text style={styles.loadingText}>Requesting Permissions...</Text>
             </View>
         );
     }
 
-    if (status === 'connecting' && !localStream) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#6366F1" />
-                <Text style={styles.loadingText}>Initializing Media...</Text>
-            </View>
-        );
-    }
-
+    // ── Main Call UI ──────────────────────────────────────────────────────────
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="#000000" translucent />
 
-            {/* Video Streams Grid */}
+            {/* ─ Video Grid ─ */}
             <View style={styles.videoGrid}>
                 {participants.length > 0 ? (
                     <View style={styles.gridInner}>
-                        {/* If 1 participant, show full screen. If more, show grid. */}
                         {participants.map((p, index) => (
-                            <ParticipantView 
+                            <ParticipantView
                                 key={p.userId || `p-${index}`}
-                                stream={(p as any).stream}  // type assertion for custom stream property
-                                displayName={p.displayName} 
-                                videoEnabled={!!p.videoTrack}
-                                audioEnabled={!!p.audioTrack}
+                                stream={p.stream}
+                                displayName={p.displayName}
+                                videoEnabled={p.videoEnabled}
+                                audioEnabled={p.audioEnabled}
                                 photo={p.photo}
                             />
                         ))}
                     </View>
                 ) : (
-                    <LinearGradient colors={['#0F172A', '#020617', '#0F172A']} style={styles.remotePlaceholder}>
-                        <View style={styles.bgCenter}>
+                    // Waiting for the other person to join
+                    <LinearGradient
+                        colors={['#0F172A', '#1E1B4B', '#0F172A']}
+                        style={styles.waitingContainer}
+                    >
+                        <View style={styles.waitingInner}>
                             <MotiView
-                                from={{ scale: 1, opacity: 0.6 }}
-                                animate={{ scale: 1.1, opacity: 1 }}
-                                transition={{ type: 'timing', duration: 1000, loop: true, repeatReverse: true }}
+                                from={{ scale: 0.95, opacity: 0.6 }}
+                                animate={{ scale: 1.05, opacity: 1 }}
+                                transition={{ type: 'timing', duration: 1200, loop: true, repeatReverse: true }}
+                                style={styles.avatarWrapper}
                             >
-                                <Image 
-                                    source={{ uri: params.calleePhoto || 'https://via.placeholder.com/150' }} 
-                                    style={styles.avatarLarge} 
+                                {/* Pulse Ring */}
+                                <View style={styles.pulseRing} />
+                                <Image
+                                    source={{ uri: params.calleePhoto || 'https://via.placeholder.com/150' }}
+                                    style={styles.avatarLarge}
                                 />
                             </MotiView>
-                            <Text style={styles.waitingText}>Calling {params.calleeName}...</Text>
+
+                            <Text style={styles.calleeName2}>{params.calleeName || 'User'}</Text>
+
+                            {/* Status line */}
+                            <View style={styles.statusRow}>
+                                <View style={styles.statusDot} />
+                                <Text style={styles.waitingText}>
+                                    {rtcStatus === 'connecting'
+                                        ? isIncoming ? 'Joining call...' : 'Calling...'
+                                        : rtcStatus === 'reconnecting'
+                                            ? 'Reconnecting...'
+                                            : 'Waiting for response...'}
+                                </Text>
+                            </View>
+
+                            <Text style={styles.callTypeTag}>
+                                {callKind === 'video' ? '📹 Video Call' : '📞 Voice Call'}
+                            </Text>
                         </View>
                     </LinearGradient>
                 )}
-                
+
+                {/* Local stream PiP */}
                 {localStream && (
                     <View style={[
-                        styles.localStreamContainer, 
+                        styles.localStreamContainer,
                         participants.length > 0 ? styles.localStreamPip : styles.localStreamFull
                     ]}>
-                        <ParticipantView 
-                            stream={localStream} 
-                            displayName="Me" 
-                            isLocal={true} 
+                        <ParticipantView
+                            stream={localStream}
+                            displayName="Me"
+                            isLocal={true}
                             videoEnabled={!isVideoOff}
                             audioEnabled={!isMuted}
                         />
@@ -193,51 +236,49 @@ export default function CallScreen() {
                 )}
             </View>
 
-
-            {/* Header */}
+            {/* ─ Header overlay ─ */}
             <SafeAreaView style={styles.headerOverlay}>
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.backBtn} onPress={endCall}>
-                        <MaterialCommunityIcons name="chevron-down" size={30} color="#FFFFFF" />
+                    <TouchableOpacity style={styles.iconBtn} onPress={handleHangup}>
+                        <MaterialCommunityIcons name="chevron-down" size={28} color="#FFFFFF" />
                     </TouchableOpacity>
 
                     <View style={styles.headerInfo}>
-                        <Text style={styles.calleeName}>{params.calleeName || 'User'}</Text>
+                        <Text style={styles.headerName}>{params.calleeName || 'User'}</Text>
                         <Text style={styles.statusText}>
-                            {status === 'active' 
-                                ? formatTime(elapsed) 
-                                : connectionStatus === 'connecting' 
-                                    ? 'Connecting Partners...' 
-                                    : 'Waiting for response...'}
+                            {screenStatus === 'active'
+                                ? formatTime(elapsed)
+                                : rtcStatus === 'connecting'
+                                    ? 'Connecting...'
+                                    : rtcStatus === 'reconnecting'
+                                        ? 'Reconnecting...'
+                                        : isIncoming ? 'Joining...' : 'Calling...'}
                         </Text>
                     </View>
-                    
-                    <TouchableOpacity style={styles.chatBtn} onPress={() => setShowChat(!showChat)}>
-                        <MaterialCommunityIcons name="chat" size={24} color={showChat ? "#6366F1" : "#FFF"} />
-                        {messages.length > 0 && !showChat && <View style={styles.chatBadge} />}
+
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => setShowChat(v => !v)}>
+                        <MaterialCommunityIcons name="chat" size={22} color={showChat ? '#6366F1' : '#FFF'} />
+                        {chatMessages.length > 0 && !showChat && <View style={styles.chatBadge} />}
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
 
-            {/* Chat Overlay */}
+            {/* ─ Chat overlay ─ */}
             {showChat && (
                 <View style={styles.chatOverlay}>
-                    <CallChat messages={messages as any} onSendMessage={sendMessage} />
+                    <CallChat messages={chatMessages as any} onSendMessage={sendMessage} />
                 </View>
             )}
 
-            {/* Controls */}
+            {/* ─ Controls ─ */}
             {!showChat && (
-                <MeetingControls 
+                <MeetingControls
                     micOn={!isMuted}
                     webcamOn={!isVideoOff}
-                    onToggleMic={toggleMic}
-                    onToggleWebcam={toggleCamera}
-                    onHangup={() => {
-                        endCall();
-                        router.replace('/(tabs)/discover');
-                    }}
-                    onSwitchCamera={() => {}} 
+                    onToggleMic={toggleMute}
+                    onToggleWebcam={toggleVideo}
+                    onHangup={handleHangup}
+                    onSwitchCamera={switchCamera}
                 />
             )}
         </View>
@@ -246,32 +287,97 @@ export default function CallScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
-    loadingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-    loadingText: { color: '#fff', marginTop: 16, fontSize: 16 },
+    loadingContainer: { flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' },
+    loadingText: { color: '#9CA3AF', marginTop: 16, fontSize: 15 },
+
     videoGrid: { flex: 1 },
-    remotePlaceholder: { flex: 1 },
-    bgCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    avatarLarge: { width: 140, height: 140, borderRadius: 70, borderWidth: 3, borderColor: '#6366F1' },
-    waitingText: { color: '#9CA3AF', marginTop: 20, fontSize: 14, fontWeight: '500' },
+
+    // Waiting / calling screen
+    waitingContainer: { flex: 1 },
+    waitingInner: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+    avatarWrapper: { position: 'relative', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    pulseRing: {
+        position: 'absolute',
+        width: 165,
+        height: 165,
+        borderRadius: 82.5,
+        borderWidth: 2,
+        borderColor: '#6366F1',
+        opacity: 0.5,
+    },
+    avatarLarge: {
+        width: 145,
+        height: 145,
+        borderRadius: 72.5,
+        borderWidth: 3,
+        borderColor: '#6366F1',
+    },
+    calleeName2: { fontSize: 26, fontWeight: '700', color: '#FFFFFF' },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+    waitingText: { color: '#9CA3AF', fontSize: 14, fontWeight: '500' },
+    callTypeTag: { color: '#6366F1', fontSize: 13, fontWeight: '600', marginTop: 4 },
+
+    // Local PiP
     localStreamContainer: { position: 'absolute', overflow: 'hidden' },
-    localStreamPip: { bottom: 100, right: 20, width: 120, height: 180, borderRadius: 12, borderWidth: 1, borderColor: '#FFF' },
+    localStreamPip: {
+        bottom: 120,
+        right: 16,
+        width: 110,
+        height: 165,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
     localStreamFull: { top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 },
-    headerOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16 },
-    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 },
-    headerInfo: { alignItems: 'center' },
-    calleeName: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-    statusText: { fontSize: 13, color: '#E2E8F0', marginTop: 2 },
-    chatBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20 },
-    chatBadge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#6366F1' },
-    chatOverlay: { position: 'absolute', top: 100, bottom: 100, left: 0, right: 0, zIndex: 10 },
+
+    // Grid for remote participants
     gridInner: {
         flex: 1,
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 4
-    }
-});
+    },
 
+    // Header
+    headerOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 8,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    iconBtn: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 20,
+    },
+    headerInfo: { alignItems: 'center' },
+    headerName: { fontSize: 17, fontWeight: '700', color: '#FFF' },
+    statusText: { fontSize: 12, color: '#CBD5E1', marginTop: 2 },
+
+    chatBadge: {
+        position: 'absolute',
+        top: 7,
+        right: 7,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#6366F1',
+    },
+    chatOverlay: {
+        position: 'absolute',
+        top: 90,
+        bottom: 110,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+    },
+});

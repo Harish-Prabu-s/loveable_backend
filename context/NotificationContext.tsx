@@ -111,9 +111,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             return;
         }
 
-        // 1. Notification Channel
+        // 1. Notification Channel — pass token for JWTAuthMiddleware
         if (!notifWsRef.current) {
-            const notifWs = new WebSocketClient('/ws/notifications/', user.id);
+            const notifWs = new WebSocketClient('/ws/notifications/', user.id, token);
             notifWs.on('message', (data) => {
                 if (data.type === 'new_notification') {
                     setNewNotification(data.data);
@@ -123,9 +123,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             notifWsRef.current = notifWs;
         }
 
-        // 2. Chat Channel
+        // 2. Chat Channel — pass token for JWTAuthMiddleware
         if (!chatWsRef.current) {
-            const chatWs = new WebSocketClient('/ws/chat/', user.id);
+            const chatWs = new WebSocketClient('/ws/chat/', user.id, token);
             chatWs.on('message', (data) => {
                 if (data.type === 'new_message' || data.type === 'messages_seen' || data.type === 'typing') {
                     setActiveChatEvent(data);
@@ -135,12 +135,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             chatWsRef.current = chatWs;
         }
 
-        // 3. Call Channel
+        // 3. Call Channel — pass token for JWTAuthMiddleware
+        // This receives incoming-call events sent by services.py when someone calls this user
         if (!callWsRef.current) {
-            const callWs = new WebSocketClient('/ws/call/', user.id);
+            const callWs = new WebSocketClient('/ws/call/', user.id, token);
             callWs.on('message', (data) => {
+                console.log('[CallWS] Received message:', data.type);
                 if (data.type === 'incoming-call') {
-                    setIncomingCall(data);
+                    console.log('[CallWS] Incoming call from:', data.callerName, '| Room:', data.roomId);
+                    setIncomingCall({
+                        sessionId: data.sessionId,
+                        // Use the roomId from the caller's initiate request.
+                        // CRITICAL: If roomId is missing, fall back to sessionId as string.
+                        // The caller uses the same fallback on their side.
+                        roomId: data.roomId ? String(data.roomId) : String(data.sessionId),
+                        callerId: data.callerId,
+                        callerName: data.callerName,
+                        callerPhoto: data.callerPhoto,
+                        callType: data.callType,
+                    });
                 }
             });
             callWs.connect();
@@ -148,8 +161,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
 
         return () => {
-            // We don't necessarily want to close them on Every render, 
-            // but the dependency array [token, user.id] ensures this only runs when auth changes.
             notifWsRef.current?.close();
             chatWsRef.current?.close();
             callWsRef.current?.close();
@@ -165,12 +176,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         try {
             await callsApi.accept(sessionId);
             setIncomingCall(null);
+            // Navigate to call screen with the EXACT roomId from the caller
             router.push({
                 pathname: `/call/${callerId}`,
-                params: { sessionId: String(sessionId), roomId: roomId ? String(roomId) : String(sessionId), isIncoming: 'true', callType, calleeName: callerName, calleePhoto: callerPhoto }
+                params: {
+                    sessionId: String(sessionId),
+                    roomId: roomId,           // This is now always a string (never undefined)
+                    isIncoming: 'true',
+                    callType,
+                    calleeName: callerName,
+                    calleePhoto: callerPhoto ?? '',
+                }
             } as any);
         } catch (err) {
-            console.error('Failed to start call:', err);
+            console.error('Failed to accept call:', err);
             setIncomingCall(null);
         }
     };
@@ -191,19 +210,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         <NotificationContext.Provider value={{ incomingCall, newNotification, activeChatEvent, globalUnreadCount, refreshUnreadCount, clearUnreadCount }}>
             {children}
             {incomingCall && (
-                <Modal transparent visible={!!incomingCall}>
+                <Modal transparent visible={!!incomingCall} statusBarTranslucent>
                     <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill}>
                         <Animated.View entering={SlideInUp} style={styles.incomingModal}>
                             <View style={styles.modalContent}>
-                                <Image source={{ uri: incomingCall.callerPhoto || 'https://via.placeholder.com/100' }} style={styles.avatar} />
+                                {/* Animated avatar pulse */}
+                                <View style={styles.avatarContainer}>
+                                    <View style={styles.avatarRing} />
+                                    <Image
+                                        source={{ uri: incomingCall.callerPhoto || 'https://via.placeholder.com/100' }}
+                                        style={styles.avatar}
+                                    />
+                                </View>
                                 <Text style={styles.name}>{incomingCall.callerName}</Text>
-                                <Text style={styles.type}>Incoming {incomingCall.callType} call...</Text>
+                                <Text style={styles.type}>
+                                    Incoming {incomingCall.callType === 'video' ? '📹 Video' : '📞 Audio'} Call
+                                </Text>
                                 <View style={styles.actions}>
-                                    <TouchableOpacity style={[styles.btn, styles.decline]} onPress={handleDecline}>
+                                    <TouchableOpacity style={[styles.btn, styles.decline]} onPress={handleDecline} activeOpacity={0.8}>
                                         <MaterialCommunityIcons name="phone-hangup" size={32} color="white" />
+                                        <Text style={styles.btnLabel}>Decline</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.btn, styles.accept]} onPress={handleAccept}>
+                                    <TouchableOpacity style={[styles.btn, styles.accept]} onPress={handleAccept} activeOpacity={0.8}>
                                         <MaterialCommunityIcons name="phone" size={32} color="white" />
+                                        <Text style={styles.btnLabel}>Accept</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -223,12 +253,31 @@ export const useNotifications = () => {
 
 const styles = StyleSheet.create({
     incomingModal: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    modalContent: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 40, borderRadius: 30, alignItems: 'center', width: '80%' },
-    avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 20 },
-    name: { fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 10 },
-    type: { fontSize: 16, color: '#9CA3AF', marginBottom: 30 },
+    modalContent: {
+        backgroundColor: 'rgba(15,15,30,0.85)',
+        padding: 40,
+        borderRadius: 30,
+        alignItems: 'center',
+        width: '85%',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    avatarContainer: { position: 'relative', marginBottom: 20, alignItems: 'center', justifyContent: 'center' },
+    avatarRing: {
+        position: 'absolute',
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 3,
+        borderColor: '#10B981',
+        opacity: 0.6,
+    },
+    avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: '#10B981' },
+    name: { fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 8 },
+    type: { fontSize: 16, color: '#9CA3AF', marginBottom: 36 },
     actions: { flexDirection: 'row', gap: 40 },
-    btn: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center' },
+    btn: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center' },
+    btnLabel: { color: 'white', fontSize: 12, marginTop: 4 },
     decline: { backgroundColor: '#EF4444' },
-    accept: { backgroundColor: '#10B981' }
+    accept: { backgroundColor: '#10B981' },
 });
