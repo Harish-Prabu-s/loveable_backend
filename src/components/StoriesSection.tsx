@@ -211,21 +211,41 @@ export default function StoriesSection() {
 
           {(() => {
             const currentStory = activeStoryGroup.stories[activeStoryGroup.currentIndex];
+            
+            // 🔒 Protocol Fixer for individual stories
+            const secureMediaUrl = currentStory.image_url && currentStory.image_url.startsWith('http://') 
+                ? currentStory.image_url.replace('http://', 'https://') 
+                : currentStory.image_url;
+
+            const isVideo = /\.(mp4|webm|mov)$/i.test(secureMediaUrl);
+
             return (
                 <>
-                  {/\.(mp4|webm|mov)$/i.test(currentStory.image_url) ? (
+                  {isVideo ? (
                     <video 
-                        src={currentStory.image_url} 
+                        key={secureMediaUrl} // Force re-mount on URL change
+                        src={secureMediaUrl} 
+                        playsInline
+                        webkit-playsinline="true"
+                        preload="auto"
                         controls={false}
                         autoPlay 
+                        muted={false} // Stories usually have sound
                         onEnded={handleNextStory}
                         className="max-h-screen max-w-full object-contain" 
+                        onError={(e) => {
+                            console.error("Video play error", e);
+                        }}
                     />
                   ) : (
                     <img 
-                      src={currentStory.image_url} 
+                      src={secureMediaUrl} 
                       alt="Story" 
                       className="max-h-screen max-w-full object-contain"
+                      onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/placeholder-media.png'; // Fallback
+                      }}
                     />
                   )}
                   

@@ -6,6 +6,7 @@ import { storiesApi } from '@/api/stories';
 import { notificationsApi } from '@/api/notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ScreenCapture from 'expo-screen-capture';
+import { ensureHttps } from '@/utils/url';
 
 const { width, height } = Dimensions.get('window');
 
@@ -93,7 +94,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.userInfo}>
-                            <Image source={{ uri: story.user_avatar }} style={styles.avatar} />
+                            <Image source={{ uri: ensureHttps(story.user_avatar) as string }} style={styles.avatar} />
                             <Text style={styles.username}>{story.user_display_name}</Text>
                             <Text style={styles.timeText}>2h</Text>
                         </View>
@@ -172,7 +173,7 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
 
                     {/* Media */}
                     <Image
-                        source={{ uri: story.media_url }}
+                        source={{ uri: ensureHttps(story.media_url) as string }}
                         style={styles.media}
                         resizeMode="cover"
                     />

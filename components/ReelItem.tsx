@@ -13,6 +13,7 @@ import { toast } from '@/utils/toast';
 import { CommentSheet } from './CommentSheet';
 import { ShareSheet } from './ShareSheet';
 import { archiveApi } from '@/api/archive';
+import { ensureHttps } from '@/utils/url';
 
 const { height, width } = Dimensions.get('window');
 
@@ -202,7 +203,7 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
                 <Video
                     key={key}
                     ref={videoRef}
-                    source={{ uri: item.video_url }}
+                    source={{ uri: ensureHttps(item.video_url) as string }}
                     style={styles.video}
                     resizeMode={ResizeMode.COVER}
                     isLooping
@@ -289,7 +290,7 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
 
             <View style={styles.bottomInfo}>
                 <View style={styles.userInfo}>
-                    <Image source={{ uri: item.user_avatar || 'https://via.placeholder.com/150' }} style={styles.avatar} />
+                    <Image source={{ uri: ensureHttps(item.user_avatar) || 'https://via.placeholder.com/150' }} style={styles.avatar} />
                     <Text style={[styles.username, { color: '#FFFFFF' }]}>{item.user_display_name}</Text>
                     <TouchableOpacity 
                         style={[styles.followBtn, isFollowing && { backgroundColor: 'rgba(255,255,255,0.2)' }]} 

@@ -56,10 +56,24 @@ export const getProfileAvatarFull = (
     mediaBaseUrl?: string | null,
 ): string => {
     if (photo) {
-        if (photo.startsWith('http://') || photo.startsWith('https://')) return photo;
+        // 🔒 Protocol Fixer: Upgrade HTTP to HTTPS to prevent Mixed Content
+        let targetUrl = photo;
+        if (photo.startsWith('http://')) {
+            targetUrl = photo.replace('http://', 'https://');
+            return targetUrl;
+        }
+        if (photo.startsWith('https://')) return photo;
+
         if (mediaBaseUrl) {
-            const clean = photo.startsWith('/') ? photo : `/${photo}`;
-            return `${mediaBaseUrl}${clean}`;
+            const cleanBase = mediaBaseUrl.endsWith('/') ? mediaBaseUrl.slice(0, -1) : mediaBaseUrl;
+            const cleanPhoto = photo.startsWith('/') ? photo : `/${photo}`;
+            let fullUrl = `${cleanBase}${cleanPhoto}`;
+            
+            // Ensure even constructed URLs are secure if the base starts with http
+            if (fullUrl.startsWith('http://')) {
+                fullUrl = fullUrl.replace('http://', 'https://');
+            }
+            return fullUrl;
         }
     }
     return generateAvatarUrl(seed, gender);
