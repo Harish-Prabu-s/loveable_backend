@@ -37,9 +37,27 @@ def get_or_create_profile(phone: str) -> tuple[User, bool]:
 @permission_classes([AllowAny])
 def health_check(request):
     """
-    Simple health check endpoint to verify connectivity.
+    Simple health check endpoint to verify connectivity and database status.
     """
-    return Response({'status': 'ok', 'message': 'API is reachable', 'ip': request.META.get('REMOTE_ADDR')})
+    db_ok = False
+    db_error = None
+    try:
+        from django.contrib.auth.models import User
+        count = User.objects.count()
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    status_code = status.HTTP_200_OK if db_ok else status.HTTP_500_INTERNAL_SERVER_ERROR
+    
+    return Response({
+        'status': 'ok' if db_ok else 'error',
+        'database': 'connected' if db_ok else 'failed',
+        'db_error': db_error,
+        'message': 'API is reachable',
+        'ip': request.META.get('REMOTE_ADDR'),
+        'timestamp': timezone.now().isoformat()
+    }, status=status_code)
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])

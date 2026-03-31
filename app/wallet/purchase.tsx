@@ -1,15 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    ActivityIndicator, Alert, Modal
+    ActivityIndicator, Alert, Modal, Animated, Dimensions, Platform
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '@/store/authStore';
 import { useWalletStore } from '@/store/walletStore';
 import { walletApi } from '@/api/wallet';
 import { offersApi, Offer } from '@/api/offers';
+import Constants from 'expo-constants';
+
+// Safe WebView import — works whether or not react-native-webview is installed
+let WebView: any;
+try { WebView = require('react-native-webview').WebView; } catch { WebView = null; }
+
+const { width: SCREEN_W } = Dimensions.get('window');
+
+
+// ─── Razorpay Config ──────────────────────────────────────────────────────────
+// Key is loaded from app.json extra or falls back to a placeholder.
+const RAZORPAY_KEY_ID =
+    Constants.expoConfig?.extra?.razorpayKeyId ||
+    'rzp_test_placeholder'; // replace with your key in app.json extra
 
 interface CoinPackage {
     id: number;
@@ -19,381 +34,639 @@ interface CoinPackage {
     bonus?: number;
     popular?: boolean;
     offer_type: string;
+    emoji?: string;
+}
+
+// Fallback packages shown when the API is unavailable
+const FALLBACK_PACKAGES: CoinPackage[] = [
+    { id: 1, title: 'Starter',   coins: 100,  price: 49,  emoji: '🪙',  offer_type: 'coin_package' },
+    { id: 2, title: 'Basic',     coins: 300,  price: 129, emoji: '💰',  offer_type: 'coin_package' },
+    { id: 3, title: 'Pro',       coins: 700,  price: 249, emoji: '💎',  bonus: 50,  popular: true, offer_type: 'coin_package' },
+    { id: 4, title: 'Elite',     coins: 1500, price: 499, emoji: '👑',  bonus: 150, offer_type: 'coin_package' },
+    { id: 5, title: 'Premium',   coins: 3000, price: 899, emoji: '🚀',  bonus: 500, offer_type: 'coin_package' },
+    { id: 6, title: 'Ultimate',  coins: 6500, price: 1799,emoji: '⚡', bonus: 1500, offer_type: 'coin_package' },
+];
+
+// ─── Razorpay WebView HTML ────────────────────────────────────────────────────
+function buildRazorpayHTML(
+    keyId: string,
+    orderId: string,
+    amount: number, // in paise
+    name: string,
+    email: string,
+    phone: string,
+    description: string
+): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body style="margin:0;background:#0F172A;display:flex;align-items:center;justify-content:center;height:100vh;">
+  <p style="color:#9CA3AF;font-family:sans-serif;">Opening Payment Gateway...</p>
+  <script>
+    var options = {
+      key: "${keyId}",
+      amount: ${amount},
+      currency: "INR",
+      name: "Vibely",
+      description: "${description}",
+      order_id: "${orderId}",
+      prefill: {
+        name: "${name}",
+        email: "${email}",
+        contact: "${phone}"
+      },
+      theme: { color: "#6366F1" },
+      modal: { ondismiss: function() { window.ReactNativeWebView.postMessage(JSON.stringify({ status: 'dismissed' })); } },
+      handler: function(response) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          status: 'success',
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_order_id:   response.razorpay_order_id,
+          razorpay_signature:  response.razorpay_signature
+        }));
+      }
+    };
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function(resp) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ status: 'failed', error: resp.error.description }));
+    });
+    rzp.open();
+  </script>
+</body>
+</html>`;
 }
 
 export default function PurchaseCoinsScreen() {
     const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null);
-    const [processing, setProcessing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [packages, setPackages] = useState<CoinPackage[]>([]);
-    const [paymentStatus, setPaymentStatus] = useState<'idle' | 'confirming' | 'verifying' | 'success'>('idle');
+    const [firstTimePackage, setFirstTimePackage] = useState<CoinPackage | null>(null);
+    const [isFirstPurchase, setIsFirstPurchase] = useState(false);
+
+    // Payment flow states
+    const [paymentStep, setPaymentStep] = useState<'idle' | 'creating_order' | 'checkout' | 'verifying' | 'success' | 'error'>('idle');
+    const [razorpayHTML, setRazorpayHTML] = useState<string>('');
+    const [errorMessage, setErrorMessage] = useState('');
+
+    // Animations
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const successScale = useRef(new Animated.Value(0)).current;
 
     const { user } = useAuthStore();
-    const { fetchWallet } = useWalletStore();
-
-    const [isFirstPurchase, setIsFirstPurchase] = useState(false);
-    const [firstTimePackage, setFirstTimePackage] = useState<CoinPackage | null>(null);
-    const [dailyOfferPackage, setDailyOfferPackage] = useState<CoinPackage | null>(null);
+    const { wallet, fetchWallet } = useWalletStore();
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const [wallet, offersRes] = await Promise.all([
-                    walletApi.getWallet(),
-                    offersApi.listOffers()
-                ]);
-
-                setIsFirstPurchase(!wallet.has_purchased);
-
-                const regularPackages: CoinPackage[] = [];
-                let foundFirstTime = null;
-                let foundDaily = null;
-
-                if (offersRes.data) {
-                    offersRes.data.forEach((offer: Offer) => {
-                        const pkg: CoinPackage = {
-                            id: offer.id,
-                            title: offer.title,
-                            coins: offer.coins_awarded,
-                            price: parseFloat(offer.price),
-                            bonus: offer.discount_coins || 0,
-                            popular: offer.title.toLowerCase().includes('pro') || offer.title.toLowerCase().includes('popular'),
-                            offer_type: offer.offer_type
-                        };
-
-                        if (offer.title.toLowerCase().includes('starter') && !wallet.has_purchased) {
-                            foundFirstTime = pkg;
-                        } else if (offer.title.toLowerCase().includes('daily') || offer.title.toLowerCase().includes('offer')) {
-                            foundDaily = pkg;
-                        } else {
-                            regularPackages.push(pkg);
-                        }
-                    });
-                }
-
-                regularPackages.sort((a, b) => a.price - b.price);
-
-                setPackages(regularPackages);
-                setFirstTimePackage(foundFirstTime);
-                setDailyOfferPackage(foundDaily);
-
-            } catch (error) {
-                console.error("Failed to fetch data", error);
-                // Fallback mock data if API fails to load
-                setPackages([
-                    { id: 1, title: 'Basic', coins: 100, price: 99, offer_type: 'coin_package' },
-                    { id: 2, title: 'Pro', coins: 500, price: 399, bonus: 50, popular: true, offer_type: 'coin_package' }
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        loadPackages();
     }, []);
 
-    const handlePurchase = () => {
-        if (!selectedPackage) return;
-        setPaymentStatus('confirming');
-    };
+    useEffect(() => {
+        if (paymentStep === 'success') {
+            Animated.spring(successScale, { toValue: 1, useNativeDriver: true, tension: 80, friction: 5 }).start();
+        }
+    }, [paymentStep]);
 
-    const handleConfirmPayment = async () => {
-        setPaymentStatus('verifying');
+    const loadPackages = async () => {
+        try {
+            setLoading(true);
+            const [walletData, offersRes] = await Promise.all([
+                walletApi.getWallet().catch(() => null),
+                offersApi.listOffers().catch(() => ({ data: [] }))
+            ]);
 
-        // Simulate Payment flow for React Native without native integration
-        setTimeout(async () => {
-            try {
-                // Note: Using a dummy payload for now. Real integration needs react-native-razorpay
-                const dummyResponse = {
-                    razorpay_payment_id: "pay_mock_dummy123",
-                    razorpay_order_id: "order_dummy123",
-                    razorpay_signature: "dummy_sig"
-                };
+            if (walletData) setIsFirstPurchase(!walletData.has_purchased);
 
-                const res = await walletApi.purchase(selectedPackage!.price, selectedPackage!.coins, dummyResponse);
-                if (res) {
-                    await fetchWallet();
-                    setPaymentStatus('success');
-                    Alert.alert('Success', `Successfully purchased ${selectedPackage!.coins} Coins!`);
-                    setTimeout(() => setPaymentStatus('idle'), 2000);
-                }
-            } catch (e) {
-                console.error(e);
-                Alert.alert('Payment Failed', 'Failed to verify payment');
-                setPaymentStatus('idle');
+            const regular: CoinPackage[] = [];
+            let firstTime: CoinPackage | null = null;
+
+            if (offersRes.data?.length > 0) {
+                offersRes.data.forEach((offer: Offer) => {
+                    const pkg: CoinPackage = {
+                        id: offer.id,
+                        title: offer.title,
+                        coins: offer.coins_awarded,
+                        price: parseFloat(offer.price),
+                        bonus: offer.discount_coins || 0,
+                        popular: offer.title.toLowerCase().includes('pro') || offer.title.toLowerCase().includes('popular'),
+                        offer_type: offer.offer_type,
+                    };
+                    if (offer.title.toLowerCase().includes('starter') && !(walletData?.has_purchased)) {
+                        firstTime = pkg;
+                    } else {
+                        regular.push(pkg);
+                    }
+                });
+                regular.sort((a, b) => a.price - b.price);
+                setPackages(regular);
+                setFirstTimePackage(firstTime);
+            } else {
+                setPackages(FALLBACK_PACKAGES);
             }
-        }, 2000);
+        } catch {
+            setPackages(FALLBACK_PACKAGES);
+        } finally {
+            setLoading(false);
+        }
     };
 
+    // ── Step 1: Create Razorpay order on backend ──────────────────────────────
+    const handleBuyNow = async (pkg: CoinPackage) => {
+        setSelectedPackage(pkg);
+        setPaymentStep('creating_order');
+
+        try {
+            // Create the order via our backend (which calls Razorpay API)
+            const orderRes = await walletApi.createOrder(pkg.price);
+
+            if (!orderRes.order_id || !orderRes.key_id) {
+                throw new Error('Order creation failed. Please try again.');
+            }
+
+            const html = buildRazorpayHTML(
+                orderRes.key_id,
+                orderRes.order_id,
+                Math.round(pkg.price * 100), // Convert ₹ → paise
+                user?.display_name || user?.username || 'User',
+                user?.email || '',
+                user?.phone_number || '',
+                `${pkg.coins + (pkg.bonus || 0)} Coins`
+            );
+
+            setRazorpayHTML(html);
+            setPaymentStep('checkout');
+        } catch (err: any) {
+            console.error('[Payment] Order creation failed:', err);
+            setPaymentStep('error');
+            setErrorMessage(err?.response?.data?.error || err?.message || 'Could not initiate payment. Please try again.');
+        }
+    };
+
+    // ── TEST MODE: Skip Razorpay, credit coins directly ───────────────────────
+    // Backend accepts pay_mock_* IDs without signature verification — safe for testing.
+    const handleTestPurchase = async (pkg: CoinPackage) => {
+        setSelectedPackage(pkg);
+        setPaymentStep('verifying');
+        try {
+            await walletApi.purchase(
+                pkg.price,
+                pkg.coins + (pkg.bonus || 0),
+                {
+                    razorpay_payment_id: `pay_mock_test_${Date.now()}`,
+                    razorpay_order_id:   `order_mock_${Date.now()}`,
+                    razorpay_signature:  'mock_signature',
+                }
+            );
+            await fetchWallet();
+            setPaymentStep('success');
+        } catch (err: any) {
+            setPaymentStep('error');
+            setErrorMessage(err?.response?.data?.error || 'Test purchase failed. Is the backend running?');
+        }
+    };
+
+    // ── Step 2: Handle WebView message (Razorpay callback) ───────────────────
+    const handleWebViewMessage = async (event: { nativeEvent: { data: string } }) => {
+        try {
+            const data = JSON.parse(event.nativeEvent.data);
+            console.log('[Payment] Razorpay callback:', data.status);
+
+            if (data.status === 'dismissed') {
+                setPaymentStep('idle');
+                return;
+            }
+
+            if (data.status === 'failed') {
+                setPaymentStep('error');
+                setErrorMessage(data.error || 'Payment failed. Please try again.');
+                return;
+            }
+
+            if (data.status === 'success') {
+                setPaymentStep('verifying');
+                await verifyAndCredit({
+                    razorpay_payment_id: data.razorpay_payment_id,
+                    razorpay_order_id: data.razorpay_order_id,
+                    razorpay_signature: data.razorpay_signature,
+                });
+            }
+        } catch (e) {
+            console.warn('[Payment] Could not parse WebView message');
+        }
+    };
+
+    // ── Step 3: Verify payment + credit coins ─────────────────────────────────
+    const verifyAndCredit = async (paymentData: {
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+    }) => {
+        if (!selectedPackage) return;
+        try {
+            await walletApi.purchase(
+                selectedPackage.price,
+                selectedPackage.coins + (selectedPackage.bonus || 0),
+                paymentData
+            );
+            await fetchWallet();
+            setPaymentStep('success');
+        } catch (err: any) {
+            setPaymentStep('error');
+            setErrorMessage(err?.response?.data?.error || 'Payment verification failed. Contact support.');
+        }
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const renderPackageCard = (pkg: CoinPackage) => {
+        const isSelected = selectedPackage?.id === pkg.id;
+        const totalCoins = pkg.coins + (pkg.bonus || 0);
+
+        return (
+            <TouchableOpacity
+                key={pkg.id}
+                activeOpacity={0.85}
+                onPress={() => setSelectedPackage(pkg)}
+                style={[styles.pkgCard, isSelected && styles.pkgCardSelected, pkg.popular && styles.pkgCardPopular]}
+            >
+                {pkg.popular && (
+                    <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.popularBadge}>
+                        <Text style={styles.popularBadgeText}>⭐ MOST POPULAR</Text>
+                    </LinearGradient>
+                )}
+
+                <Text style={styles.pkgEmoji}>{pkg.emoji || '🪙'}</Text>
+                <Text style={styles.pkgCoins}>{totalCoins.toLocaleString()}</Text>
+                <Text style={styles.pkgCoinsLabel}>COINS</Text>
+
+                {pkg.bonus ? (
+                    <View style={styles.bonusPill}>
+                        <Text style={styles.bonusPillText}>+{pkg.bonus} FREE</Text>
+                    </View>
+                ) : <View style={{ height: 26 }} />}
+
+                <LinearGradient
+                    colors={isSelected ? ['#6366F1', '#8B5CF6'] : ['#1E293B', '#334155']}
+                    style={styles.pricePill}
+                >
+                    <Text style={styles.priceText}>₹{pkg.price}</Text>
+                </LinearGradient>
+
+                {isSelected && (
+                    <View style={styles.selectedCheck}>
+                        <MaterialCommunityIcons name="check" size={12} color="#FFF" />
+                    </View>
+                )}
+
+                {/* 🧪 Test Mode Button — tap to instantly credit without Razorpay */}
+                <TouchableOpacity
+                    style={styles.testBtn}
+                    onPress={(e) => { e.stopPropagation?.(); handleTestPurchase(pkg); }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.testBtnText}>🧪 Test Buy</Text>
+                </TouchableOpacity>
+            </TouchableOpacity>
+        );
+    };
+
+    // ── Loading state ─────────────────────────────────────────────────────────
     if (loading) {
         return (
-            <View style={[styles.container, styles.centerAll]}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#6366F1" />
+                <Text style={styles.loadingText}>Loading packages...</Text>
             </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Buy Coins</Text>
-                <View style={{ width: 40 }} />
-            </View>
+        <View style={styles.root}>
+            <LinearGradient colors={['#0F172A', '#1E1B4B', '#0F172A']} style={StyleSheet.absoluteFill} />
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Hero Section */}
-                <View style={styles.heroCard}>
-                    <View style={styles.heroIconBg}>
-                        <MaterialCommunityIcons name="currency-usd" size={32} color="#FFFFFF" />
+            {/* ── Razorpay Checkout Modal ─────────────────────────────────── */}
+            <Modal
+                visible={paymentStep === 'checkout'}
+                animationType="slide"
+                onRequestClose={() => setPaymentStep('idle')}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+                    <View style={styles.webViewHeader}>
+                        <TouchableOpacity onPress={() => setPaymentStep('idle')} style={styles.closeBtn}>
+                            <MaterialCommunityIcons name="close" size={22} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.webViewTitle}>Secure Payment</Text>
+                        <View style={{ width: 40 }} />
                     </View>
-                    <Text style={styles.heroTitle}>Recharge Wallet</Text>
-                    <Text style={styles.heroSub}>Get coins to make voice & video calls</Text>
-                </View>
+                    <WebView
+                        source={{ html: razorpayHTML }}
+                        onMessage={handleWebViewMessage}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        style={{ flex: 1, backgroundColor: '#0F172A' }}
+                    />
+                </SafeAreaView>
+            </Modal>
 
-                {/* First Time Offer */}
-                {isFirstPurchase && firstTimePackage && (
-                    <View style={styles.offerCard}>
-                        <View style={styles.offerTag}>
-                            <Text style={styles.offerTagText}>FIRST TIME ONLY</Text>
-                        </View>
-                        <View style={styles.offerRow}>
-                            <View>
-                                <Text style={styles.offerTitle}>{firstTimePackage.title}</Text>
-                                <Text style={styles.offerDesc}>Get {firstTimePackage.coins} Coins for just ₹{firstTimePackage.price}!</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.buyBtn}
-                                onPress={() => setSelectedPackage(firstTimePackage)}
-                            >
-                                <Text style={styles.buyBtnText}>Buy Now</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* Daily Offer */}
-                {dailyOfferPackage && (
-                    <View style={styles.dailyCard}>
-                        <View style={styles.offerRow}>
-                            <View>
-                                <Text style={styles.dailyTitle}>Daily Offer (9 AM - 9 PM)</Text>
-                                <Text style={styles.dailyDesc}>{dailyOfferPackage.coins} Coins for ₹{dailyOfferPackage.price}</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[styles.applyBtn, { backgroundColor: '#16A34A' }]}
-                                onPress={() => setSelectedPackage(dailyOfferPackage)}
-                            >
-                                <Text style={styles.applyBtnText}>Apply Offer</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* Packages Grid */}
-                <View style={styles.grid}>
-                    {packages.map((pkg) => {
-                        const isSelected = selectedPackage?.id === pkg.id;
-                        return (
-                            <TouchableOpacity
-                                key={pkg.id}
-                                style={[styles.pkgCard, isSelected && styles.pkgCardSelected]}
-                                onPress={() => setSelectedPackage(pkg)}
-                            >
-                                {pkg.popular && (
-                                    <View style={styles.popularTag}>
-                                        <Text style={styles.popularTagText}>MOST POPULAR</Text>
-                                    </View>
-                                )}
-
-                                <Text style={styles.coinsText}>{pkg.coins}</Text>
-                                <Text style={styles.coinsLabel}>COINS</Text>
-
-                                {pkg.bonus && pkg.bonus > 0 ? (
-                                    <View style={styles.bonusTag}>
-                                        <Text style={styles.bonusText}>+{pkg.bonus} Bonus</Text>
-                                    </View>
-                                ) : (
-                                    <View style={{ height: 24, marginBottom: 12 }} />
-                                )}
-
-                                <View style={styles.priceTag}>
-                                    <Text style={styles.priceText}>₹{pkg.price}</Text>
+            {/* ── Processing / Success / Error Modal ─────────────────────── */}
+            <Modal visible={['creating_order', 'verifying', 'success', 'error'].includes(paymentStep)} transparent animationType="fade">
+                <View style={styles.overlayBg}>
+                    <View style={styles.overlayCard}>
+                        {(paymentStep === 'creating_order' || paymentStep === 'verifying') && (
+                            <>
+                                <ActivityIndicator size="large" color="#6366F1" />
+                                <Text style={styles.overlayTitle}>
+                                    {paymentStep === 'creating_order' ? 'Creating Order...' : 'Verifying Payment...'}
+                                </Text>
+                                <Text style={styles.overlaySubtitle}>Please wait, do not close the app</Text>
+                            </>
+                        )}
+                        {paymentStep === 'success' && (
+                            <Animated.View style={[styles.successBox, { transform: [{ scale: successScale }] }]}>
+                                <LinearGradient colors={['#059669', '#10B981']} style={styles.successIcon}>
+                                    <MaterialCommunityIcons name="check" size={48} color="#FFF" />
+                                </LinearGradient>
+                                <Text style={styles.overlayTitle}>Payment Successful! 🎉</Text>
+                                <Text style={styles.overlaySubtitle}>
+                                    {(selectedPackage?.coins || 0) + (selectedPackage?.bonus || 0)} coins added to your wallet
+                                </Text>
+                                <View style={styles.coinsAwardedRow}>
+                                    <MaterialCommunityIcons name="currency-usd" size={28} color="#F59E0B" />
+                                    <Text style={styles.coinsAwardedText}>
+                                        {wallet?.coin_balance?.toLocaleString() || '—'}
+                                    </Text>
+                                    <Text style={styles.coinsAwardedLabel}>New Balance</Text>
                                 </View>
-
-                                {isSelected && (
-                                    <View style={styles.checkIcon}>
-                                        <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            </ScrollView>
-
-            {/* Payment Bottom Sheet (simplified) */}
-            {selectedPackage && paymentStatus === 'idle' && (
-                <View style={styles.bottomSheet}>
-                    <View style={styles.bottomHeaderRow}>
-                        <View>
-                            <Text style={styles.bottomLabel}>Total to pay</Text>
-                            <Text style={styles.bottomPrice}>₹{selectedPackage.price}</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={styles.bottomLabel}>You get</Text>
-                            <View style={styles.flexRow}>
-                                <MaterialCommunityIcons name="currency-usd" size={16} color="#D97706" />
-                                <Text style={styles.totalCoins}>{selectedPackage.coins + (selectedPackage.bonus || 0)}</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity style={styles.payBtn} onPress={handlePurchase}>
-                        <MaterialCommunityIcons name="credit-card" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={styles.payBtnText}>Pay Securely</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.secureLine}>
-                        <MaterialCommunityIcons name="shield-check" size={12} color="#94A3B8" />
-                        <Text style={styles.secureText}>100% Secure Payment</Text>
-                    </View>
-                </View>
-            )}
-
-            {/* Confirmation Modal */}
-            <Modal visible={paymentStatus === 'confirming' || paymentStatus === 'verifying' || paymentStatus === 'success'} transparent>
-                <View style={styles.modalBg}>
-                    <View style={styles.modalContent}>
-                        {paymentStatus === 'confirming' && (
-                            <>
-                                <Text style={styles.modalTitle}>Confirm Purchase</Text>
-                                <Text style={styles.modalDesc}>Pay ₹{selectedPackage?.price} for {selectedPackage?.coins} coins?</Text>
-                                <TouchableOpacity style={styles.payBtnTextOnly} onPress={handleConfirmPayment}>
-                                    <Text style={styles.payBtnText}>Confirm & Pay</Text>
+                                <TouchableOpacity
+                                    style={styles.doneBtn}
+                                    onPress={() => { setPaymentStep('idle'); router.back(); }}
+                                >
+                                    <Text style={styles.doneBtnText}>Done</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.cancelBtn} onPress={() => setPaymentStatus('idle')}>
-                                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                            </Animated.View>
+                        )}
+                        {paymentStep === 'error' && (
+                            <>
+                                <MaterialCommunityIcons name="alert-circle" size={56} color="#EF4444" />
+                                <Text style={styles.overlayTitle}>Payment Failed</Text>
+                                <Text style={styles.overlaySubtitle}>{errorMessage}</Text>
+                                <TouchableOpacity
+                                    style={[styles.doneBtn, { backgroundColor: '#EF4444' }]}
+                                    onPress={() => setPaymentStep('idle')}
+                                >
+                                    <Text style={styles.doneBtnText}>Try Again</Text>
                                 </TouchableOpacity>
-                            </>
-                        )}
-                        {paymentStatus === 'verifying' && (
-                            <>
-                                <ActivityIndicator size="large" color="#8B5CF6" />
-                                <Text style={styles.modalDesc}>Processing payment...</Text>
-                            </>
-                        )}
-                        {paymentStatus === 'success' && (
-                            <>
-                                <MaterialCommunityIcons name="check-circle" size={48} color="#22C55E" />
-                                <Text style={styles.modalTitle}>Success!</Text>
                             </>
                         )}
                     </View>
                 </View>
             </Modal>
 
-        </SafeAreaView>
+            {/* ── Main Screen ─────────────────────────────────────────────── */}
+            <SafeAreaView style={{ flex: 1 }}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <MaterialCommunityIcons name="arrow-left" size={22} color="#FFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Buy Coins</Text>
+                    {/* Current balance chip */}
+                    <View style={styles.balanceChip}>
+                        <MaterialCommunityIcons name="currency-usd" size={14} color="#F59E0B" />
+                        <Text style={styles.balanceChipText}>{wallet?.coin_balance?.toLocaleString() ?? '—'}</Text>
+                    </View>
+                </View>
+
+                <ScrollView
+                    contentContainerStyle={styles.scroll}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Hero Banner */}
+                    <LinearGradient colors={['#4F46E5', '#7C3AED', '#A855F7']} style={styles.hero} start={[0, 0]} end={[1, 1]}>
+                        <View style={styles.heroGlow} />
+                        <Text style={styles.heroEmoji}>💎</Text>
+                        <Text style={styles.heroTitle}>Power Up Your Experience</Text>
+                        <Text style={styles.heroSub}>Use coins to make voice & video calls,{'\n'}send gifts, and unlock premium features</Text>
+                        <View style={styles.heroStats}>
+                            <View style={styles.heroStat}>
+                                <Text style={styles.heroStatNum}>📞</Text>
+                                <Text style={styles.heroStatLabel}>Voice Calls</Text>
+                            </View>
+                            <View style={styles.heroDivider} />
+                            <View style={styles.heroStat}>
+                                <Text style={styles.heroStatNum}>📹</Text>
+                                <Text style={styles.heroStatLabel}>Video Calls</Text>
+                            </View>
+                            <View style={styles.heroDivider} />
+                            <View style={styles.heroStat}>
+                                <Text style={styles.heroStatNum}>🎁</Text>
+                                <Text style={styles.heroStatLabel}>Gifts</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+
+                    {/* First-Time Offer Banner */}
+                    {isFirstPurchase && firstTimePackage && (
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => handleBuyNow(firstTimePackage)}
+                            style={styles.firstTimeCard}
+                        >
+                            <LinearGradient colors={['#EC4899', '#F43F5E']} style={styles.firstTimeGrad}>
+                                <View style={styles.firstTimeBadge}>
+                                    <Text style={styles.firstTimeBadgeText}>🔥 FIRST PURCHASE OFFER</Text>
+                                </View>
+                                <View style={styles.firstTimeRow}>
+                                    <View>
+                                        <Text style={styles.firstTimeTitle}>{firstTimePackage.title}</Text>
+                                        <Text style={styles.firstTimeDesc}>
+                                            {firstTimePackage.coins + (firstTimePackage.bonus || 0)} Coins for just ₹{firstTimePackage.price}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.firstTimeBuyBtn}>
+                                        <Text style={styles.firstTimeBuyText}>Buy Now</Text>
+                                    </View>
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Packages Grid */}
+                    <Text style={styles.sectionTitle}>Choose a Package</Text>
+                    <View style={styles.grid}>
+                        {packages.map(renderPackageCard)}
+                    </View>
+
+                    {/* Trust Badges */}
+                    <View style={styles.trustRow}>
+                        {[
+                            { icon: 'shield-check', label: '100% Secure' },
+                            { icon: 'bank', label: 'Bank Transfer' },
+                            { icon: 'refresh', label: 'Instant Credit' },
+                        ].map(({ icon, label }) => (
+                            <View key={label} style={styles.trustItem}>
+                                <MaterialCommunityIcons name={icon as any} size={20} color="#6366F1" />
+                                <Text style={styles.trustLabel}>{label}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    <Text style={styles.disclaimer}>
+                        Payments secured by Razorpay. All transactions are encrypted.
+                    </Text>
+                </ScrollView>
+
+                {/* Bottom CTA — only shown when a package is selected */}
+                {selectedPackage && (
+                    <View style={styles.bottomBar}>
+                        <View style={styles.bottomInfo}>
+                            <Text style={styles.bottomLabel}>Selected:</Text>
+                            <Text style={styles.bottomPkg}>
+                                {selectedPackage.emoji} {(selectedPackage.coins + (selectedPackage.bonus || 0)).toLocaleString()} Coins
+                            </Text>
+                        </View>
+                        <View style={styles.bottomRight}>
+                            <Text style={styles.bottomPrice}>₹{selectedPackage.price}</Text>
+                            <TouchableOpacity
+                                style={styles.buyBtn}
+                                onPress={() => handleBuyNow(selectedPackage)}
+                                activeOpacity={0.85}
+                            >
+                                <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.buyBtnGrad}>
+                                    <MaterialCommunityIcons name="credit-card-fast" size={18} color="#FFF" />
+                                    <Text style={styles.buyBtnText}>Pay Securely</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FAFAFA' },
-    centerAll: { justifyContent: 'center', alignItems: 'center' },
+    root: { flex: 1, backgroundColor: '#0F172A' },
+    loadingContainer: { flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' },
+    loadingText: { color: '#9CA3AF', marginTop: 12, fontSize: 14 },
+
+    // Header
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        padding: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9'
+        paddingHorizontal: 16, paddingVertical: 12,
     },
-    backBtn: { padding: 8 },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
-    scrollContent: { padding: 16, paddingBottom: 120 },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+    balanceChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
+    balanceChipText: { color: '#F59E0B', fontWeight: '700', fontSize: 13 },
 
-    heroCard: {
-        backgroundColor: '#F59E0B',
-        borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 24
-    },
-    heroIconBg: {
-        backgroundColor: 'rgba(255,255,255,0.2)', width: 64, height: 64,
-        borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 12
-    },
-    heroTitle: { fontSize: 24, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
-    heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.9)' },
+    scroll: { paddingHorizontal: 16, paddingBottom: 130 },
 
-    offerCard: {
-        backgroundColor: '#EC4899', borderRadius: 16, padding: 16, marginBottom: 24,
-        position: 'relative'
-    },
-    offerTag: {
-        position: 'absolute', top: 0, right: 0, backgroundColor: '#FACC15',
-        paddingHorizontal: 8, paddingVertical: 4, borderBottomLeftRadius: 8, borderTopRightRadius: 16
-    },
-    offerTagText: { fontSize: 10, fontWeight: '800', color: '#000000' },
-    offerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    offerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
-    offerDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4 },
-    buyBtn: { backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-    buyBtnText: { color: '#EC4899', fontWeight: '700', fontSize: 14 },
+    // Hero
+    hero: { borderRadius: 24, padding: 24, marginBottom: 20, overflow: 'hidden', position: 'relative' },
+    heroGlow: { position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.07)' },
+    heroEmoji: { fontSize: 40, marginBottom: 8 },
+    heroTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginBottom: 6 },
+    heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 20, marginBottom: 20 },
+    heroStats: { flexDirection: 'row', alignItems: 'center' },
+    heroStat: { flex: 1, alignItems: 'center' },
+    heroStatNum: { fontSize: 24, marginBottom: 2 },
+    heroStatLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600' },
+    heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
 
-    dailyCard: {
-        backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1,
-        borderRadius: 16, padding: 16, marginBottom: 24
-    },
-    dailyTitle: { fontSize: 14, fontWeight: '700', color: '#065F46' },
-    dailyDesc: { fontSize: 12, color: '#047857', marginTop: 2 },
-    applyBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    applyBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+    // First time
+    firstTimeCard: { marginBottom: 20, borderRadius: 20, overflow: 'hidden' },
+    firstTimeGrad: { padding: 16 },
+    firstTimeBadge: { backgroundColor: '#FBBF24', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 10 },
+    firstTimeBadgeText: { color: '#000', fontSize: 10, fontWeight: '800' },
+    firstTimeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    firstTimeTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+    firstTimeDesc: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 3 },
+    firstTimeBuyBtn: { backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+    firstTimeBuyText: { color: '#EC4899', fontWeight: '800', fontSize: 14 },
 
-    grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    // Section
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#E2E8F0', marginBottom: 14 },
+
+    // Grid
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
     pkgCard: {
-        width: '48%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
-        alignItems: 'center', marginBottom: 16, borderWidth: 2, borderColor: 'transparent',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05,
-        elevation: 2, position: 'relative'
+        width: (SCREEN_W - 44) / 2,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 20,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.08)',
+        position: 'relative',
+        overflow: 'hidden',
     },
-    pkgCardSelected: { borderColor: '#8B5CF6', backgroundColor: '#F5F3FF' },
-    popularTag: {
-        position: 'absolute', top: -10, backgroundColor: '#EF4444',
-        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12
+    pkgCardSelected: { borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.12)' },
+    pkgCardPopular: { borderColor: '#8B5CF6' },
+    popularBadge: { position: 'absolute', top: 0, left: 0, right: 0, paddingVertical: 5, alignItems: 'center' },
+    popularBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+    pkgEmoji: { fontSize: 32, marginTop: 16, marginBottom: 6 },
+    pkgCoins: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
+    pkgCoinsLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8', marginBottom: 6 },
+    bonusPill: { backgroundColor: 'rgba(16,185,129,0.2)', borderWidth: 1, borderColor: '#10B981', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginBottom: 10 },
+    bonusPillText: { color: '#10B981', fontSize: 10, fontWeight: '700' },
+    pricePill: { borderRadius: 10, paddingHorizontal: 18, paddingVertical: 8, marginTop: 4 },
+    priceText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+    selectedCheck: { position: 'absolute', top: 8, right: 8, backgroundColor: '#6366F1', borderRadius: 10, padding: 3 },
+    testBtn: {
+        marginTop: 10, backgroundColor: 'rgba(234,179,8,0.15)', borderWidth: 1,
+        borderColor: 'rgba(234,179,8,0.4)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
     },
-    popularTagText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-    coinsText: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-    coinsLabel: { fontSize: 10, fontWeight: '700', color: '#64748B', marginBottom: 8 },
-    bonusTag: { backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 12 },
-    bonusText: { color: '#166534', fontSize: 10, fontWeight: '700' },
-    priceTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-    priceText: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-    checkIcon: {
-        position: 'absolute', top: 8, right: 8, backgroundColor: '#8B5CF6',
-        borderRadius: 10, padding: 2
-    },
+    testBtnText: { color: '#EAB308', fontSize: 11, fontWeight: '700' },
 
-    bottomSheet: {
+    // Trust
+    trustRow: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 16, marginBottom: 16 },
+    trustItem: { alignItems: 'center', gap: 6 },
+    trustLabel: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+    disclaimer: { color: '#475569', fontSize: 11, textAlign: 'center', lineHeight: 16 },
+
+    // Bottom bar
+    bottomBar: {
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: '#FFFFFF', padding: 24, borderTopLeftRadius: 32, borderTopRightRadius: 32,
-        shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10,
-        elevation: 20
+        backgroundColor: 'rgba(15,23,42,0.97)',
+        borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+        paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 28,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     },
-    bottomHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-    bottomLabel: { fontSize: 12, color: '#64748B', marginBottom: 4 },
-    bottomPrice: { fontSize: 28, fontWeight: '800', color: '#0F172A' },
-    flexRow: { flexDirection: 'row', alignItems: 'center' },
-    totalCoins: { fontSize: 20, fontWeight: '800', color: '#D97706' },
-    payBtn: {
-        backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        padding: 16, borderRadius: 16
-    },
-    payBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    secureLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-    secureText: { fontSize: 10, color: '#94A3B8', marginLeft: 4 },
+    bottomInfo: { flex: 1 },
+    bottomLabel: { color: '#64748B', fontSize: 11 },
+    bottomPkg: { color: '#FFFFFF', fontWeight: '700', fontSize: 15, marginTop: 2 },
+    bottomRight: { alignItems: 'flex-end', gap: 6 },
+    bottomPrice: { color: '#F59E0B', fontWeight: '800', fontSize: 20 },
+    buyBtn: { borderRadius: 14, overflow: 'hidden' },
+    buyBtnGrad: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12 },
+    buyBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
 
-    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-    modalContent: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 16, alignItems: 'center', width: '100%' },
-    modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-    modalDesc: { color: '#64748B', marginBottom: 24, textAlign: 'center' },
-    payBtnTextOnly: { backgroundColor: '#8B5CF6', width: '100%', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
-    cancelBtn: { padding: 14, width: '100%', alignItems: 'center' },
-    cancelBtnText: { color: '#64748B', fontWeight: '600' }
+    // WebView modal header
+    webViewHeader: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 14,
+        backgroundColor: '#1E293B', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+    },
+    webViewTitle: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+
+    // Overlay
+    overlayBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    overlayCard: {
+        backgroundColor: '#1E293B', borderRadius: 28, padding: 32, width: '100%',
+        alignItems: 'center', gap: 12,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    },
+    overlayTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+    overlaySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+    successBox: { width: '100%', alignItems: 'center', gap: 12 },
+    successIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+    coinsAwardedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245,158,11,0.1)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, marginTop: 4 },
+    coinsAwardedText: { fontSize: 24, fontWeight: '800', color: '#F59E0B' },
+    coinsAwardedLabel: { fontSize: 12, color: '#94A3B8' },
+    doneBtn: { backgroundColor: '#6366F1', borderRadius: 14, paddingHorizontal: 40, paddingVertical: 14, marginTop: 8, width: '100%', alignItems: 'center' },
+    doneBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });

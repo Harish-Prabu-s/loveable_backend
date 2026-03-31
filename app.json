@@ -45,6 +45,7 @@
       "bundler": "metro"
     },
     "extra": {
+      "razorpayKeyId": "rzp_test_SNqKlEWV9NSYuU",
       "signalingUrl": "wss://loveable.sbs/api",
       "apiUrl": "https://loveable.sbs/api",
       "note": "Update apiUrl with your machine's local IP address for mobile testing",

@@ -13,22 +13,41 @@ class AuthDebugMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
     def __call__(self, request):
-        auth = request.META.get('HTTP_AUTHORIZATION', 'NONE')
-        # Only log first 20 chars of token for security
-        bearer = auth[:20] if len(auth) > 20 else auth
-        print(f"AG_DEBUG: [{request.method}] {request.path} | Auth: {bearer}")
-        response = self.get_response(request)
-        print(f"AG_DEBUG: Response: {response.status_code}")
-        # If 401, check if user was authenticated
-        if response.status_code == 401:
-            print(f"AG_DEBUG: 401 Detail - User: {request.user}")
-        return response
+        try:
+            auth = request.META.get('HTTP_AUTHORIZATION', 'NONE')
+            # Only log first 20 chars of token for security
+            bearer = auth[:20] if len(auth) > 20 else auth
+            print(f"AG_DEBUG: [{request.method}] {request.path} | Auth: {bearer}")
+        except Exception as e:
+            print(f"AG_DEBUG_ERR: Pre-request logging failed: {e}")
+
+        try:
+            response = self.get_response(request)
+            
+            # Safe access to response status
+            status_code = getattr(response, 'status_code', 'UNKNOWN')
+            print(f"AG_DEBUG: Response: {status_code}")
+            
+            # If 401/500, check if user was authenticated safely
+            if status_code in (401, 500):
+                user_info = "N/A"
+                if hasattr(request, 'user'):
+                    user_info = str(request.user)
+                print(f"AG_DEBUG: {status_code} Detail - User: {user_info}")
+                
+            return response
+        except Exception as e:
+            import traceback
+            print(f"AG_DEBUG_CRITICAL: Request failed with error: {e}")
+            traceback.print_exc()
+            raise # Re-raise to let Django handle the 500 properly
 # -----------------------------
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')
 DEBUG = True
-ALLOWED_HOSTS = ['*', '74.220.48.249', '192.168.1.4', '10.130.45.184']
+ALLOWED_HOSTS = ['*', 'loveable.sbs', '72.62.195.63', '74.220.48.249', '192.168.1.4', '10.130.45.184']
 CSRF_TRUSTED_ORIGINS = [
+    'https://loveable.sbs',
     'https://*.ngrok-free.dev',
     'https://berneice-untransmigrated-exotically.ngrok-free.dev'
 ]
@@ -84,9 +103,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'vibely_backend.wsgi.application'
 ASGI_APPLICATION = 'vibely_backend.asgi.application'
 
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            # Separate namespace so channel messages don't collide with cache keys
+            "prefix": "vibely",
+            # Expire stale channel groups after 24h
+            "group_expiry": 86400,
+            # Cap channel message queue at 100 to prevent memory bloat
+            "capacity": 100,
+        },
     },
 }
 
@@ -98,6 +128,9 @@ DATABASES = {
         'PASSWORD': 'Harish@123',
         'HOST': '72.62.195.63',
         'PORT': '3306',
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
     }
 }
 

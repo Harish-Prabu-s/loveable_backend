@@ -1,44 +1,136 @@
-services:
-  db:
-    image: postgres:15
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: vibely
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+version: "3.9"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Vibely — Production Docker Compose
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   Development:  docker compose up
+#   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Key env vars to override in production:
+#   ANNOUNCED_IP        — server's public IP for mediasoup
+#   TURN_STATIC_SECRET  — HMAC secret shared between backend and coturn
+#   DJANGO_SECRET_KEY   — Django secret (must match SFU_JWT_SECRET)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       vibely
+      POSTGRES_USER:     vibely_user
+      POSTGRES_PASSWORD: vibely_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibely_user -d vibely"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Django Backend ─────────────────────────────────────────────────────────
   backend:
-    build: 
+    build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
     volumes:
       - ./backend:/app
+      - backend_media:/app/media
     environment:
       - DB_HOST=db
-      - REDIS_HOST=redis
-    depends_on:
-      - db
-      - redis
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key}
+      - TURN_STATIC_SECRET=${TURN_STATIC_SECRET:-CHANGEME_SECURE_SECRET}
+      - TURN_HOST=${TURN_HOST:-loveable.sbs}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - DEBUG=${DEBUG:-True}
     ports:
       - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # ── mediasoup SFU ─────────────────────────────────────────────────────────
   sfu:
     build:
       context: ./sfu-server
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
-      - ANNOUNCED_IP=127.0.0.1
-    network_mode: "host" # Mediasoup works best with host network for RTP port management
-    # Alternately, expose entire port range if not using host mode
+      - ANNOUNCED_IP=${ANNOUNCED_IP:-127.0.0.1}
+      - SFU_PORT=3001
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key}
+      - MAX_PARTICIPANTS=25
+      - RTC_MIN_PORT=40000
+      - RTC_MAX_PORT=49999
+      - MEDIASOUP_LOG_LEVEL=${MEDIASOUP_LOG_LEVEL:-warn}
+    # host network is required for mediasoup UDP port range to work correctly.
+    # Without this, ICE candidates won't include the right IP and peers won't connect.
+    network_mode: "host"
+    # To use bridge mode instead (less efficient):
     # ports:
-    #   - "3000:3000"
-    #   - "40000-40100:40000-40100/udp"
+    #   - "3001:3001"
+    #   - "40000-49999:40000-49999/udp"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Coturn (TURN Server) ───────────────────────────────────────────────────
+  # Uncomment when you have a domain and TLS certificate
+  # coturn:
+  #   image: coturn/coturn:latest
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   volumes:
+  #     - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+  #     - /etc/letsencrypt:/etc/letsencrypt:ro
+  #   command: -c /etc/coturn/turnserver.conf
+  #   healthcheck:
+  #     test: ["CMD", "turnutils_uclient", "-t", "127.0.0.1"]
+  #     interval: 30s
+  #     timeout: 10s
 
 volumes:
+  redis_data:
   postgres_data:
+  backend_media:

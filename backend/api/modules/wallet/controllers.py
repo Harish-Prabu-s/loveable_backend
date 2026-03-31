@@ -235,3 +235,45 @@ def transfer_view(request):
     )
     
     return Response({'success': True, 'new_balance': sender_wallet.coin_balance})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_credit_view(request):
+    """
+    POST /api/wallet/seed-coins/
+    Admin-only: Adds 'coins' to every user's wallet instantly.
+    Useful for testing calls without going through payment.
+
+    Body: { "coins": 1000, "description": "Test credit" }  (optional fields)
+    """
+    if not request.user.is_staff:
+        return Response({'error': 'Admin only.'}, status=403)
+
+    coins = int(request.data.get('coins', 500))
+    description = request.data.get('description', 'Admin seed credit')
+
+    if coins <= 0:
+        return Response({'error': 'coins must be > 0'}, status=400)
+
+    wallets = Wallet.objects.all()
+    updated = 0
+    for w in wallets:
+        w.coin_balance = F('coin_balance') + coins
+        w.total_earned = F('total_earned') + coins
+        w.save(update_fields=['coin_balance', 'total_earned'])
+        CoinTransaction.objects.create(
+            wallet=w,
+            type='credit',
+            transaction_type='earned',
+            amount=coins,
+            description=description
+        )
+        updated += 1
+
+    return Response({
+        'success': True,
+        'wallets_updated': updated,
+        'coins_added_each': coins,
+        'message': f'Added {coins} coins to {updated} user wallets.'
+    })

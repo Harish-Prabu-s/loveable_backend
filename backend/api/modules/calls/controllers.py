@@ -1,3 +1,8 @@
+import hmac
+import hashlib
+import base64
+import time
+import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -77,6 +82,7 @@ class EndCallView(APIView):
         return Response(result)
 
 
+
 class CallLogsView(APIView):
     """GET /api/calls/logs/ — call history for the current user."""
 
@@ -86,3 +92,52 @@ class CallLogsView(APIView):
             .filter(caller=request.user) | CallSession.objects.filter(callee=request.user)
         ).order_by('-started_at')[:50]
         return Response(CallSessionSerializer(sessions, many=True).data)
+
+
+class TurnCredentialsView(APIView):
+    """
+    GET /api/calls/turn-credentials/
+
+    Generates time-limited HMAC-SHA1 credentials for Coturn.
+    Credentials expire after TTL seconds (default 24h).
+    Coturn must be configured with: use-auth-secret + static-auth-secret
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        turn_secret = os.environ.get('TURN_STATIC_SECRET', 'CHANGEME_SECURE_SECRET_RANDOM_STRING')
+        turn_host   = os.environ.get('TURN_HOST', 'loveable.sbs')
+
+        # Credentials valid for 24 hours
+        ttl = 24 * 3600
+        timestamp = int(time.time()) + ttl
+        username = f"{timestamp}:{request.user.id}"
+
+        # HMAC-SHA1 — the algorithm Coturn expects with use-auth-secret
+        raw = hmac.new(
+            turn_secret.encode('utf-8'),
+            username.encode('utf-8'),
+            hashlib.sha1
+        ).digest()
+        credential = base64.b64encode(raw).decode('utf-8')
+
+        ice_servers = [
+            # Fast STUN paths (no relay, free)
+            {'urls': 'stun:stun.l.google.com:19302'},
+            {'urls': 'stun:stun1.l.google.com:19302'},
+            # Self-hosted TURN: UDP primary, TCP fallback, TLS secured fallback
+            {
+                'urls': [
+                    f'turn:{turn_host}:3478?transport=udp',
+                    f'turn:{turn_host}:3478?transport=tcp',
+                    f'turns:{turn_host}:5349?transport=tcp',  # TLS — penetrates strict firewalls
+                ],
+                'username': username,
+                'credential': credential,
+            },
+        ]
+
+        return Response({
+            'iceServers': ice_servers,
+            'ttl': ttl,
+        })

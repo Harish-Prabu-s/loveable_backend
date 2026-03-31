@@ -7,6 +7,12 @@ export const walletApi = {
     return response.data;
   },
 
+  // Creates a Razorpay order on the backend. Returns { order_id, key_id }.
+  createOrder: async (amount: number, currency = 'INR'): Promise<{ order_id: string; key_id: string }> => {
+    const response = await apiClient.post('wallet/create_order/', { amount, currency });
+    return response.data;
+  },
+
   getTransactions: async (): Promise<PaginatedResponse<CoinTransaction>> => {
     const response = await apiClient.get('wallet/transactions/');
     const data = response.data;
