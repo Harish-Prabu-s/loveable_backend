@@ -275,3 +275,7 @@ FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '')
 #    - Enable 'AUTH_PASSWORD_VALIDATORS'.
 #    - Set 'SECURE_SSL_REDIRECT = True' and use proper 'CORS_ALLOWED_ORIGINS'.
 # ==============================================================================
+
+# Allow Large Video Reels Uploads
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
