@@ -22,6 +22,7 @@ export interface User {
   app_lock_value?: string;
   biometrics_enabled?: boolean;
   face_unlock_enabled?: boolean;
+  password?: string;
 }
 
 export interface Profile {

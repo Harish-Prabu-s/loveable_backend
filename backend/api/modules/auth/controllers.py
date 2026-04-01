@@ -390,6 +390,10 @@ def update_profile_view(request):
     if 'language' in data:
         p.language = data['language']
         
+    if 'password' in data and data['password']:
+        request.user.set_password(data['password'])
+        request.user.save()
+        
     p.save()
     
     return Response({

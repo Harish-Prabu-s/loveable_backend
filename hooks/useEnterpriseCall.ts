@@ -19,7 +19,19 @@ if (Platform.OS !== "web") {
     global.RTCPeerConnection = webrtc.RTCPeerConnection;
     global.RTCIceCandidate = webrtc.RTCIceCandidate;
     global.RTCSessionDescription = webrtc.RTCSessionDescription;
-    global.navigator.mediaDevices = webrtc.mediaDevices;
+    const nav = global.navigator as any;
+    if (nav) {
+      if (!nav.mediaDevices) {
+        Object.defineProperty(nav, 'mediaDevices', {
+          value: webrtc.mediaDevices,
+          configurable: true,
+          writable: true,
+          enumerable: true
+        });
+      }
+    } else {
+      (global as any).navigator = { mediaDevices: webrtc.mediaDevices };
+    }
 
     const icm = require("@videosdk.live/react-native-incallmanager");
     InCallManager = icm.default ?? icm;
