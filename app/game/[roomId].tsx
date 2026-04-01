@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import apiClient from '@/api/client';
 
 type GameState = 'Lobby' | 'Waiting' | 'TurnAssigned' | 'ActionPending' | 'VotingState' | 'ResultState';
 type WSMessage = {
@@ -34,8 +35,9 @@ export default function GameRoomScreen() {
 
     useEffect(() => {
         if (!roomId) return;
-        // In a real app, use the env WS_URL
-        const wsUrl = `wss://loveable.sbs/api/ws/game/${roomId}/`;
+        const urlObj = new URL(apiClient.defaults.baseURL || 'https://loveable.sbs/api/');
+        const protocol = urlObj.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${protocol}://${urlObj.host}/ws/game/${roomId}/`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
