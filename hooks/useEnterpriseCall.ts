@@ -96,7 +96,7 @@ export function useEnterpriseCall(roomId: string) {
         socket.emit('joinRoom', { 
             roomId, 
             userId: user.id,
-            profileData: { displayName: user.displayName, photo: user.photo }
+            profileData: { displayName: user.display_name, photo: user.photo }
         }, async (response: any) => {
           if (response.error) {
             console.error('[SFU] Join Room Error:', response.error);
