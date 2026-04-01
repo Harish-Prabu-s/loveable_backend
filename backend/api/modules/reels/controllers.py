@@ -9,6 +9,7 @@ from .services import (
 )
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
+from ...utils import strip_base_url
 import uuid
 import os
 
@@ -54,7 +55,11 @@ def create_reel_view(request):
     visibility = request.data.get('visibility', 'all')
     if not video_url:
         return Response({'error': 'video_url required'}, status=400)
-    reel = create_reel(request.user, video_url, caption, visibility)
+    
+    # Ensure we store relative path in DB
+    relative_video_path = strip_base_url(video_url)
+    
+    reel = create_reel(request.user, relative_video_path, caption, visibility)
     return Response(ReelSerializer(reel, context={'request': request}).data, status=201)
 
 @api_view(['POST'])

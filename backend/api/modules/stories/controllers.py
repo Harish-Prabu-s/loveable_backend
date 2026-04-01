@@ -6,6 +6,7 @@ from .services import create_story, record_view, get_story_views
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 from ...models import Story
+from ...utils import strip_base_url
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -25,7 +26,10 @@ def create_story_view(request):
     if not media_url:
         return Response({'error': 'media_url required'}, status=400)
     
-    story = create_story(request.user, media_url, media_type, visibility, caption)
+    # Ensure we store relative path in DB
+    relative_media_path = strip_base_url(media_url)
+    
+    story = create_story(request.user, relative_media_path, media_type, visibility, caption)
     return Response(StorySerializer(story, context={'request': request}).data, status=201)
 
 from rest_framework.parsers import MultiPartParser, FormParser
