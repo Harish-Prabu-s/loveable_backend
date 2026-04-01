@@ -69,7 +69,8 @@
             "edgeToEdgeEnabled": false
           }
         }
-      ]
+      ],
+      "expo-video"
     ],
     "owner": "prabu2003"
   }

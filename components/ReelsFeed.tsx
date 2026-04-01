@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
-import { Video, ResizeMode, Audio } from 'expo-av';
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { reelsApi, Reel } from '@/api/reels';
 import { profilesApi } from '@/api/profiles';
