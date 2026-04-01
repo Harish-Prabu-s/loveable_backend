@@ -29,13 +29,13 @@ export class WebSocketClient {
         const configSignalingUrl = BASE_URL; // e.g. https://loveable.sbs/api/
         const protocol = configSignalingUrl.startsWith('https') ? 'wss' : 'ws';
         
-        // Extract domain and full path, ensuring we don't double up on slashes
-        const domainAndPath = configSignalingUrl.replace(/^(wss?|https?):\/\//, '').replace(/\/+$/, '');
+        // Use URL to extract just the host (excluding path prefixes like /api)
+        const urlObj = new URL(configSignalingUrl);
+        const host = urlObj.host;
         
-        // The resulting URL will be wss://loveable.sbs/api/ws/notifications/2/?token=...
-        // The token is REQUIRED by the backend's JWTAuthMiddleware
+        // Connect directly to the websocket routes at the root, rather than passing through HTTP API prefix routes
         const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        this.url = `${protocol}://${domainAndPath}${path}${userId}/${tokenParam}`;
+        this.url = `${protocol}://${host}${path}${userId}/${tokenParam}`;
 
         // Watch for App State changes to reconnect when moving to foreground
         this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);

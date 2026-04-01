@@ -48,9 +48,12 @@ export default function MatchmakingScreen() {
         }
     };
 
-    const startRandomMatch = (playerMode: '2p' | '4p') => {
+    const startRandomMatch = async (playerMode: '2p' | '4p') => {
         setStatus('searching');
-        const wsUrl = `wss://loveable.sbs/api/ws/matchmaking/`;
+        const urlObj = new URL(apiClient.defaults.baseURL || 'https://loveable.sbs/api/');
+        const protocol = urlObj.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${protocol}://${urlObj.host}/ws/matchmaking/`;
+        
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
