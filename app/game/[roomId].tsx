@@ -37,7 +37,8 @@ export default function GameRoomScreen() {
         if (!roomId) return;
         const urlObj = new URL(apiClient.defaults.baseURL || 'https://loveable.sbs/api/');
         const protocol = urlObj.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${protocol}://${urlObj.host}/ws/game/${roomId}/`;
+        const pathPrefix = urlObj.pathname.replace(/\/+$/, '');
+        const wsUrl = `${protocol}://${urlObj.host}${pathPrefix}/ws/game/${roomId}/`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
