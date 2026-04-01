@@ -91,7 +91,8 @@ export default function CreateReel({ visible, onClose, onCreated }) {
             });
 
             if (!uploadRes.ok) {
-                throw new Error('Upload failed');
+                const errorText = await uploadRes.text();
+                throw new Error(`Upload failed HTTP ${uploadRes.status}: ${errorText}`);
             }
 
             const data = await uploadRes.json();
@@ -105,9 +106,9 @@ export default function CreateReel({ visible, onClose, onCreated }) {
             setVisibility('all');
             if (onCreated) onCreated();
             onClose();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Failed to upload reel');
+            alert(`Failed to upload reel: ${e?.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
