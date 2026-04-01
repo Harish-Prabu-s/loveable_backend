@@ -65,9 +65,6 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
             timer = setInterval(() => {
                 setProgress((prev) => {
                     if (prev >= 1) {
-                        clearInterval(timer);
-                        if (onNext) onNext();
-                        else onClose();
                         return 1;
                     }
                     return prev + 0.05; // 5% every 250ms -> 5 seconds total
@@ -76,6 +73,14 @@ export default function StoryViewer({ visible, story, onClose, onNext, onPrev, o
         }
         return () => clearInterval(timer);
     }, [visible, story]);
+
+    // Handle progress completion as a side effect
+    useEffect(() => {
+        if (progress >= 1 && visible) {
+            if (onNext) onNext();
+            else onClose();
+        }
+    }, [progress, visible, onNext, onClose]);
 
     if (!visible || !story) return null;
 

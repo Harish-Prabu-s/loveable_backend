@@ -16,7 +16,8 @@ class TraceMiddleware:
         path = scope.get('path', 'unknown')
         if "ws" in path:
             headers = {k.decode(): v.decode() for k, v in scope.get('headers', [])}
-            print(f"[TRACE] {scope['type'].upper()} request on {path}")
+            version = scope.get('http_version', 'unknown')
+            print(f"[TRACE] {scope['type'].upper()} request on {path} | Version: {version}")
             print(f"[TRACE] Headers: {headers}")
         return await self.inner(scope, receive, send)
 
