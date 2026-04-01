@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import { useTheme } from '@/context/ThemeContext';
-import { Video, ResizeMode, Audio } from 'expo-av';
+import { Audio } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEvent } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AnimatePresence } from 'moti';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,12 +22,29 @@ const { height, width } = Dimensions.get('window');
 export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel, isVisible: boolean, isFocused: boolean, onDelete: (id: number) => void }) => {
     const { colors, isDark } = useTheme();
     const router = useRouter();
-    const videoRef = useRef<Video>(null);
     const [isPlaying, setIsPlaying] = useState(isVisible);
     const [isMuted, setIsMuted] = useState(false);
     const [isLiked, setIsLiked] = useState(item.is_liked);
     const [likesCount, setLikesCount] = useState(item.likes_count);
     const [isLoading, setIsLoading] = useState(true);
+
+    const player = useVideoPlayer(ensureHttps(item.video_url) as string, player => {
+        player.loop = true;
+        player.muted = isMuted;
+    });
+
+    const { status } = useEvent(player, 'statusChange', { status: player.status });
+
+    useEffect(() => {
+        if (status === 'readyToPlay') {
+            setIsLoading(false);
+        } else if (status === 'error') {
+            setError('Failed to load video');
+            setIsLoading(false);
+        } else if (status === 'loading') {
+            setIsLoading(true);
+        }
+    }, [status]);
     const [isFollowing, setIsFollowing] = useState(false);
     
     const [showComments, setShowComments] = useState(false);
@@ -49,12 +68,16 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
     useEffect(() => {
         if (isVisible && isFocused) {
             setIsPlaying(true);
-            videoRef.current?.playAsync();
+            player.play();
         } else {
             setIsPlaying(false);
-            videoRef.current?.pauseAsync();
+            player.pause();
         }
-    }, [isVisible, isFocused]);
+    }, [isVisible, isFocused, player]);
+
+    useEffect(() => {
+        player.muted = isMuted;
+    }, [isMuted, player]);
 
     const handleLike = async () => {
         const previousState = isLiked;
@@ -189,10 +212,10 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
 
     const togglePlayPause = () => {
         if (isPlaying) {
-            videoRef.current?.pauseAsync();
+            player.pause();
             setIsPlaying(false);
         } else {
-            videoRef.current?.playAsync();
+            player.play();
             setIsPlaying(true);
         }
     };
@@ -200,26 +223,12 @@ export const ReelItem = ({ item, isVisible, isFocused, onDelete }: { item: Reel,
     return (
         <View style={styles.reelContainer}>
             <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={StyleSheet.absoluteFill}>
-                <Video
+                <VideoView
                     key={key}
-                    ref={videoRef}
-                    source={{ uri: ensureHttps(item.video_url) as string }}
+                    player={player}
                     style={styles.video}
-                    resizeMode={ResizeMode.COVER}
-                    isLooping
-                    isMuted={isMuted}
-                    shouldPlay={isVisible && isFocused && isPlaying}
-                    onLoadStart={() => {
-                        setIsLoading(true);
-                        setError(null);
-                    }}
-                    onLoad={() => {
-                        setIsLoading(false);
-                    }}
-                    onError={(e) => {
-                        setError(`Failed to load video: ${e}`);
-                        setIsLoading(false);
-                    }}
+                    contentFit="cover"
+                    nativeControls={false}
                 />
                 <AnimatePresence>
                     {showHeart && (

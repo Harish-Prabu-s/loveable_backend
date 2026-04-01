@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { streaksApi } from '@/api/streaks';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -17,6 +17,19 @@ export default function CreateStreak({ visible, onClose, onCreated }: CreateStre
     const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
     const [visibility, setVisibility] = useState<'all' | 'close_friends'>('all');
     const [loading, setLoading] = useState(false);
+
+    const isVideo = media?.type === 'video';
+    const player = useVideoPlayer(isVideo ? media.uri : null, p => {
+        p.loop = true;
+    });
+
+    useEffect(() => {
+        if (isVideo && visible) {
+            player.play();
+        } else {
+            player.pause();
+        }
+    }, [isVideo, visible, media?.uri, player]);
 
     const pickMedia = async (type: 'Images' | 'Videos' | 'All') => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -108,12 +121,11 @@ export default function CreateStreak({ visible, onClose, onCreated }: CreateStre
                     {media ? (
                         <View style={styles.previewContainer}>
                             {media.type === 'video' ? (
-                                <Video
-                                    source={{ uri: media.uri }}
+                                <VideoView
+                                    player={player}
                                     style={styles.preview}
-                                    resizeMode={ResizeMode.COVER}
-                                    isLooping
-                                    shouldPlay
+                                    contentFit="cover"
+                                    nativeControls={false}
                                 />
                             ) : (
                                 <Image source={{ uri: media.uri }} style={styles.preview} />

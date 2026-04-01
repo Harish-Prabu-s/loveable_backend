@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,12 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function MediaViewerScreen() {
     const { uri, type } = useLocalSearchParams<{ uri: string; type: 'image' | 'video' }>();
+    const isVideo = type === 'video';
+
+    const player = useVideoPlayer(isVideo ? uri : null, p => {
+        p.loop = true;
+        p.play();
+    });
 
     if (!uri) return null;
 
@@ -36,16 +42,12 @@ export default function MediaViewerScreen() {
                             transition={200}
                         />
                     ) : (
-                        <Video
-                            source={{ uri }}
-                            rate={1.0}
-                            volume={1.0}
-                            isMuted={false}
-                            resizeMode={ResizeMode.CONTAIN}
-                            shouldPlay
-                            isLooping
-                            useNativeControls
+                        <VideoView
+                            player={player}
                             style={styles.fullMedia}
+                            contentFit="contain"
+                            nativeControls={true}
+                            allowsFullscreen
                         />
                     )}
                 </View>

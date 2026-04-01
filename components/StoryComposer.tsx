@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   TextInput, KeyboardAvoidingView, Platform, ScrollView,
@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
 import { storiesApi } from '@/api/stories';
 
@@ -22,6 +22,19 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
   const [textOverlay, setTextOverlay] = useState<string>('');
   const [filter, setFilter] = useState({ brightness: 100, contrast: 100, blur: 0 });
   const [uploading, setUploading] = useState(false);
+
+  const isVideo = selectedMedia?.type === 'video';
+  const player = useVideoPlayer(isVideo ? selectedMedia.uri : null, p => {
+    p.loop = true;
+  });
+
+  useEffect(() => {
+    if (isVideo) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isVideo, selectedMedia?.uri, player]);
 
   const pickMedia = async () => {
     try {
@@ -120,12 +133,11 @@ export default function StoryComposer({ onClose, onCreated }: Props) {
               {selectedMedia ? (
                 <View style={styles.mediaWrapper}>
                   {selectedMedia.type === 'video' ? (
-                    <Video
-                      source={{ uri: selectedMedia.uri }}
+                    <VideoView
+                      player={player}
                       style={styles.media}
-                      resizeMode={ResizeMode.COVER}
-                      shouldPlay
-                      isLooping
+                      contentFit="cover"
+                      nativeControls={false}
                     />
                   ) : (
                     <Image

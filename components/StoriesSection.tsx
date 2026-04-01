@@ -7,7 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEventListener } from 'expo';
 import { router } from 'expo-router';
 
 import { storiesApi } from '@/api/stories';
@@ -32,6 +33,24 @@ export default function StoriesSection() {
 
   const [activeStoryGroup, setActiveStoryGroup] = useState<{ userId: number, stories: Story[], currentIndex: number } | null>(null);
 
+  const activeStory = activeStoryGroup ? activeStoryGroup.stories[activeStoryGroup.currentIndex] : null;
+  const isVideoAtRoot = activeStory ? /\.(mp4|webm|mov)$/i.test(activeStory.image_url) : false;
+
+  const player = useVideoPlayer(isVideoAtRoot && activeStory ? activeStory.image_url : null, p => {
+    p.loop = false;
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    handleNextStory();
+  });
+
+  useEffect(() => {
+    if (isVideoAtRoot && activeStory) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isVideoAtRoot, activeStory, player]);
   useEffect(() => {
     if (user?.id) {
       profilesApi.getFollowing(user.id)
@@ -148,11 +167,6 @@ export default function StoriesSection() {
     }
   };
 
-  const handleVideoStatusUpdate = (status: AVPlaybackStatus) => {
-    if (status.isLoaded && status.didJustFinish) {
-      handleNextStory();
-    }
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -233,13 +247,11 @@ export default function StoriesSection() {
                 {/* Media */}
                 <View style={styles.mediaContainer}>
                   {isVideo ? (
-                    <Video
-                      source={{ uri: currentStory.image_url }}
+                    <VideoView
+                      player={player}
                       style={styles.media}
-                      resizeMode={ResizeMode.CONTAIN}
-                      shouldPlay
-                      isLooping={false}
-                      onPlaybackStatusUpdate={handleVideoStatusUpdate}
+                      contentFit="contain"
+                      nativeControls={false}
                     />
                   ) : (
                     <Image source={{ uri: currentStory.image_url }} style={styles.media} contentFit="contain" />

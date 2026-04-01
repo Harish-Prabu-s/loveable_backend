@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { reelsApi } from '@/api/reels';
 import { profilesApi } from '@/api/profiles';
 
@@ -17,6 +17,19 @@ export default function CreateReel({ visible, onClose, onCreated }) {
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [visibility, setVisibility] = useState('all');
     const [loading, setLoading] = useState(false);
+
+    const player = useVideoPlayer(media, p => {
+        p.loop = true;
+        p.muted = true;
+    });
+
+    useEffect(() => {
+        if (media && visible) {
+            player.play();
+        } else {
+            player.pause();
+        }
+    }, [media, visible, player]);
 
     const handleMentionSearch = async (text: string) => {
         setMentionSearch(text);
@@ -128,13 +141,11 @@ export default function CreateReel({ visible, onClose, onCreated }) {
                             <TouchableOpacity style={styles.mediaSelector} onPress={pickVideo}>
                                 {media ? (
                                     <View style={styles.previewContainer}>
-                                        <Video
-                                            source={{ uri: media }}
+                                        <VideoView
+                                            player={player}
                                             style={styles.preview}
-                                            resizeMode={ResizeMode.COVER}
-                                            shouldPlay
-                                            isMuted
-                                            isLooping
+                                            contentFit="cover"
+                                            nativeControls={false}
                                         />
                                         <View style={styles.videoIcon}>
                                             <MaterialCommunityIcons name="video" size={16} color="#FFF" />

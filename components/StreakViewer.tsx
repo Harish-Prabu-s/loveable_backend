@@ -10,7 +10,7 @@ import {
     SafeAreaView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ScreenCapture from 'expo-screen-capture';
 import { useTheme } from '@/context/ThemeContext';
@@ -36,6 +36,19 @@ export default function StreakViewer({ visible, uploadId, onClose }: StreakViewe
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState<StreakComment[]>([]);
     const [loadingComments, setLoadingComments] = useState(false);
+
+    const isVideo = upload?.media_type === 'video';
+    const player = useVideoPlayer(isVideo ? upload.media_url : null, p => {
+        p.loop = true;
+    });
+
+    useEffect(() => {
+        if (isVideo && visible) {
+            player.play();
+        } else {
+            player.pause();
+        }
+    }, [isVideo, visible, player]);
 
     useEffect(() => {
         if (visible && uploadId) {
@@ -112,12 +125,11 @@ export default function StreakViewer({ visible, uploadId, onClose }: StreakViewe
                     <>
                         <View style={styles.mediaContainer}>
                             {upload.media_type === 'video' ? (
-                                <Video
-                                    source={{ uri: upload.media_url }}
+                                <VideoView
+                                    player={player}
                                     style={styles.media}
-                                    resizeMode={ResizeMode.CONTAIN}
-                                    shouldPlay
-                                    isLooping
+                                    contentFit="contain"
+                                    nativeControls={false}
                                 />
                             ) : (
                                 <Image

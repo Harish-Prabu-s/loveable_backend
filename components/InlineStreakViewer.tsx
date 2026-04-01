@@ -14,7 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/context/ThemeContext';
 import { generateAvatarUrl } from '@/utils/avatar';
 import { streaksApi } from '@/api/streaks';
@@ -113,11 +113,25 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
     const [currentIndex, setCurrentIndex] = useState(0);
     const lastTapTime = useRef(0);
     const tapTimer = useRef<NodeJS.Timeout | null>(null);
-    const videoRef = useRef<Video>(null);
     const [isPaused, setIsPaused] = useState(false);
 
     const mediaList = user?.media_list || (user?.media ? [user.media] : []);
     const currentMedia = mediaList.length > 0 ? mediaList[currentIndex] : null;
+
+    const mediaUrlRoot = currentMedia?.media_url ?? user?.media?.media_url;
+    const isVideoRoot = currentMedia?.media_type === 'video' || (!currentMedia && user?.media?.media_type === 'video');
+
+    const player = useVideoPlayer(isVideoRoot ? mediaUrlRoot : null, p => {
+        p.loop = true;
+    });
+
+    useEffect(() => {
+        if (isVideoRoot && visible && !isPaused) {
+            player.play();
+        } else {
+            player.pause();
+        }
+    }, [isVideoRoot, visible, isPaused, player]);
 
     useEffect(() => {
         if (user) { 
@@ -240,8 +254,8 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
     };
 
     if (!visible || !user) return null;
-    const mediaUrl = currentMedia?.media_url ?? user.media?.media_url;
-    const isVideo = currentMedia?.media_type === 'video';
+    const mediaUrl = mediaUrlRoot;
+    const isVideo = isVideoRoot;
 
     return (
         <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
@@ -252,14 +266,11 @@ export function InlineStreakViewer({ visible, user, onClose, onNext, onPrev }: a
             <Animated.View style={[styles.viewerSheet, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                 <TouchableOpacity activeOpacity={1} onPress={handleViewerPress} style={StyleSheet.absoluteFill}>
                     {isVideo ? (
-                        <Video
-                            ref={videoRef}
-                            source={{ uri: mediaUrl }}
+                        <VideoView
+                            player={player}
                             style={styles.viewerImg}
-                            resizeMode={ResizeMode.COVER}
-                            shouldPlay={!isPaused}
-                            isLooping
-                            useNativeControls={false}
+                            contentFit="cover"
+                            nativeControls={false}
                         />
                     ) : (
                         <Image source={{ uri: mediaUrl }} style={styles.viewerImg} resizeMode="cover" />
