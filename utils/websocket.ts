@@ -29,13 +29,13 @@ export class WebSocketClient {
         const configSignalingUrl = BASE_URL; // e.g. https://loveable.sbs/api/
         const protocol = configSignalingUrl.startsWith('https') ? 'wss' : 'ws';
         
-        // Use URL to extract just the host (excluding path prefixes like /api)
-        const urlObj = new URL(configSignalingUrl);
-        const host = urlObj.host;
+        // Extract domain and full path, ensuring we don't double up on slashes
+        const domainAndPath = configSignalingUrl.replace(/^(wss?|https?):\/\//, '').replace(/\/+$/, '');
         
-        // Connect directly to the websocket routes at the root, rather than passing through HTTP API prefix routes
+        // The resulting URL will be wss://loveable.sbs/api/ws/notifications/2/?token=...
+        // WebSockets MUST use the /api/ namespace so the production Nginx correctly forwards the Upgrade Headers!
         const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        this.url = `${protocol}://${host}${path}${userId}/${tokenParam}`;
+        this.url = `${protocol}://${domainAndPath}${path}${userId}/${tokenParam}`;
 
         // Watch for App State changes to reconnect when moving to foreground
         this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
