@@ -86,10 +86,19 @@ server {
     listen 443 ssl;
     server_name api.loveable.sbs;
 
+    # Allow large uploads for reels and images (up to 100MB)
+    client_max_body_size 100M;
+
     location / {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Serve uploaded media files directly (Profile pictures, Reels, etc.)
+    # Note: Ensure this path correctly points to your Django media folder
+    location /media/ {
+        alias /var/www/loveable_backend_PRO/media/;
     }
 
     # WebSocket signaling endpoint
