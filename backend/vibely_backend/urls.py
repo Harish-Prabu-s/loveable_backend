@@ -23,8 +23,9 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    # Diagnostic Trap: If this is hit, then the connection is failing to upgrade to WebSocket.
+    # Diagnostic Trap: If these are hit, then the connection is failing to upgrade to WebSocket.
     path('ws/call/room/<str:room_id>/', diagnostic_view),
+    path('api/ws/call/room/<str:room_id>/', diagnostic_view),
 ]
 
 # Always serve media files via Django (fallback setup)
