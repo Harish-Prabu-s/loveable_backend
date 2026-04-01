@@ -469,13 +469,13 @@ export function useWebRTC(options: UseWebRTCOptions): UseWebRTCResult {
         protocol = 'wss';
     }
     
-    // 2. Base URL clean-up: Extract host and path prefix
+    // 2. Base URL clean-up: Extract host
     const urlObj = new URL(BASE_URL);
     const host = urlObj.host;
-    const pathPrefix = urlObj.pathname.replace(/\/+$/, ''); // e.g. "/api"
     
     // 3. Construct Final Signaling URL
-    const wsUrl = `${protocol}://${host}${pathPrefix}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
+    // Connect to the root websocket path, not under the /api/ HTTP prefix
+    const wsUrl = `${protocol}://${host}/ws/call/room/${rId}/?token=${encodeURIComponent(token)}`;
 
     try {
       console.log(`[WebRTC] Protocol: ${protocol.toUpperCase()}`);
